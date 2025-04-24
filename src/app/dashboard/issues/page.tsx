@@ -5,7 +5,7 @@ import { getIssues, deleteIssue, Issue, DeviceType, DeviceLocation, IssueStatus,
 import AddIssueForm from './add-form';
 import EditIssueForm from './edit-form';
 import ViewIssueForm from './view-issue-form';
-import { EyeIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -540,18 +540,14 @@ export default function IssuesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-xl font-bold mb-4">Arıza Detayları</h2>
-            <ViewIssueForm issue={currentIssue} />
-            <div className="mt-4 flex justify-between">
-              <button
-                onClick={() => {
-                  setIsViewModalOpen(false);
-                  setIsEditModalOpen(true);
-                }}
-                className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 flex items-center"
-              >
-                <PencilIcon className="w-5 h-5 mr-2" />
-                Düzenle
-              </button>
+            <ViewIssueForm 
+              issue={currentIssue} 
+              onEdit={() => {
+                setIsViewModalOpen(false);
+                setIsEditModalOpen(true);
+              }}
+            />
+            <div className="mt-4 flex justify-end">
               <button
                 onClick={closeViewModal}
                 className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"

@@ -2,9 +2,25 @@
 
 import { useState, useEffect } from 'react';
 
+// Tablo bilgisi için tip tanımı
+interface TableInfo {
+  exists: boolean;
+  error: string | null;
+  hasData: boolean | null;
+  rowCount?: number;
+}
+
+// API yanıt tipi tanımı
+interface DatabaseCheckResult {
+  success: boolean;
+  message?: string;
+  tables: Record<string, TableInfo>;
+  error?: string;
+}
+
 export default function DatabaseCheckPage() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DatabaseCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,7 +87,7 @@ export default function DatabaseCheckPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {Object.entries(data.tables).map(([tableName, tableInfo]: [string, any]) => (
+                    {Object.entries(data.tables).map(([tableName, tableInfo]: [string, TableInfo]) => (
                       <tr key={tableName}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {tableName}
@@ -101,12 +117,12 @@ export default function DatabaseCheckPage() {
             <div className="bg-white p-6 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">Supabase Bağlantı Kontrol Özeti</h2>
               <p className="text-gray-600">
-                {Object.values(data.tables).every((t: any) => t.exists) 
+                {Object.values(data.tables).every((table: TableInfo) => table.exists) 
                   ? 'Tüm gerekli tablolar Supabase veritabanında mevcut.'
                   : 'Bazı tablolar Supabase veritabanında eksik! Aşağıdaki SQL ifadelerini Supabase SQL Editöründe çalıştırarak eksik tabloları oluşturun.'}
               </p>
               
-              {!Object.values(data.tables).every((t: any) => t.exists) && (
+              {!Object.values(data.tables).every((table: TableInfo) => table.exists) && (
                 <div className="mt-4 space-y-4">
                   {!data.tables.settings?.exists && (
                     <div>

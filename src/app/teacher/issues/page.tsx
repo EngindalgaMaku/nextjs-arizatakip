@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
 import AddIssueForm from './add-form';
-import { EyeIcon, PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
-import Modal from '@/components/Modal';
 
 // Format date function
 const formatDate = (date: Date | string | null): string => {
@@ -24,6 +23,8 @@ const formatDate = (date: Date | string | null): string => {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     }).format(dateObj);
   } catch (error) {
     console.error('Tarih formatı hatası:', error);
@@ -65,16 +66,6 @@ function getLocationName(location: DeviceLocation) {
   }
 }
 
-function getIssuePriorityName(priority: IssuePriority) {
-  switch (priority) {
-    case 'kritik': return 'Kritik';
-    case 'normal': return 'Normal';
-    case 'dusuk': return 'Düşük';
-    case 'yuksek': return 'Yüksek';
-    default: return priority;
-  }
-}
-
 function getStatusName(status: IssueStatus) {
   switch (status) {
     case 'beklemede': return 'Beklemede';
@@ -94,11 +85,8 @@ export default function TeacherIssuesPage() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
   const [isAddFormSubmitted, setIsAddFormSubmitted] = useState(false);
   const [teacher, setTeacher] = useState<TeacherUser | null>(null);
-  const [selectedIssue, setSelectedIssue] = useState<IssueData | null>(null);
   const router = useRouter();
   
   // Arızaları yükle
@@ -322,15 +310,6 @@ export default function TeacherIssuesPage() {
     return matchesSearch && matchesStatus && matchesType && matchesLocation;
   });
 
-  const viewIssueDetails = (issue: IssueData) => {
-    setCurrentIssue(issue);
-    setIsViewModalOpen(true);
-  };
-  
-  const closeViewModal = () => {
-    setIsViewModalOpen(false);
-  };
-
   // Durum çeviri fonksiyonu
   const getStatusColor = (status: IssueStatus): string => {
     const colors: Record<IssueStatus, string> = {
@@ -342,7 +321,7 @@ export default function TeacherIssuesPage() {
     };
     return colors[status] || 'status-badge';
   };
-
+  
   // Arıza ekleme başarılı olduğunda çağrılacak fonksiyon
   const handleAddSuccess = () => {
     setIsAddFormSubmitted(true);
@@ -713,127 +692,11 @@ export default function TeacherIssuesPage() {
         </div>
       </main>
 
-      {/* View Modal */}
-      {isViewModalOpen && currentIssue && (
-        <Modal
-          isOpen={isViewModalOpen}
-          onClose={closeViewModal}
-          title="Arıza Detayı"
-        >
-          <div className="p-4 bg-white rounded-lg">
-            <div className="flex flex-col space-y-4">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Cihaz Adı</h3>
-                    <p className="text-base text-gray-800">{currentIssue.device_name}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Cihaz Türü</h3>
-                    <div className="flex items-center space-x-2">
-                      {currentIssue.device_type === "bilgisayar" ? (
-                        <ComputerDesktopIcon className="h-5 w-5 text-gray-500" />
-                      ) : currentIssue.device_type === "projektor" ? (
-                        <FilmIcon className="h-5 w-5 text-gray-500" />
-                      ) : currentIssue.device_type === "yazici" ? (
-                        <PrinterIcon className="h-5 w-5 text-gray-500" />
-                      ) : (
-                        <DevicePhoneMobileIcon className="h-5 w-5 text-gray-500" />
-                      )}
-                      <p className="text-base text-gray-800">{getDeviceTypeName(currentIssue.device_type as DeviceType)}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Konum</h3>
-                    <div className="flex items-center space-x-2">
-                      <MapPinIcon className="h-5 w-5 text-gray-500" />
-                      <p className="text-base text-gray-800">{getLocationName(currentIssue.device_location as DeviceLocation)}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Öncelik</h3>
-                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      currentIssue.priority === 'kritik' ? 'bg-red-100 text-red-800' :
-                      currentIssue.priority === 'normal' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {getIssuePriorityName(currentIssue.priority as IssuePriority)}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Durum</h3>
-                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      currentIssue.status === 'inceleniyor' ? 'bg-yellow-100 text-yellow-800' :
-                      currentIssue.status === 'kapatildi' ? 'bg-green-100 text-green-800' :
-                      currentIssue.status === 'atandi' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {getStatusName(currentIssue.status as IssueStatus)}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Bildirim Tarihi</h3>
-                    <div className="flex items-center space-x-2">
-                      <ClockIcon className="h-5 w-5 text-gray-500" />
-                      <p className="text-base text-gray-800">
-                        {currentIssue.created_at && formatDate(currentIssue.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Bildiren</h3>
-                    <p className="text-base text-gray-800">{currentIssue.reported_by}</p>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Atanan</h3>
-                    <p className="text-base text-gray-800">{currentIssue.assigned_to || 'Henüz atanmadı'}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-500">Açıklama</h3>
-                <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{currentIssue.description}</p>
-                </div>
-              </div>
-              
-              {currentIssue.notes && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500">Notlar</h3>
-                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{currentIssue.notes}</p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex justify-end space-x-3 mt-4 pt-4 border-t">
-                <button
-                  onClick={() => setIsViewModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md"
-                >
-                  Kapat
-                </button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div className="modal-overlay" onClick={closeAddModal}>
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={closeAddModal}>
           <div
-            className="modal-content max-w-4xl bg-white rounded-lg shadow-lg overflow-y-auto"
+            className="bg-white rounded-lg shadow-xl overflow-hidden max-w-4xl w-full overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-8 py-5 bg-gray-50 border-b border-gray-200">

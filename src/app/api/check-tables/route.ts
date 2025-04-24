@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// Tablo bilgisi için tip tanımı
+interface TableInfo {
+  exists: boolean;
+  error: string | null;
+  hasData: boolean | null;
+  rowCount?: number;
+}
+
 export async function GET() {
   try {
     // Kontrol edilecek tablolar
     const tablesToCheck = ['settings', 'issues', 'users'];
-    const results: Record<string, any> = {};
+    const results: Record<string, TableInfo> = {};
 
     // Her tablonun varlığını kontrol edelim
     for (const table of tablesToCheck) {
@@ -25,7 +33,9 @@ export async function GET() {
       } catch (err) {
         results[table] = {
           exists: false,
-          error: err instanceof Error ? err.message : String(err)
+          error: err instanceof Error ? err.message : String(err),
+          hasData: null,
+          rowCount: 0
         };
       }
     }

@@ -2,11 +2,29 @@
 
 import { useState } from 'react';
 
+// API yanıt tipi tanımı
+interface AuthTestResult {
+  success: boolean;
+  supabaseSignIn: {
+    success: boolean;
+    error?: string;
+  };
+  directSignIn: {
+    success: boolean;
+    error?: string;
+  };
+  env: {
+    supabaseUrl: string;
+    hasAnonKey: boolean;
+  };
+  [key: string]: unknown; // Ekstra alanlar için
+}
+
 export default function AuthTestPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<AuthTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function testAuth() {
