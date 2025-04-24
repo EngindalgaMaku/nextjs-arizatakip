@@ -13,7 +13,7 @@ export default function LoginPage() {
   const router = useRouter();
   
   // Demo modunu kontrol edecek değişken (Supabase kurulumu yoksa true yapın)
-  const DEMO_MODE = true;
+  const DEMO_MODE = false;
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();

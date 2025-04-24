@@ -1,66 +1,88 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Öğretmen yetkilendirmesi gerektiren yollar
-const TEACHER_PATHS = [
-  '/teacher/issues'
-];
+// Demo modu - üretimde false olmalı
+const DEMO_MODE = false;
 
-// Ana yol
-const HOME_PATH = '/';
-
-// Giriş yönlendirme yolları 
-const TEACHER_AUTH_PATH = '/teacher/login';
-
-// Auth gerektirmeyen yollar (açık yollar)
-const PUBLIC_PATHS = [
-  '/login', 
-  '/register', 
-  '/forgot-password',
-  '/api/auth',
-  '/teacher/login',
-  '/teacher-login',
-  '/',
-  // Statik dosyalar
-  '/_next',
-  '/favicon.ico'
-];
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // Statik dosyalar ve public yollar için middleware çalıştırma
-  if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
-    return NextResponse.next();
-  }
-  
-  // Tarayıcı tarafı doğrulama için client-side yönlendirmeyi kullanıyoruz,
-  // middleware'de minimum işlem yaparak hataları önlüyoruz
-  
+export function middleware(request: NextRequest) {
   try {
-    // Öğretmen sayfaları için basit kontrol
-    if (TEACHER_PATHS.some(path => pathname.startsWith(path))) {
-      const teacherSession = request.cookies.get('teacher-session');
-      
-      if (!teacherSession) {
-        return NextResponse.redirect(new URL(TEACHER_AUTH_PATH, request.url));
+    const path = request.nextUrl.pathname;
+    const response = NextResponse.next();
+
+    // Admin ve öğretmen kısmı için yönlendirme kuralları
+    if (path.startsWith('/admin')) {
+      // Admin dashboard erişimi kontrolü
+      if (path.startsWith('/admin/dashboard')) {
+        // Demo modda admin kontrolü bypass edilir
+        if (DEMO_MODE) {
+          console.log('Demo mod: Admin kimlik doğrulama atlandı');
+          return response;
+        }
+        
+        const adminSessionCookie = request.cookies.get('admin-session');
+        if (!adminSessionCookie?.value) {
+          // Session yoksa login sayfasına yönlendir
+          return NextResponse.redirect(new URL('/admin/login', request.url));
+        }
+        
+        try {
+          // Session değerini ayrıştır
+          const session = JSON.parse(adminSessionCookie.value);
+          if (!session || !session.role || session.role !== 'admin') {
+            return NextResponse.redirect(new URL('/admin/login', request.url));
+          }
+        } catch (error) {
+          console.error('Admin session ayrıştırma hatası:', error);
+          return NextResponse.redirect(new URL('/admin/login', request.url));
+        }
+      }
+    } else if (path.startsWith('/teacher')) {
+      // Öğretmen bölümü erişimi kontrolü
+      if (path.startsWith('/teacher/issues')) {
+        // Demo modda öğretmen kontrolü bypass edilir
+        if (DEMO_MODE) {
+          console.log('Demo mod: Öğretmen kimlik doğrulama atlandı');
+          return response;
+        }
+        
+        const teacherSessionCookie = request.cookies.get('teacher-session');
+        if (!teacherSessionCookie?.value) {
+          // Session yoksa login sayfasına yönlendir
+          return NextResponse.redirect(new URL('/teacher/login', request.url));
+        }
+        
+        try {
+          // Session değerini ayrıştır
+          const session = JSON.parse(teacherSessionCookie.value);
+          if (!session || !session.role || session.role !== 'teacher') {
+            return NextResponse.redirect(new URL('/teacher/login', request.url));
+          }
+        } catch (error) {
+          console.error('Öğretmen session ayrıştırma hatası:', error);
+          return NextResponse.redirect(new URL('/teacher/login', request.url));
+        }
       }
     }
-    
-    // Admin sayfaları için sadece client-side doğrulama kullanılacak
-    // Burada middleware işlemini atla
-    
-    return NextResponse.next();
+
+    return response;
   } catch (error) {
-    console.error('Middleware error:', error);
+    // Genel hata durumunda 
+    console.error('Middleware hatası:', error);
+    
+    // Demo modda hataları görmezden gel ve geçişe izin ver
+    if (DEMO_MODE) {
+      console.warn('Demo mod: Middleware hatası yoksayıldı');
+      return NextResponse.next();
+    }
+    
     // Hata durumunda ana sayfaya yönlendir
-    return NextResponse.redirect(new URL(HOME_PATH, request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
 }
 
 export const config = {
   matcher: [
-    // Sadece öğretmen sayfasında middleware çalıştır
-    '/teacher/issues/:path*',
+    '/admin/:path*',
+    '/teacher/:path*',
   ],
 }; 
