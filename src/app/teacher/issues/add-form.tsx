@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
-import { DeviceType, DeviceLocation, addIssue } from '@/lib/supabase';
+import { addIssue } from '@/lib/supabase';
 
 // Form verileri için şema ve tip
 const formSchema = z.object({

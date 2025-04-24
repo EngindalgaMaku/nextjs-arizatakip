@@ -102,9 +102,16 @@ export default function AddIssueForm({ onCancel, onSuccess }: AddIssueFormProps)
       if (error) throw error;
       
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Arıza kaydı eklenirken hata oluştu:', error);
-      setError(`Arıza kaydı eklenirken bir hata oluştu: ${error.message}`);
+      // Hata tipini kontrol et ve uygun mesajı göster
+      let errorMessage = 'Arıza kaydı eklenirken bir hata oluştu';
+      
+      if (error instanceof Error) {
+        errorMessage += `: ${error.message}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

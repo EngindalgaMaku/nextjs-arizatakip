@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { updateIssue, DeviceType, DeviceLocation, IssueStatus, IssuePriority, Issue } from '@/lib/supabase';
 
 interface EditIssueFormProps {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getIssues, deleteIssue, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority, getIssue } from '@/lib/supabase';
 import AddIssueForm from './add-form';
 import EditIssueForm from './edit-form';
@@ -26,71 +26,8 @@ export default function IssuesPage() {
   const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
   const [isAddFormSubmitted, setIsAddFormSubmitted] = useState(false);
 
-  useEffect(() => {
-    loadIssues();
-  }, []);
-  
-  // URL'den parametreleri kontrol et
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const issueId = params.get('id');
-      const openAddForm = params.get('open') === 'add';
-      const filterStatus = params.get('filter');
-      
-      // URL'de ID varsa o arıza detayını göster
-      if (issueId) {
-        const loadIssueDetails = async () => {
-          try {
-            // Doğrudan belirli ID'li arızayı çek
-            const { data, error } = await getIssue(issueId);
-            
-            if (error || !data) {
-              console.error('Arıza detayları yüklenirken hata oluştu:', error);
-              alert('Arıza detayları yüklenirken bir hata oluştu.');
-              return;
-            }
-            
-            // Veriyi IssueData formatına çevir
-            const formattedIssue: IssueData = {
-              ...data,
-              created_at: new Date(data.created_at).toLocaleString('tr-TR'),
-              updated_at: data.updated_at ? new Date(data.updated_at).toLocaleString('tr-TR') : null,
-              resolved_at: data.resolved_at ? new Date(data.resolved_at).toLocaleString('tr-TR') : null
-            };
-            
-            setCurrentIssue(formattedIssue);
-            setIsViewModalOpen(true);
-          } catch (err) {
-            console.error('Arıza detayları yüklenirken hata oluştu:', err);
-          }
-        };
-        
-        // Eğer issues yüklendiyse ve ID'yi içeriyorsa, zaten listelerde var demektir
-        // Değilse, direkt olarak çekelim
-        const existingIssue = issues.find(issue => issue.id === issueId);
-        if (existingIssue) {
-          setCurrentIssue(existingIssue);
-          setIsViewModalOpen(true);
-        } else if (!isLoading) { // Sayfa yüklemesi bitince direkt arızayı çek
-          loadIssueDetails();
-        }
-      }
-      
-      // "open=add" parametresi varsa yeni arıza ekleme formunu aç
-      if (openAddForm) {
-        setIsAddModalOpen(true);
-      }
-      
-      // "filter" parametresi varsa o duruma göre filtrele
-      if (filterStatus) {
-        setSelectedStatus(filterStatus);
-      }
-    }
-  }, [issues, isLoading]);
-
   // Arızaları yükle
-  const loadIssues = async () => {
+  const loadIssues = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -213,7 +150,70 @@ export default function IssuesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadIssues();
+  }, [loadIssues]);
+  
+  // URL'den parametreleri kontrol et
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const issueId = params.get('id');
+      const openAddForm = params.get('open') === 'add';
+      const filterStatus = params.get('filter');
+      
+      // URL'de ID varsa o arıza detayını göster
+      if (issueId) {
+        const loadIssueDetails = async () => {
+          try {
+            // Doğrudan belirli ID'li arızayı çek
+            const { data, error } = await getIssue(issueId);
+            
+            if (error || !data) {
+              console.error('Arıza detayları yüklenirken hata oluştu:', error);
+              alert('Arıza detayları yüklenirken bir hata oluştu.');
+              return;
+            }
+            
+            // Veriyi IssueData formatına çevir
+            const formattedIssue: IssueData = {
+              ...data,
+              created_at: new Date(data.created_at).toLocaleString('tr-TR'),
+              updated_at: data.updated_at ? new Date(data.updated_at).toLocaleString('tr-TR') : null,
+              resolved_at: data.resolved_at ? new Date(data.resolved_at).toLocaleString('tr-TR') : null
+            };
+            
+            setCurrentIssue(formattedIssue);
+            setIsViewModalOpen(true);
+          } catch (err) {
+            console.error('Arıza detayları yüklenirken hata oluştu:', err);
+          }
+        };
+        
+        // Eğer issues yüklendiyse ve ID'yi içeriyorsa, zaten listelerde var demektir
+        // Değilse, direkt olarak çekelim
+        const existingIssue = issues.find(issue => issue.id === issueId);
+        if (existingIssue) {
+          setCurrentIssue(existingIssue);
+          setIsViewModalOpen(true);
+        } else if (!isLoading) { // Sayfa yüklemesi bitince direkt arızayı çek
+          loadIssueDetails();
+        }
+      }
+      
+      // "open=add" parametresi varsa yeni arıza ekleme formunu aç
+      if (openAddForm) {
+        setIsAddModalOpen(true);
+      }
+      
+      // "filter" parametresi varsa o duruma göre filtrele
+      if (filterStatus) {
+        setSelectedStatus(filterStatus);
+      }
+    }
+  }, [issues, isLoading, loadIssues]);
 
   // Filtre based on search term, status, and device type
   const filteredIssues = issues.filter((issue) => {
