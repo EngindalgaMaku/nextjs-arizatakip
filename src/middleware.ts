@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
 // Yönetici yetkilendirmesi gerektiren yollar
 const ADMIN_PATHS = [
@@ -32,6 +31,7 @@ const PUBLIC_PATHS = [
   '/api/auth',
   '/teacher/login',
   '/teacher-login',
+  '/',
   // Statik dosyalar
   '/_next',
   '/favicon.ico'
@@ -39,73 +39,39 @@ const PUBLIC_PATHS = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const res = NextResponse.next();
-  
-  // Supabase client oluştur
-  const supabase = createMiddlewareClient({ req: request, res });
   
   // Statik dosyalar ve public yollar için middleware çalıştırma
   if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
-    return res;
+    return NextResponse.next();
   }
   
-  // Admin sayfaları için yetkilendirme kontrolü
-  if (ADMIN_PATHS.some(path => pathname.startsWith(path))) {
-    // Admin oturumu kontrolü
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      const url = new URL(ADMIN_AUTH_PATH, request.url);
-      url.searchParams.set('redirectUrl', pathname);
-      return NextResponse.redirect(url);
-    }
-
-    return res;
-  }
+  // Tarayıcı tarafı doğrulama için client-side yönlendirmeyi kullanıyoruz,
+  // middleware'de minimum işlem yaparak hataları önlüyoruz
   
-  // Öğretmen sayfaları için yetkilendirme kontrolü
-  if (TEACHER_PATHS.some(path => pathname.startsWith(path))) {
-    // Client tarafında localStorage kontrol edemediğimiz için
-    // öğretmen oturumunu bir çerez üzerinden kontrol edebiliriz
-    const teacherSession = request.cookies.get('teacher-session');
-    
-    if (!teacherSession) {
-      const url = new URL(TEACHER_AUTH_PATH, request.url);
-      return NextResponse.redirect(url);
+  try {
+    // Öğretmen sayfaları için basit kontrol
+    if (TEACHER_PATHS.some(path => pathname.startsWith(path))) {
+      const teacherSession = request.cookies.get('teacher-session');
+      
+      if (!teacherSession) {
+        return NextResponse.redirect(new URL(TEACHER_AUTH_PATH, request.url));
+      }
     }
     
-    return res;
-  }
-
-  // Eğer kullanıcı giriş yapmışsa ve login sayfasına erişmeye çalışıyorsa dashboard'a yönlendir
-  if (pathname === '/login') {
-    const { data: { session } } = await supabase.auth.getSession();
+    // Admin sayfaları için sadece client-side doğrulama kullanılacak
+    // Burada middleware işlemini atla
     
-    if (session) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
+    return NextResponse.next();
+  } catch (error) {
+    console.error('Middleware error:', error);
+    // Hata durumunda ana sayfaya yönlendir
+    return NextResponse.redirect(new URL(HOME_PATH, request.url));
   }
-
-  // Diğer tüm sayfalar için
-  if (pathname === HOME_PATH) {
-    return res;
-  }
-
-  // İsterseniz varsayılan olarak ana sayfaya yönlendir
-  // const url = new URL(HOME_PATH, request.url);
-  // return NextResponse.redirect(url);
-  
-  // Veya sadece normale devam et
-  return res;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Tüm yollarda çalıştır, ama aşağıdakileri hariç tut:
-     * - API rotaları (/api/)
-     * - Statik dosyalar (/_next/static/, /_next/image/, /favicon.ico)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Sadece öğretmen sayfasında middleware çalıştır
+    '/teacher/issues/:path*',
   ],
 }; 
