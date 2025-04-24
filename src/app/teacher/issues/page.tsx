@@ -44,7 +44,8 @@ function getLocationName(location: DeviceLocation) {
   switch (location) {
     case 'sinif': return 'Sınıf';
     case 'ogretmenler_odasi': return 'Öğretmenler Odası';
-    case 'lab': return 'Laboratuvar';
+    case 'laboratuvar': return 'Laboratuvar';
+    case 'idare': return 'İdare';
     case 'diger': return 'Diğer';
     default: return location;
   }
@@ -55,15 +56,17 @@ function getIssuePriorityName(priority: IssuePriority) {
     case 'kritik': return 'Kritik';
     case 'normal': return 'Normal';
     case 'dusuk': return 'Düşük';
+    case 'yuksek': return 'Yüksek';
     default: return priority;
   }
 }
 
 function getStatusName(status: IssueStatus) {
   switch (status) {
-    case 'acik': return 'Açık';
+    case 'beklemede': return 'Beklemede';
     case 'inceleniyor': return 'İnceleniyor';
     case 'atandi': return 'Atandı';
+    case 'cozuldu': return 'Çözüldü';
     case 'kapatildi': return 'Kapatıldı';
     default: return status;
   }
