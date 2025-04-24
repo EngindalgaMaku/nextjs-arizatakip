@@ -1,9 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 // .env.local'den ortam değişkenleri
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gcxbfmqyvqchcrudxpmh.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjeGJmbXF5dnFjaGNydWR4cG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNzQ5NTcsImV4cCI6MjA2MDc1MDk1N30.ZVAsgNkAWqtSpEgUufOdvegyXVeN5H6fXYA7rn-8osQ";
 
+// Demo modunu kontrol et - Supabase bağlantısı yoksa true yapın
+export const DEMO_MODE = true;
+
+// Supabase istemcisini oluştur
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type User = {
@@ -91,9 +95,6 @@ export type SystemSettings = {
 
 // Öğretmen giriş kodu ayar anahtarı
 export const TEACHER_ACCESS_CODE_KEY = 'teacher_access_code';
-
-// DEMO modu (Supabase settings tablosu yoksa true yapın)
-export const DEMO_MODE = true;
 
 // Auth fonksiyonları
 export async function signIn(email: string, password: string) {

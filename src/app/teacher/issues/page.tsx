@@ -41,44 +41,52 @@ export default function TeacherIssuesPage() {
       setIsLoading(true);
       
       // API çağrısı
-      const { data, error } = await getIssuesForTeacher(teacher.name);
-      
-      if (error) {
-        console.error('Arızalar yüklenirken hata oluştu:', error);
-        throw error;
-      }
-      
-      if (!data || data.length === 0) {
+      if (typeof window !== 'undefined') {
+        const { data, error } = await getIssuesForTeacher(teacher.name);
+        
+        if (error) {
+          console.error('Arızalar yüklenirken hata oluştu:', error);
+          throw error;
+        }
+        
+        if (!data || data.length === 0) {
+          setIssues([]);
+          setIsLoading(false);
+          return;
+        }
+        
+        // API'den gelen veriyi formata
+        const formattedIssues = data.map(issue => ({
+          id: issue.id,
+          device_type: issue.device_type,
+          device_name: issue.device_name,
+          device_location: issue.device_location,
+          room_number: issue.room_number,
+          reported_by: issue.reported_by,
+          assigned_to: issue.assigned_to,
+          description: issue.description,
+          status: issue.status,
+          priority: issue.priority,
+          notes: issue.notes,
+          created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
+          updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
+          resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
+        }));
+        
+        setIssues(formattedIssues);
+      } else {
+        // Server-side rendering için boş data döndür
         setIssues([]);
-        setIsLoading(false);
-        return;
       }
-      
-      // API'den gelen veriyi formata
-      const formattedIssues = data.map(issue => ({
-        id: issue.id,
-        device_type: issue.device_type,
-        device_name: issue.device_name,
-        device_location: issue.device_location,
-        room_number: issue.room_number,
-        reported_by: issue.reported_by,
-        assigned_to: issue.assigned_to,
-        description: issue.description,
-        status: issue.status,
-        priority: issue.priority,
-        notes: issue.notes,
-        created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-        updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-        resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
-      }));
-      
-      setIssues(formattedIssues);
     } catch (err) {
       console.error('Arızalar yüklenirken hata oluştu:', err);
       
       // Hata durumunda boş liste göster
       setIssues([]);
-      alert('Arızalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      
+      if (typeof window !== 'undefined') {
+        alert('Arızalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      }
     } finally {
       setIsLoading(false);
     }
