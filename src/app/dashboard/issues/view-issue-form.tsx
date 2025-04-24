@@ -93,7 +93,7 @@ function formatDate(dateString: string | null): string {
   try {
     const date = new Date(dateString);
     return `${date.toLocaleDateString('tr-TR')} ${date.toLocaleTimeString('tr-TR')} (${formatDistanceToNow(date, { addSuffix: true, locale: tr })})`;
-  } catch (_) {
+  } catch {
     return 'Geçersiz tarih';
   }
 }
