@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getIssuesForTeacher, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
+import { getIssuesForTeacher, Issue, DeviceType, DeviceLocation, IssueStatus } from '@/lib/supabase';
 import AddIssueForm from './add-form';
 import { EyeIcon, PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
@@ -33,49 +33,8 @@ export default function TeacherIssuesPage() {
   const [teacher, setTeacher] = useState<TeacherUser | null>(null);
   const router = useRouter();
   
-  // Öğretmen giriş kontrolü
-  useEffect(() => {
-    const checkTeacherAuth = () => {
-      if (typeof window !== 'undefined') {
-        const teacherData = localStorage.getItem('teacherUser');
-        if (!teacherData) {
-          router.push('/teacher/login');
-          return;
-        }
-        
-        try {
-          const parsedTeacher = JSON.parse(teacherData) as TeacherUser;
-          setTeacher(parsedTeacher);
-          
-          // Giriş süresi kontrolü (örn: 8 saat sonra otomatik çıkış)
-          const loginTime = new Date(parsedTeacher.loginTime).getTime();
-          const currentTime = new Date().getTime();
-          const hoursPassed = (currentTime - loginTime) / (1000 * 60 * 60);
-          
-          if (hoursPassed > 8) {
-            // Oturum süresi dolmuş
-            localStorage.removeItem('teacherUser');
-            router.push('/teacher/login');
-          }
-        } catch (error) {
-          console.error('Öğretmen verisi ayrıştırılamadı:', error);
-          localStorage.removeItem('teacherUser');
-          router.push('/teacher/login');
-        }
-      }
-    };
-    
-    checkTeacherAuth();
-  }, [router]);
-
-  useEffect(() => {
-    if (teacher) {
-      loadIssues();
-    }
-  }, [teacher]);
-
   // Arızaları yükle
-  const loadIssues = async () => {
+  const loadIssues = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -121,7 +80,45 @@ export default function TeacherIssuesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [teacher]);
+
+  // Öğretmen giriş kontrolü
+  useEffect(() => {
+    const checkTeacherAuth = () => {
+      if (typeof window !== 'undefined') {
+        const teacherData = localStorage.getItem('teacherUser');
+        if (!teacherData) {
+          router.push('/teacher/login');
+          return;
+        }
+        
+        try {
+          const parsedTeacher = JSON.parse(teacherData) as TeacherUser;
+          setTeacher(parsedTeacher);
+          
+          // Giriş süresi kontrolü (örn: 8 saat sonra otomatik çıkış)
+          const loginTime = new Date(parsedTeacher.loginTime).getTime();
+          const currentTime = new Date().getTime();
+          const hoursPassed = (currentTime - loginTime) / (1000 * 60 * 60);
+          
+          if (hoursPassed > 8) {
+            // Oturum süresi dolmuş
+            localStorage.removeItem('teacherUser');
+            router.push('/teacher/login');
+          } else {
+            // Öğretmen bilgisi geçerliyse arızaları yükle
+            loadIssues();
+          }
+        } catch (error) {
+          console.error('Öğretmen verisi ayrıştırılamadı:', error);
+          localStorage.removeItem('teacherUser');
+          router.push('/teacher/login');
+        }
+      }
+    };
+    
+    checkTeacherAuth();
+  }, [router, loadIssues]);
 
   // Filtre işlemi
   const filteredIssues = issues.filter((issue) => {

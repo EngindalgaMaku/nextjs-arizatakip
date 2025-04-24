@@ -1,342 +1,361 @@
 'use client';
 
-import { useState } from 'react';
-import { updateIssue, DeviceType, DeviceLocation, IssueStatus, IssuePriority, Issue } from '@/lib/supabase';
+import React, { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Issue as SupabaseIssue } from '@/lib/supabase';
+
+// Constants for device types and locations
+const deviceTypes = [
+  { value: 'akilli_tahta', label: 'Akıllı Tahta' },
+  { value: 'bilgisayar', label: 'Bilgisayar' },
+  { value: 'yazici', label: 'Yazıcı' },
+  { value: 'projektor', label: 'Projektör' },
+  { value: 'diger', label: 'Diğer' }
+];
+
+const deviceLocations = [
+  { value: 'sinif', label: 'Sınıf' },
+  { value: 'laboratuvar', label: 'Laboratuvar' },
+  { value: 'idare', label: 'İdare' },
+  { value: 'ogretmenler_odasi', label: 'Öğretmenler Odası' },
+  { value: 'diger', label: 'Diğer' }
+];
+
+// Constants for priority and status options
+const priorityOptions = [
+  { value: 'dusuk', label: 'Düşük' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'yuksek', label: 'Yüksek' },
+  { value: 'kritik', label: 'Kritik' }
+];
+
+const statusOptions = [
+  { value: 'beklemede', label: 'Beklemede' },
+  { value: 'atandi', label: 'Atandı' },
+  { value: 'inceleniyor', label: 'İnceleniyor' },
+  { value: 'cozuldu', label: 'Çözüldü' },
+  { value: 'kapatildi', label: 'Kapatıldı' }
+];
+
+// Use the interface that matches IssueData from page.tsx
+interface Issue extends Omit<SupabaseIssue, 'created_at' | 'updated_at' | 'resolved_at'> {
+  created_at: string;
+  updated_at: string | null;
+  resolved_at: string | null;
+}
 
 interface EditIssueFormProps {
-  issue: Issue & {
-    created_at: string; // ISO string veya TR tarih formatı
-    updated_at: string | null; // ISO string, TR tarih formatı veya null
-    resolved_at: string | null; // ISO string, TR tarih formatı veya null
-  };
-  onCancel: () => void;
+  issue: Issue;
+  onClose: () => void;
   onSuccess: () => void;
 }
 
-interface FormData {
-  device_type: DeviceType;
-  device_name: string;
-  device_location: DeviceLocation;
-  room_number: string;
-  reported_by: string;
-  assigned_to: string | null;
-  description: string;
-  status: IssueStatus;
-  priority: IssuePriority;
-  notes: string | null;
-  resolved_at?: string | null;
-}
-
-export default function EditIssueForm({ issue, onCancel, onSuccess }: EditIssueFormProps) {
-  const [formData, setFormData] = useState<FormData>({
-    device_type: issue.device_type,
-    device_name: issue.device_name,
-    device_location: issue.device_location,
-    room_number: issue.room_number,
-    reported_by: issue.reported_by,
+export default function EditIssueForm({ issue, onClose, onSuccess }: EditIssueFormProps) {
+  const [formData, setFormData] = useState({
+    device_name: issue.device_name || '',
+    description: issue.description || '',
+    device_type: issue.device_type || '',
+    device_location: issue.device_location || '',
+    priority: issue.priority || 'normal',
+    status: issue.status || 'beklemede',
+    reported_by: issue.reported_by || '',
     assigned_to: issue.assigned_to || '',
-    description: issue.description,
-    status: issue.status,
-    priority: issue.priority,
-    notes: issue.notes || '',
+    notes: issue.notes || ''
   });
   
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState('');
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Temizle hataları
+    // Clear error for this field when user changes it
     if (formErrors[name]) {
-      setFormErrors((prev) => {
+      setFormErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[name];
         return newErrors;
       });
     }
   };
-
-  const validateForm = () => {
+  
+  const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
     
     if (!formData.device_name.trim()) {
-      errors.device_name = 'Cihaz adı gereklidir';
-    }
-    
-    if (!formData.room_number.trim()) {
-      errors.room_number = 'Oda numarası gereklidir';
-    }
-    
-    if (!formData.reported_by.trim()) {
-      errors.reported_by = 'Bildiren kişi bilgisi gereklidir';
+      errors.device_name = 'Arıza başlığı zorunludur';
     }
     
     if (!formData.description.trim()) {
-      errors.description = 'Arıza açıklaması gereklidir';
+      errors.description = 'Arıza açıklaması zorunludur';
+    }
+    
+    if (!formData.reported_by.trim()) {
+      errors.reported_by = 'Bildiren kişi bilgisi zorunludur';
     }
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    setIsSubmitting(true);
-    setError('');
-    
-    // Validate form
     if (!validateForm()) {
-      setIsSubmitting(false);
       return;
     }
     
+    setIsSubmitting(true);
+    setSubmitError('');
+    
     try {
-      // Eğer durum "çözüldü" olarak değiştiyse resolved_at değerini ekle
-      const dataToSubmit = {
+      // Prepare data for update
+      const issueData = {
         ...formData,
-        resolved_at: formData.status === 'cozuldu' && !issue.resolved_at ? new Date().toISOString() : issue.resolved_at
+        // Convert empty strings to null for optional fields
+        device_type: formData.device_type || null,
+        device_location: formData.device_location || null,
+        assigned_to: formData.assigned_to || null,
+        notes: formData.notes || null
       };
       
-      await updateIssue(issue.id, dataToSubmit);
+      // Update data in Supabase
+      const result = await supabase
+        .from('issues')
+        .update(issueData)
+        .eq('id', issue.id);
+      
+      if (result.error) {
+        throw result.error;
+      }
+      
+      // Call success callback
       onSuccess();
+      
+      // Close the modal
+      onClose();
     } catch (error) {
-      console.error('Error updating issue:', error);
-      setError('Kayıt güncellenirken bir hata oluştu.');
+      if (error instanceof Error) {
+        setSubmitError(error.message);
+      } else {
+        setSubmitError('Arıza kaydı güncellenirken bir hata oluştu.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-semibold">Arıza Kaydını Düzenle</h2>
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      {submitError && (
+        <div className="mb-4 bg-red-100 text-red-800 border border-red-300 px-4 py-3 rounded relative">
+          {submitError}
+        </div>
+      )}
+      
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          {/* Title */}
           <div>
-            <label htmlFor="device_type" className="block text-sm font-medium text-gray-700">
-              Cihaz Tipi
-            </label>
-            <select
-              id="device_type"
-              name="device_type"
-              className="mt-1 block w-full rounded-md bg-white border-gray-400 text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-500 sm:text-sm"
-              value={formData.device_type}
-              onChange={handleInputChange}
-            >
-              <option value="akilli_tahta">Akıllı Tahta</option>
-              <option value="bilgisayar">Bilgisayar</option>
-              <option value="yazici">Yazıcı</option>
-              <option value="projektor">Projektör</option>
-              <option value="diger">Diğer</option>
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="device_name" className="block text-sm font-medium text-gray-700">
-              Cihaz Adı
+            <label htmlFor="device_name" className="block mb-1 font-medium text-gray-700">
+              Arıza Başlığı <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              name="device_name"
               id="device_name"
-              placeholder="Örn: Samsung Akıllı Tahta S40"
-              className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm bg-white text-gray-800 ${
-                formErrors.device_name
-                  ? 'border-red-500 focus:border-red-600 focus:ring-red-500'
-                  : 'border-gray-400 focus:border-blue-600 focus:ring-blue-500'
-              }`}
+              name="device_name"
               value={formData.device_name}
-              onChange={handleInputChange}
+              onChange={handleChange}
+              className={`w-full p-2 border rounded-md ${formErrors.device_name ? 'border-red-500' : 'border-gray-300'}`}
+              placeholder="Arıza başlığını girin"
             />
             {formErrors.device_name && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.device_name}</p>
+              <p className="mt-1 text-sm text-red-500">{formErrors.device_name}</p>
             )}
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          
+          {/* Description */}
           <div>
-            <label htmlFor="device_location" className="block text-sm font-medium text-gray-700">
-              Konum
+            <label htmlFor="description" className="block mb-1 font-medium text-gray-700">
+              Arıza Açıklaması <span className="text-red-500">*</span>
             </label>
-            <select
-              id="device_location"
-              name="device_location"
-              className="mt-1 block w-full rounded-md bg-white border-gray-400 text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-500 sm:text-sm"
-              value={formData.device_location}
-              onChange={handleInputChange}
-            >
-              <option value="sinif">Sınıf</option>
-              <option value="laboratuvar">Laboratuvar</option>
-              <option value="idare">İdare</option>
-              <option value="ogretmenler_odasi">Öğretmenler Odası</option>
-              <option value="diger">Diğer</option>
-            </select>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={4}
+              className={`w-full p-2 border rounded-md ${formErrors.description ? 'border-red-500' : 'border-gray-300'}`}
+              placeholder="Arıza detaylarını girin"
+            />
+            {formErrors.description && (
+              <p className="mt-1 text-sm text-red-500">{formErrors.description}</p>
+            )}
           </div>
           
+          {/* Device Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="device_type" className="block mb-1 font-medium text-gray-700">
+                Cihaz Türü
+              </label>
+              <select
+                id="device_type"
+                name="device_type"
+                value={formData.device_type}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Seçiniz</option>
+                {deviceTypes.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="device_location" className="block mb-1 font-medium text-gray-700">
+                Cihaz Konumu
+              </label>
+              <select
+                id="device_location"
+                name="device_location"
+                value={formData.device_location}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Seçiniz</option>
+                {deviceLocations.map(location => (
+                  <option key={location.value} value={location.value}>{location.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          {/* Priority and Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="priority" className="block mb-1 font-medium text-gray-700">
+                Öncelik
+              </label>
+              <select
+                id="priority"
+                name="priority"
+                value={formData.priority}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                {priorityOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="status" className="block mb-1 font-medium text-gray-700">
+                Durum
+              </label>
+              <select
+                id="status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                {statusOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          {/* Reporter and Assignee */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="reported_by" className="block mb-1 font-medium text-gray-700">
+                Bildiren Kişi <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="reported_by"
+                name="reported_by"
+                value={formData.reported_by}
+                onChange={handleChange}
+                className={`w-full p-2 border rounded-md ${formErrors.reported_by ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Bildiren kişinin adını girin"
+              />
+              {formErrors.reported_by && (
+                <p className="mt-1 text-sm text-red-500">{formErrors.reported_by}</p>
+              )}
+            </div>
+            
+            <div>
+              <label htmlFor="assigned_to" className="block mb-1 font-medium text-gray-700">
+                Atanan Kişi
+              </label>
+              <input
+                type="text"
+                id="assigned_to"
+                name="assigned_to"
+                value={formData.assigned_to}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder="Atanan kişinin adını girin (opsiyonel)"
+              />
+            </div>
+          </div>
+          
+          {/* Resolution */}
           <div>
-            <label htmlFor="room_number" className="block text-sm font-medium text-gray-700">
-              Oda/Sınıf Numarası
+            <label htmlFor="notes" className="block mb-1 font-medium text-gray-700">
+              Çözüm
             </label>
-            <input
-              type="text"
-              name="room_number"
-              id="room_number"
-              placeholder="Örn: 101 veya Lab-02"
-              className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm bg-white text-gray-800 ${
-                formErrors.room_number
-                  ? 'border-red-500 focus:border-red-600 focus:ring-red-500'
-                  : 'border-gray-400 focus:border-blue-600 focus:ring-blue-500'
+            <textarea
+              id="notes"
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              rows={3}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              placeholder="Çözüm detaylarını girin (opsiyonel)"
+            />
+          </div>
+          
+          {/* Form Actions */}
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 ${
+                isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
               }`}
-              value={formData.room_number}
-              onChange={handleInputChange}
-            />
-            {formErrors.room_number && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.room_number}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="reported_by" className="block text-sm font-medium text-gray-700">
-              Bildiren Kişi
-            </label>
-            <input
-              type="text"
-              name="reported_by"
-              id="reported_by"
-              placeholder="Örn: Ahmet Öğretmen"
-              className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm bg-white text-gray-800 ${
-                formErrors.reported_by
-                  ? 'border-red-500 focus:border-red-600 focus:ring-red-500'
-                  : 'border-gray-400 focus:border-blue-600 focus:ring-blue-500'
-              }`}
-              value={formData.reported_by}
-              onChange={handleInputChange}
-            />
-            {formErrors.reported_by && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.reported_by}</p>
-            )}
-          </div>
-          
-          <div>
-            <label htmlFor="assigned_to" className="block text-sm font-medium text-gray-700">
-              Atanan Kişi (Opsiyonel)
-            </label>
-            <input
-              type="text"
-              name="assigned_to"
-              id="assigned_to"
-              placeholder="Örn: Mehmet Teknisyen"
-              className="mt-1 block w-full rounded-md bg-white border-gray-400 text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-500 sm:text-sm"
-              value={formData.assigned_to || ''}
-              onChange={handleInputChange}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-            Arıza Açıklaması
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            rows={3}
-            placeholder="Arızanın detaylı açıklaması..."
-            className={`mt-1 block w-full rounded-md shadow-sm sm:text-sm bg-white text-gray-800 ${
-              formErrors.description
-                ? 'border-red-500 focus:border-red-600 focus:ring-red-500'
-                : 'border-gray-400 focus:border-blue-600 focus:ring-blue-500'
-            }`}
-            value={formData.description}
-            onChange={handleInputChange}
-          ></textarea>
-          {formErrors.description && (
-            <p className="mt-1 text-sm text-red-600">{formErrors.description}</p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700">
-              Durum
-            </label>
-            <select
-              id="status"
-              name="status"
-              className="mt-1 block w-full rounded-md bg-white border-gray-400 text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-500 sm:text-sm"
-              value={formData.status}
-              onChange={handleInputChange}
             >
-              <option value="beklemede">Beklemede</option>
-              <option value="atandi">Atandı</option>
-              <option value="inceleniyor">İnceleniyor</option>
-              <option value="cozuldu">Çözüldü</option>
-              <option value="kapatildi">Kapatıldı</option>
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="priority" className="block text-sm font-medium text-gray-700">
-              Öncelik
-            </label>
-            <select
-              id="priority"
-              name="priority"
-              className="mt-1 block w-full rounded-md bg-white border-gray-400 text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-500 sm:text-sm"
-              value={formData.priority}
-              onChange={handleInputChange}
-            >
-              <option value="dusuk">Düşük</option>
-              <option value="normal">Normal</option>
-              <option value="yuksek">Yüksek</option>
-              <option value="kritik">Kritik</option>
-            </select>
+              {isSubmitting ? 'Güncelleniyor...' : 'Güncelle'}
+            </button>
           </div>
         </div>
-
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-            Notlar (Opsiyonel)
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            rows={2}
-            placeholder="Ek notlar..."
-            className="mt-1 block w-full rounded-md bg-white border-gray-400 text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-500 sm:text-sm"
-            value={formData.notes || ''}
-            onChange={handleInputChange}
-          ></textarea>
-        </div>
-      </div>
-
-      <div className="mt-6 flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isSubmitting}
-          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        >
-          İptal
-        </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className={`inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-            isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
-          }`}
-        >
-          {isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
-        </button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 } 

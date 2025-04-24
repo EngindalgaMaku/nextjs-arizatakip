@@ -351,6 +351,10 @@ export default function IssuesPage() {
     }
   };
 
+  const openAddModal = () => {
+    setIsAddModalOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -427,7 +431,7 @@ export default function IssuesPage() {
         <button
           type="button"
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => openAddModal()}
         >
           Arıza Ekle
         </button>
@@ -594,7 +598,7 @@ export default function IssuesPage() {
                 setIsEditModalOpen(false);
                 loadIssues();
               }}
-              onCancel={() => setIsEditModalOpen(false)}
+              onClose={() => setIsEditModalOpen(false)}
             />
           </div>
         </div>
@@ -602,40 +606,11 @@ export default function IssuesPage() {
 
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div className="modal-overlay" onClick={closeAddModal}>
-          <div
-            className="modal-content max-w-2xl mx-auto mt-20 p-5 rounded-lg shadow-lg bg-white overflow-y-auto max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Yeni Arıza Ekle</h2>
-              <button
-                onClick={closeAddModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <AddIssueForm
-              onSuccess={() => {
-                setIsAddFormSubmitted(true);
-                closeAddModal();
-                loadIssues();
-              }}
-              onCancel={closeAddModal}
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={closeAddModal}>
+          <div className="bg-white rounded-lg shadow-xl overflow-hidden max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <AddIssueForm 
+              onClose={closeAddModal} 
+              onSuccess={handleAddSuccess}
             />
           </div>
         </div>

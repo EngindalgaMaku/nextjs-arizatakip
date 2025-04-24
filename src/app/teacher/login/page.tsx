@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { setCookie } from 'cookies-next';
-import { getTeacherAccessCode, DEMO_MODE } from '@/lib/supabase';
+import { getTeacherAccessCode } from '@/lib/supabase';
 
 export default function TeacherLoginPage() {
   const [teacherName, setTeacherName] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false); // Artık kodun yüklenmesini beklemiyoruz
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -70,7 +69,6 @@ export default function TeacherLoginPage() {
     }
   };
 
-  // İlk yükleme sırasında loading göstermiyoruz, doğrudan formu gösteriyoruz
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">

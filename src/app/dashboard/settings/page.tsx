@@ -78,7 +78,10 @@ export default function SettingsPage() {
         }
 
         // Öğretmen giriş kodunu al
-        const { data: accessCodeData } = await getSystemSetting(TEACHER_ACCESS_CODE_KEY);
+        const { data: accessCodeData, error: accessCodeError } = await getSystemSetting(TEACHER_ACCESS_CODE_KEY);
+        if (accessCodeError) {
+          throw accessCodeError;
+        }
         if (accessCodeData) {
           setTeacherAccessCode(accessCodeData.value);
         }
@@ -469,232 +472,243 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Ayarlar</h1>
-        <p className="mt-1 text-gray-500">Uygulama ayarlarını ve profilinizi yönetin</p>
-      </div>
-      
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* Profil Ayarları */}
-        <div className="bg-white shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">Profil Ayarları</h3>
-            <div className="mt-2 max-w-xl text-sm text-gray-500">
-              <p>Kişisel bilgilerinizi ve hesap ayarlarınızı güncelleyin.</p>
-            </div>
-            <form className="mt-5 space-y-4" onSubmit={handleProfileSubmit}>
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  İsim
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  id="name"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  E-posta adresi
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  id="email"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isProfileLoading}
-                  className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isProfileLoading ? 'Kaydediliyor...' : 'Profili Kaydet'}
-                </button>
-              </div>
-            </form>
-          </div>
+    <div className="space-y-10 divide-y divide-gray-900/10">
+      {/* Yükleniyor durum kontrolü */}
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
         </div>
+      ) : (
+        <>
+          <div className="space-y-10">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Ayarlar</h1>
+              <p className="mt-1 text-gray-500">Uygulama ayarlarını ve profilinizi yönetin</p>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+              {/* Profil Ayarları */}
+              <div className="bg-white shadow sm:rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">Profil Ayarları</h3>
+                  <div className="mt-2 max-w-xl text-sm text-gray-500">
+                    <p>Kişisel bilgilerinizi ve hesap ayarlarınızı güncelleyin.</p>
+                  </div>
+                  <form className="mt-5 space-y-4" onSubmit={handleProfileSubmit}>
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                        İsim
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        id="name"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        E-posta adresi
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        id="email"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={isProfileLoading}
+                        className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isProfileLoading ? 'Kaydediliyor...' : 'Profili Kaydet'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
 
-        {/* Site Ayarları */}
-        <div className="bg-white shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">Site Ayarları</h3>
-            <div className="mt-2 max-w-xl text-sm text-gray-500">
-              <p>Uygulamanız için genel ayarları yapılandırın.</p>
-            </div>
-            <form className="mt-5 space-y-4" onSubmit={handleSiteSubmit}>
-              <div>
-                <label htmlFor="site-name" className="block text-sm font-medium text-gray-700">
-                  Site Adı
-                </label>
-                <input
-                  type="text"
-                  name="site-name"
-                  id="site-name"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  value={siteName}
-                  onChange={(e) => setSiteName(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="site-description" className="block text-sm font-medium text-gray-700">
-                  Site Açıklaması
-                </label>
-                <textarea
-                  name="site-description"
-                  id="site-description"
-                  rows={3}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  value={siteDescription}
-                  onChange={(e) => setSiteDescription(e.target.value)}
-                />
-              </div>
-              
-              <div className="flex items-start">
-                <div className="flex h-5 items-center">
-                  <input
-                    id="allow-registration"
-                    name="allow-registration"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={allowRegistration}
-                    onChange={(e) => setAllowRegistration(e.target.checked)}
-                  />
+              {/* Site Ayarları */}
+              <div className="bg-white shadow sm:rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">Site Ayarları</h3>
+                  <div className="mt-2 max-w-xl text-sm text-gray-500">
+                    <p>Uygulamanız için genel ayarları yapılandırın.</p>
+                  </div>
+                  <form className="mt-5 space-y-4" onSubmit={handleSiteSubmit}>
+                    <div>
+                      <label htmlFor="site-name" className="block text-sm font-medium text-gray-700">
+                        Site Adı
+                      </label>
+                      <input
+                        type="text"
+                        name="site-name"
+                        id="site-name"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        value={siteName}
+                        onChange={(e) => setSiteName(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="site-description" className="block text-sm font-medium text-gray-700">
+                        Site Açıklaması
+                      </label>
+                      <textarea
+                        name="site-description"
+                        id="site-description"
+                        rows={3}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        value={siteDescription}
+                        onChange={(e) => setSiteDescription(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <div className="flex h-5 items-center">
+                        <input
+                          id="allow-registration"
+                          name="allow-registration"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={allowRegistration}
+                          onChange={(e) => setAllowRegistration(e.target.checked)}
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="allow-registration" className="font-medium text-gray-700">
+                          Kullanıcı Kaydına İzin Ver
+                        </label>
+                        <p className="text-gray-500">Yeni hesapların açık kayıt yapmasını sağlar</p>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={isSiteLoading}
+                        className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSiteLoading ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-                <div className="ml-3 text-sm">
-                  <label htmlFor="allow-registration" className="font-medium text-gray-700">
-                    Kullanıcı Kaydına İzin Ver
-                  </label>
-                  <p className="text-gray-500">Yeni hesapların açık kayıt yapmasını sağlar</p>
-                </div>
               </div>
-              
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSiteLoading}
-                  className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSiteLoading ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
 
-        {/* Bildirim Ayarları */}
-        <div className="bg-white shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">Bildirim Ayarları</h3>
-            <div className="mt-2 max-w-xl text-sm text-gray-500">
-              <p>Sistemden bildirimleri nasıl alacağınızı yapılandırın.</p>
-            </div>
-            <form className="mt-5 space-y-4" onSubmit={handleNotificationSubmit}>
-              <div className="flex items-start">
-                <div className="flex h-5 items-center">
-                  <input
-                    id="email-notifications"
-                    name="email-notifications"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={emailNotifications}
-                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label htmlFor="email-notifications" className="font-medium text-gray-700">
-                    E-posta Bildirimleri
-                  </label>
-                  <p className="text-gray-500">Güncellemeleri e-posta yoluyla alın</p>
+              {/* Bildirim Ayarları */}
+              <div className="bg-white shadow sm:rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">Bildirim Ayarları</h3>
+                  <div className="mt-2 max-w-xl text-sm text-gray-500">
+                    <p>Sistemden bildirimleri nasıl alacağınızı yapılandırın.</p>
+                  </div>
+                  <form className="mt-5 space-y-4" onSubmit={handleNotificationSubmit}>
+                    <div className="flex items-start">
+                      <div className="flex h-5 items-center">
+                        <input
+                          id="email-notifications"
+                          name="email-notifications"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={emailNotifications}
+                          onChange={(e) => setEmailNotifications(e.target.checked)}
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="email-notifications" className="font-medium text-gray-700">
+                          E-posta Bildirimleri
+                        </label>
+                        <p className="text-gray-500">Güncellemeleri e-posta yoluyla alın</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <div className="flex h-5 items-center">
+                        <input
+                          id="push-notifications"
+                          name="push-notifications"
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={pushNotifications}
+                          onChange={(e) => setPushNotifications(e.target.checked)}
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="push-notifications" className="font-medium text-gray-700">
+                          Anlık Bildirimler
+                        </label>
+                        <p className="text-gray-500">Tarayıcınızda gerçek zamanlı güncellemeler alın</p>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={isNotificationLoading}
+                        className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isNotificationLoading ? 'Kaydediliyor...' : 'Bildirim Ayarlarını Kaydet'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
-              
-              <div className="flex items-start">
-                <div className="flex h-5 items-center">
-                  <input
-                    id="push-notifications"
-                    name="push-notifications"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={pushNotifications}
-                    onChange={(e) => setPushNotifications(e.target.checked)}
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label htmlFor="push-notifications" className="font-medium text-gray-700">
-                    Anlık Bildirimler
-                  </label>
-                  <p className="text-gray-500">Tarayıcınızda gerçek zamanlı güncellemeler alın</p>
-                </div>
-              </div>
-              
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isNotificationLoading}
-                  className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isNotificationLoading ? 'Kaydediliyor...' : 'Bildirim Ayarlarını Kaydet'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
 
-        {/* Öğretmen Erişim Kodu */}
-        <div className="bg-white shadow sm:rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">Öğretmen Erişimi</h3>
-            <div className="mt-2 max-w-xl text-sm text-gray-500">
-              <p>Öğretmenlerin arıza bildirim sistemine giriş yaparken kullanacakları kodu belirleyin. Bu kod tüm öğretmenler için geçerlidir.</p>
-            </div>
-            <form className="mt-5 space-y-4" onSubmit={handleUpdateTeacherCode}>
-              <div className="grid grid-cols-6 gap-6">
-                <div className="col-span-6 sm:col-span-4">
-                  <label htmlFor="teacherAccessCode" className="block text-sm font-medium text-gray-700">
-                    Öğretmen Giriş Kodu
-                  </label>
-                  <input
-                    type="text"
-                    name="teacherAccessCode"
-                    id="teacherAccessCode"
-                    value={teacherAccessCode}
-                    onChange={(e) => setTeacherAccessCode(e.target.value)}
-                    className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                  />
-                  {error && (
-                    <p className="mt-2 text-sm text-red-600">{error}</p>
-                  )}
-                  {success && (
-                    <p className="mt-2 text-sm text-green-600">Öğretmen giriş kodu başarıyla güncellendi.</p>
-                  )}
+              {/* Öğretmen Erişim Kodu */}
+              <div className="bg-white shadow sm:rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">Öğretmen Erişimi</h3>
+                  <div className="mt-2 max-w-xl text-sm text-gray-500">
+                    <p>Öğretmenlerin arıza bildirim sistemine giriş yaparken kullanacakları kodu belirleyin. Bu kod tüm öğretmenler için geçerlidir.</p>
+                  </div>
+                  <form className="mt-5 space-y-4" onSubmit={handleUpdateTeacherCode}>
+                    <div className="grid grid-cols-6 gap-6">
+                      <div className="col-span-6 sm:col-span-4">
+                        <label htmlFor="teacherAccessCode" className="block text-sm font-medium text-gray-700">
+                          Öğretmen Giriş Kodu
+                        </label>
+                        <input
+                          type="text"
+                          name="teacherAccessCode"
+                          id="teacherAccessCode"
+                          value={teacherAccessCode}
+                          onChange={(e) => setTeacherAccessCode(e.target.value)}
+                          className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                        />
+                        {error && (
+                          <p className="mt-2 text-sm text-red-600">{error}</p>
+                        )}
+                        {success && (
+                          <p className="mt-2 text-sm text-green-600">Öğretmen giriş kodu başarıyla güncellendi.</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-5">
+                      <button
+                        type="submit"
+                        disabled={updating}
+                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                      >
+                        {updating ? 'Güncelleniyor...' : 'Güncelle'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
-              
-              <div className="mt-5">
-                <button
-                  type="submit"
-                  disabled={updating}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {updating ? 'Güncelleniyor...' : 'Güncelle'}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 } 
