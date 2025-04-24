@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Yönetici yetkilendirmesi gerektiren yollar
-const ADMIN_PATHS = [
-  '/dashboard', 
-  '/users', 
-  '/settings',
-  '/products',
-  '/orders',
-  '/analytics'
-];
-
 // Öğretmen yetkilendirmesi gerektiren yollar
 const TEACHER_PATHS = [
   '/teacher/issues'
@@ -20,7 +10,6 @@ const TEACHER_PATHS = [
 const HOME_PATH = '/';
 
 // Giriş yönlendirme yolları 
-const ADMIN_AUTH_PATH = '/login';
 const TEACHER_AUTH_PATH = '/teacher/login';
 
 // Auth gerektirmeyen yollar (açık yollar)
