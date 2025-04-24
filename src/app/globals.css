@@ -92,10 +92,20 @@
 
 /* Teacher panel styles */
 .teacher-header {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
-  padding: 1rem;
+  background-color: #4338ca; /* indigo-700 */
+  color: white;
+  border-bottom: 1px solid #3730a3; /* indigo-800 */
+  padding: 1.5rem 1rem;
   margin-bottom: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.teacher-header h1 {
+  color: white !important;
+}
+
+.teacher-header p {
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .status-badge {

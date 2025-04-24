@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hüsniye Özdilek Bilişim Alanı Şeflik Yönetici Paneli",
-  description: "Hüsniye Özdilek Bilişim Alanı Şeflik için yönetici kontrol paneli",
+  title: "Hüsniye Özdilek Ticaret M.T.A.L. - Yönetici Paneli",
+  description: "Hüsniye Özdilek Ticaret M.T.A.L. Arıza Takip Sistemi",
 };
 
 export default function RootLayout({

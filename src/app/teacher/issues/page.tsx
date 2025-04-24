@@ -12,11 +12,29 @@ const formatDate = (date: Date | string | null): string => {
   try {
     if (!date) return '-';
     
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    // Önce standart tarih formatını deneyelim
+    let dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Eğer geçersiz bir tarih oluştuysa ve format "DD.MM.YYYY" veya "DD.MM.YYYY HH:MM" gibi ise
+    if (isNaN(dateObj.getTime()) && typeof date === 'string' && date.includes('.')) {
+      const parts = date.split(' ');
+      const datePart = parts[0];
+      const timePart = parts.length > 1 ? parts[1] : '';
+      
+      const [day, month, year] = datePart.split('.').map(part => parseInt(part, 10));
+      
+      if (timePart) {
+        const [hours, minutes] = timePart.split(':').map(part => parseInt(part, 10));
+        dateObj = new Date(year, month - 1, day, hours, minutes);
+      } else {
+        dateObj = new Date(year, month - 1, day);
+      }
+    }
     
     // Geçerli bir tarih değeri mi kontrol et
     if (isNaN(dateObj.getTime())) {
-      return '-';
+      console.warn('Geçersiz tarih formatı:', date);
+      return 'Geçersiz tarih formatı';
     }
     
     return new Intl.DateTimeFormat('tr-TR', {
@@ -27,8 +45,8 @@ const formatDate = (date: Date | string | null): string => {
       minute: '2-digit'
     }).format(dateObj);
   } catch (error) {
-    console.error('Tarih formatı hatası:', error);
-    return '-';
+    console.error('Tarih formatı hatası:', error, 'Tarih değeri:', date);
+    return 'Tarih işlenemedi';
   }
 };
 
@@ -96,158 +114,44 @@ export default function TeacherIssuesPage() {
     try {
       setIsLoading(true);
       
-      // Önce demo modda mı kontrol edelim
-      const DEMO_MODE = false; // Supabase API anahtarı olmadan çalışabilmek için
+      // Gerçek API çağrısı
+      const { data, error } = await getIssuesForTeacher(teacher.name);
       
-      if (DEMO_MODE) {
-        // Demo verisi
-        console.log("Demo modunda arızalar yükleniyor...");
-        const demoIssues = [
-          {
-            id: "1",
-            device_type: "akilli_tahta" as DeviceType,
-            device_name: "10A Akıllı Tahtası",
-            device_location: "sinif" as DeviceLocation,
-            room_number: "A-101",
-            reported_by: teacher.name,
-            assigned_to: null,
-            description: "Dokunmatik ekran çalışmıyor",
-            status: "beklemede" as IssueStatus,
-            priority: "normal" as IssuePriority,
-            notes: null,
-            created_at: new Date().toISOString(),
-            updated_at: null,
-            resolved_at: null
-          },
-          {
-            id: "2",
-            device_type: "bilgisayar" as DeviceType,
-            device_name: "Öğretmen Bilgisayarı",
-            device_location: "sinif" as DeviceLocation,
-            room_number: "B-203",
-            reported_by: teacher.name,
-            assigned_to: "Teknik Servis",
-            description: "Bilgisayar açılırken çok yavaş",
-            status: "inceleniyor" as IssueStatus,
-            priority: "dusuk" as IssuePriority,
-            notes: "Disk temizliği yapılacak",
-            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 gün önce
-            updated_at: new Date().toISOString(),
-            resolved_at: null
-          }
-        ];
-        
-        // Demo veriyi formatlayarak state'e ata
-        const formattedIssues = demoIssues.map(issue => ({
-          id: issue.id,
-          device_type: issue.device_type,
-          device_name: issue.device_name,
-          device_location: issue.device_location,
-          room_number: issue.room_number,
-          reported_by: issue.reported_by,
-          assigned_to: issue.assigned_to,
-          description: issue.description,
-          status: issue.status,
-          priority: issue.priority,
-          notes: issue.notes,
-          created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-          updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-          resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
-        }));
-        
-        setIssues(formattedIssues);
+      if (error) {
+        console.error('Arızalar yüklenirken hata oluştu:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        setIssues([]);
         setIsLoading(false);
         return;
       }
       
-      // Gerçek API çağrısı (Demo mod değilse)
-      if (typeof window !== 'undefined') {
-        const { data, error } = await getIssuesForTeacher(teacher.name);
-        
-        if (error) {
-          console.error('Arızalar yüklenirken hata oluştu:', error);
-          throw error;
-        }
-        
-        if (!data || data.length === 0) {
-          setIssues([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        // API'den gelen veriyi formata
-        const formattedIssues = data.map(issue => ({
-          id: issue.id,
-          device_type: issue.device_type,
-          device_name: issue.device_name,
-          device_location: issue.device_location,
-          room_number: issue.room_number,
-          reported_by: issue.reported_by,
-          assigned_to: issue.assigned_to,
-          description: issue.description,
-          status: issue.status,
-          priority: issue.priority,
-          notes: issue.notes,
-          created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-          updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-          resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
-        }));
-        
-        setIssues(formattedIssues);
-      } else {
-        // Server-side rendering için boş data döndür
-        setIssues([]);
-      }
+      // API'den gelen veriyi formata
+      const formattedIssues = data.map(issue => ({
+        id: issue.id,
+        device_type: issue.device_type,
+        device_name: issue.device_name,
+        device_location: issue.device_location,
+        room_number: issue.room_number,
+        reported_by: issue.reported_by,
+        assigned_to: issue.assigned_to,
+        description: issue.description,
+        status: issue.status,
+        priority: issue.priority,
+        notes: issue.notes,
+        created_at: issue.created_at, // Ham tarih verisi
+        updated_at: issue.updated_at,
+        resolved_at: issue.resolved_at
+      }));
+      
+      setIssues(formattedIssues);
     } catch (err) {
       console.error('Arızalar yüklenirken hata oluştu:', err);
-      
+      alert('Arızalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       // Hata durumunda boş liste göster
       setIssues([]);
-      
-      if (typeof window !== 'undefined') {
-        // alert('Arızalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-        console.warn('Demo moduna geçiliyor...');
-        
-        // Demo verisi
-        const demoIssues = [
-          {
-            id: "1",
-            device_type: "akilli_tahta" as DeviceType,
-            device_name: "Arıza Demo 1",
-            device_location: "sinif" as DeviceLocation,
-            room_number: "A-101",
-            reported_by: teacher.name,
-            assigned_to: null,
-            description: "Bu bir demo arıza kaydıdır",
-            status: "beklemede" as IssueStatus,
-            priority: "normal" as IssuePriority,
-            notes: null,
-            created_at: new Date().toISOString(),
-            updated_at: null,
-            resolved_at: null
-          }
-        ];
-        
-        // Demo veriyi formatlayarak state'e ata
-        const formattedIssues = demoIssues.map(issue => ({
-          id: issue.id,
-          device_type: issue.device_type,
-          device_name: issue.device_name,
-          device_location: issue.device_location,
-          room_number: issue.room_number,
-          reported_by: issue.reported_by,
-          assigned_to: issue.assigned_to,
-          description: issue.description,
-          status: issue.status,
-          priority: issue.priority,
-          notes: issue.notes,
-          created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-          updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-          resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
-        }));
-        
-        setIssues(formattedIssues);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -397,12 +301,13 @@ export default function TeacherIssuesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Öğretmen Arıza Bildirim Sistemi</h1>
-              <p className="mt-1 text-gray-500">Merhaba, {teacher.name}! Arıza bildirimlerinizi yönetin</p>
+              <h1 className="text-2xl font-semibold text-gray-900">Hüsniye Özdilek Ticaret M.T.A.L.</h1>
+              <p className="mt-1 text-gray-500">Merhaba, {teacher.name}! Arıza bildirim sistemi</p>
             </div>
+            {/* Masaüstünde göster, mobilde gizle */}
             <button
               onClick={handleLogout}
-              className="flex items-center px-4 py-2 text-sm text-red-600 border border-red-600 rounded-md hover:bg-red-50"
+              className="hidden md:flex items-center px-4 py-2 text-sm text-red-600 border border-red-600 rounded-md hover:bg-red-50"
             >
               <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
               Çıkış Yap
@@ -562,7 +467,7 @@ export default function TeacherIssuesPage() {
                         Açıklama/Not
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Bildirim Tarihi
+                        Oluşturulma Tarihi ve Saati
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         İşlemler
@@ -601,8 +506,8 @@ export default function TeacherIssuesPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {issue.created_at}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-blue-50">
+                          {formatDate(issue.created_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           {issue.status === 'beklemede' && (
@@ -650,7 +555,7 @@ export default function TeacherIssuesPage() {
                                 </span>
                                 <span className="flex items-center">
                                   <ClockIcon className="h-3.5 w-3.5 mr-1" />
-                                  {formatDate(issue.created_at)}
+                                  <span className="font-medium text-blue-600">{formatDate(issue.created_at)}</span>
                                 </span>
                               </div>
                             </div>
@@ -734,6 +639,17 @@ export default function TeacherIssuesPage() {
           </div>
         </div>
       )}
+
+      {/* Mobil için sabit çıkış butonu - sadece md boyutunun altında gösterilecek */}
+      <div className="md:hidden fixed bottom-6 right-6 z-40">
+        <button
+          onClick={handleLogout}
+          className="flex items-center justify-center p-3 bg-red-600 text-white rounded-full shadow-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          aria-label="Çıkış Yap"
+        >
+          <ArrowRightOnRectangleIcon className="w-6 h-6" />
+        </button>
+      </div>
     </div>
   );
 } 

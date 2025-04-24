@@ -31,122 +31,44 @@ export default function IssuesPage() {
     try {
       setIsLoading(true);
       
-      // Mock veriyi her zaman hazır tut (geliştirme veya hata durumları için)
-      const mockIssues: IssueData[] = [
-        {
-          id: '1',
-          device_type: 'akilli_tahta' as DeviceType,
-          device_name: 'Smart Board X1',
-          device_location: 'sinif' as DeviceLocation,
-          room_number: '101',
-          reported_by: 'Murat Öğretmen',
-          assigned_to: null,
-          description: 'Akıllı tahta açılmıyor, güç düğmesine basınca sadece kırmızı ışık yanıp sönüyor.',
-          status: 'beklemede' as IssueStatus,
-          priority: 'yuksek' as IssuePriority,
-          notes: null,
-          created_at: '22.05.2023 09:15',
-          updated_at: null,
-          resolved_at: null
-        },
-        {
-          id: '2',
-          device_type: 'bilgisayar' as DeviceType,
-          device_name: 'Bilgisayar Lab-01-PC12',
-          device_location: 'laboratuvar' as DeviceLocation,
-          room_number: 'Lab-01',
-          reported_by: 'Ayşe Öğretmen',
-          assigned_to: 'Ahmet Teknisyen',
-          description: 'Bilgisayar çok yavaş açılıyor ve arada donuyor.',
-          status: 'inceleniyor' as IssueStatus,
-          priority: 'normal' as IssuePriority,
-          notes: 'Disk temizliği ve virüs taraması yapıldı, RAM kontrol edilecek.',
-          created_at: '20.05.2023 14:30',
-          updated_at: '21.05.2023 10:45',
-          resolved_at: null
-        },
-        {
-          id: '3',
-          device_type: 'yazici' as DeviceType,
-          device_name: 'HP LaserJet 107w',
-          device_location: 'idare' as DeviceLocation,
-          room_number: 'Müdür Yrd. Odası',
-          reported_by: 'Zeynep Müdür Yrd.',
-          assigned_to: 'Ahmet Teknisyen',
-          description: 'Yazıcı kağıdı sıkıştırıyor ve yazdırmıyor.',
-          status: 'cozuldu' as IssueStatus,
-          priority: 'yuksek' as IssuePriority,
-          notes: 'Yazıcı içindeki sıkışmış kağıtlar temizlendi, test baskısı alındı.',
-          created_at: '18.05.2023 11:20',
-          updated_at: '18.05.2023 13:45',
-          resolved_at: '18.05.2023 13:45'
-        },
-      ];
+      // Gerçek API çağrısı yap
+      const { data, error } = await getIssues();
       
-      let useRealData = true;
-      
-      try {
-        // Gerçek API çağrısı yap (production'da)
-        const { data, error } = await getIssues();
-        
-        if (error) {
-          console.warn('Supabase veri çekme hatası:', error);
-          useRealData = false;
-        } else if (!data || data.length === 0) {
-          console.log('Supabase\'den veri alındı fakat hiç kayıt yok, mock veri kullanılacak');
-          useRealData = false;
-        } else {
-          // API'den gelen veriyi formata
-          const formattedIssues = data.map(issue => ({
-            id: issue.id,
-            device_type: issue.device_type,
-            device_name: issue.device_name,
-            device_location: issue.device_location,
-            room_number: issue.room_number,
-            reported_by: issue.reported_by,
-            assigned_to: issue.assigned_to,
-            description: issue.description,
-            status: issue.status,
-            priority: issue.priority,
-            notes: issue.notes,
-            created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-            updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-            resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
-          }));
-          setIssues(formattedIssues);
-        }
-      } catch (err) {
-        console.error('API çağrısı hatası:', err);
-        useRealData = false;
+      if (error) {
+        console.error('Supabase veri çekme hatası:', error);
+        throw error;
       }
       
-      // Eğer gerçek veri alınamadıysa veya sorun oluştuysa mock veri kullan
-      if (!useRealData) {
-        console.log('Mock veri kullanılıyor');
-        setIssues(mockIssues);
+      if (!data || data.length === 0) {
+        setIssues([]);
+        setIsLoading(false);
+        return;
       }
+      
+      // API'den gelen veriyi formata
+      const formattedIssues = data.map(issue => ({
+        id: issue.id,
+        device_type: issue.device_type,
+        device_name: issue.device_name,
+        device_location: issue.device_location,
+        room_number: issue.room_number,
+        reported_by: issue.reported_by,
+        assigned_to: issue.assigned_to,
+        description: issue.description,
+        status: issue.status,
+        priority: issue.priority,
+        notes: issue.notes,
+        created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
+        updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
+        resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
+      }));
+      
+      setIssues(formattedIssues);
     } catch (err) {
       console.error('Arızalar yüklenirken hata oluştu:', err);
-      alert('Arızalar yüklenirken bir hata oluştu. Mock veriler gösterilecek.');
-      // Yine de kullanıcıya bir şeyler gösterelim
-      setIssues([
-        {
-          id: '1',
-          device_type: 'akilli_tahta' as DeviceType,
-          device_name: 'DEMO - Akıllı Tahta',
-          device_location: 'sinif' as DeviceLocation,
-          room_number: 'Demo-101',
-          reported_by: 'Demo Kullanıcı',
-          assigned_to: null,
-          description: 'Demo arıza kaydı - Veritabanı bağlantısı kurulamadı',
-          status: 'beklemede' as IssueStatus,
-          priority: 'normal' as IssuePriority,
-          notes: null,
-          created_at: new Date().toLocaleString('tr-TR'),
-          updated_at: null,
-          resolved_at: null
-        }
-      ]);
+      alert('Arızalar yüklenirken bir hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin veya yönetici ile iletişime geçin.');
+      // Boş liste göster
+      setIssues([]);
     } finally {
       setIsLoading(false);
     }

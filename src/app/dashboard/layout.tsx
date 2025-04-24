@@ -13,7 +13,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [userName, setUserName] = useState('Yönetici');
-  const schoolName = 'Hüsniye Özdilek';
+  const schoolName = 'Hüsniye Özdilek Ticaret Mesleki ve Teknik Anadolu Lisesi';
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
@@ -83,11 +83,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } fixed inset-y-0 left-0 z-30 w-64 bg-indigo-700 transition duration-300 ease-in-out transform md:translate-x-0 md:static md:inset-auto md:h-full`}
       >
-        <div className="flex items-center justify-center h-16 bg-indigo-800">
-          <span className="text-xl font-semibold text-white">{schoolName}</span>
+        <div className="flex items-center justify-center h-20 bg-indigo-800 px-2 text-center">
+          <span className="text-lg font-semibold text-white">Hüsniye Özdilek</span>
         </div>
-        <div className="flex items-center justify-center h-10 bg-indigo-700">
-          <span className="text-base font-medium text-white">Bilişim Alanı Şeflik</span>
+        <div className="flex items-center justify-center h-12 bg-indigo-700 px-2 text-center">
+          <span className="text-sm font-medium text-white">Ticaret M.T.A.L.</span>
         </div>
         <nav className="px-2 mt-5 space-y-1">
           {navigation.map((item) => {
