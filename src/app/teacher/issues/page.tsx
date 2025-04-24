@@ -580,6 +580,9 @@ export default function TeacherIssuesPage() {
                         Durum
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Açıklama/Not
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Bildirim Tarihi
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -609,6 +612,15 @@ export default function TeacherIssuesPage() {
                           <span className={getStatusColor(issue.status as IssueStatus)}>
                             {getStatusName(issue.status as IssueStatus)}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900 line-clamp-2">{issue.description}</div>
+                          {issue.notes && (
+                            <div className="mt-1">
+                              <div className="text-xs font-medium text-blue-600">Yönetici Notu:</div>
+                              <div className="text-sm text-blue-800 italic line-clamp-2">{issue.notes}</div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {issue.created_at}
@@ -669,8 +681,15 @@ export default function TeacherIssuesPage() {
                           </span>
                         </div>
                         
-                        <div className="mt-3 text-sm text-gray-800 line-clamp-2">
-                          {issue.description}
+                        <div className="mt-3 text-sm text-gray-800">
+                          <p className="line-clamp-2">{issue.description}</p>
+                          
+                          {issue.notes && (
+                            <div className="mt-2 p-2 bg-blue-50 rounded-md border-l-4 border-blue-500">
+                              <div className="text-xs font-medium text-blue-700">Yönetici Notu:</div>
+                              <p className="text-sm text-blue-900 line-clamp-3">{issue.notes}</p>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="mt-4 flex items-center justify-end space-x-2">
