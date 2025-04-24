@@ -91,10 +91,34 @@ function formatDate(dateString: string | null): string {
   if (!dateString) return 'Belirtilmemiş';
   
   try {
-    const date = new Date(dateString);
+    // Önce standart tarih formatını deneyelim
+    let date = new Date(dateString);
+    
+    // Eğer geçersiz bir tarih oluştuysa ve format "DD.MM.YYYY" veya "DD.MM.YYYY HH:MM" gibi ise
+    if (isNaN(date.getTime()) && dateString.includes('.')) {
+      const parts = dateString.split(' ');
+      const datePart = parts[0];
+      const timePart = parts.length > 1 ? parts[1] : '';
+      
+      const [day, month, year] = datePart.split('.').map(part => parseInt(part, 10));
+      
+      if (timePart) {
+        const [hours, minutes] = timePart.split(':').map(part => parseInt(part, 10));
+        date = new Date(year, month - 1, day, hours, minutes);
+      } else {
+        date = new Date(year, month - 1, day);
+      }
+    }
+    
+    // Son kontrol: Hala geçersiz bir tarih mi?
+    if (isNaN(date.getTime())) {
+      return 'Geçersiz tarih formatı';
+    }
+    
     return `${date.toLocaleDateString('tr-TR')} ${date.toLocaleTimeString('tr-TR')} (${formatDistanceToNow(date, { addSuffix: true, locale: tr })})`;
-  } catch {
-    return 'Geçersiz tarih';
+  } catch (e) {
+    console.error('Tarih işleme hatası:', e, 'Tarih değeri:', dateString);
+    return 'Tarih işlenemedi';
   }
 }
 
