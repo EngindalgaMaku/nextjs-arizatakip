@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getIssuesForTeacher, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
+import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
 import AddIssueForm from './add-form';
-import { EyeIcon, PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
 import Modal from '@/components/Modal';
 
@@ -376,6 +376,27 @@ export default function TeacherIssuesPage() {
     }
   };
 
+  // Arıza silme fonksiyonu
+  const handleDeleteIssue = async (issueId: string) => {
+    if (window.confirm('Bu arıza kaydını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+      try {
+        const { error } = await deleteIssueFromDB(issueId);
+        
+        if (error) {
+          alert('Arıza silinirken bir hata oluştu: ' + error.message);
+          return;
+        }
+        
+        // Başarılı silme işlemi sonrası listeyi güncelle
+        setIssues(prev => prev.filter(issue => issue.id !== issueId));
+        alert('Arıza başarıyla silindi');
+      } catch (err) {
+        console.error('Arıza silme hatası:', err);
+        alert('Arıza silinirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -593,16 +614,15 @@ export default function TeacherIssuesPage() {
                           {issue.created_at}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-50 transition-colors"
-                            onClick={() => {
-                              setCurrentIssue(issue);
-                              setIsViewModalOpen(true);
-                            }}
-                            title="Detay Görüntüle"
-                          >
-                            <EyeIcon className="w-5 h-5" />
-                          </button>
+                          {issue.status === 'beklemede' && (
+                            <button
+                              className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 transition-colors"
+                              onClick={() => handleDeleteIssue(issue.id)}
+                              title="Arızayı Sil"
+                            >
+                              <TrashIcon className="w-5 h-5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -654,26 +674,15 @@ export default function TeacherIssuesPage() {
                         </div>
                         
                         <div className="mt-4 flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => {
-                              setCurrentIssue(issue);
-                              setIsViewModalOpen(true);
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
-                          >
-                            <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
-                            Detaylar
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCurrentIssue(issue);
-                              setIsAddModalOpen(true);
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
-                          >
-                            <PencilSquareIcon className="w-3.5 h-3.5 mr-1.5" />
-                            Düzenle
-                          </button>
+                          {issue.status === 'beklemede' && (
+                            <button
+                              onClick={() => handleDeleteIssue(issue.id)}
+                              className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
+                            >
+                              <TrashIcon className="w-3.5 h-3.5 mr-1.5" />
+                              Sil
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
