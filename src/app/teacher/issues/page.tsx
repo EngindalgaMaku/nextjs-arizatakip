@@ -34,12 +34,14 @@ export default function TeacherIssuesPage() {
   const router = useRouter();
   
   // Arızaları yükle
-  const loadIssues = useCallback(async (teacherName: string) => {
+  const loadIssues = useCallback(async () => {
+    if (!teacher?.name) return;
+    
     try {
       setIsLoading(true);
       
       // API çağrısı
-      const { data, error } = await getIssuesForTeacher(teacherName || '');
+      const { data, error } = await getIssuesForTeacher(teacher.name);
       
       if (error) {
         console.error('Arızalar yüklenirken hata oluştu:', error);
@@ -80,7 +82,7 @@ export default function TeacherIssuesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [teacher]);
 
   // Öğretmen giriş kontrolü
   useEffect(() => {
@@ -105,9 +107,6 @@ export default function TeacherIssuesPage() {
             // Oturum süresi dolmuş
             localStorage.removeItem('teacherUser');
             router.push('/teacher/login');
-          } else {
-            // Öğretmen bilgisi geçerliyse arızaları yükle
-            loadIssues(parsedTeacher.name);
           }
         } catch (error) {
           console.error('Öğretmen verisi ayrıştırılamadı:', error);
@@ -118,7 +117,14 @@ export default function TeacherIssuesPage() {
     };
     
     checkTeacherAuth();
-  }, [router, loadIssues]);
+  }, [router]);
+
+  // Öğretmen değiştiğinde arızaları yükle
+  useEffect(() => {
+    if (teacher) {
+      loadIssues();
+    }
+  }, [teacher, loadIssues]);
 
   // Filtre işlemi
   const filteredIssues = issues.filter((issue) => {
@@ -196,9 +202,7 @@ export default function TeacherIssuesPage() {
   const handleAddSuccess = () => {
     setIsAddFormSubmitted(true);
     setIsAddModalOpen(false);
-    if (teacher) {
-      loadIssues(teacher.name);
-    }
+    loadIssues();
   };
 
   // Modal kapatma fonksiyonu  
