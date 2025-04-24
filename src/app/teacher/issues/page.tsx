@@ -445,8 +445,8 @@ export default function TeacherIssuesPage() {
             </div>
           </div>
           
-          {/* Filtreler */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Filtreler - sadece tablet ve masaüstünde göster */}
+          <div className="hidden md:grid md:grid-cols-4 gap-3">
             <div>
               <label htmlFor="status-filter" className="block text-xs text-gray-500 mb-1">Durum</label>
               <select
@@ -608,7 +608,7 @@ export default function TeacherIssuesPage() {
               </div>
               
               {/* Mobile View */}
-              <div className="xl:hidden">
+              <div className="md:hidden">
                 <div className="space-y-4">
                   {filteredIssues.map((issue) => (
                     <div 
@@ -652,7 +652,10 @@ export default function TeacherIssuesPage() {
                         
                         <div className="mt-4 flex items-center justify-end space-x-2">
                           <button
-                            onClick={() => viewIssueDetails(issue)}
+                            onClick={() => {
+                              setCurrentIssue(issue);
+                              setIsViewModalOpen(true);
+                            }}
                             className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
                           >
                             <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
