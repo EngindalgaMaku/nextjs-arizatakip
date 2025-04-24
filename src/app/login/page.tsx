@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn, demoSignIn } from '@/lib/auth';
+import { signIn } from '@/lib/supabase';
+import { setCookie } from 'cookies-next';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -27,32 +28,71 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       
+      console.log('Giriş deneniyor:', email);
+      
       if (DEMO_MODE) {
-        // Demo mod giriş işlemi
-        const { success, error } = await demoSignIn(email, password);
-        
-        if (!success) {
-          throw new Error(error);
+        // Demo giriş - sadece test için
+        if (email === 'admin@example.com' && password === 'admin123') {
+          const loginTime = new Date().toISOString();
+          const userData = {
+            email,
+            name: 'Demo Admin',
+            role: 'admin',
+            loginTime
+          };
+          
+          localStorage.setItem('adminUser', JSON.stringify(userData));
+          setCookie('admin-session', JSON.stringify(userData), {
+            maxAge: 60 * 60 * 8, // 8 saat
+            path: '/',
+          });
+          
+          router.push('/dashboard');
+        } else {
+          setError('Demo modunda geçersiz kimlik bilgileri. admin@example.com / admin123 kullanın.');
         }
-        
-        // Demo giriş başarılı ise dashboard'a yönlendir
-        router.push('/dashboard');
       } else {
         // Supabase giriş işlemi
         const { data, error } = await signIn(email, password);
+        
+        console.log('Supabase cevabı:', { data, error });
         
         if (error) {
           throw error;
         }
         
-        if (data.user) {
-          // Başarıyla giriş yapıldığında dashboard'a yönlendir
+        if (data?.user) {
+          // Kullanıcı doğrulandı, oturum bilgilerini kaydet
+          const userData = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.user_metadata?.name || data.user.email,
+            role: data.user.user_metadata?.role || 'admin',
+            loginTime: new Date().toISOString()
+          };
+          
+          // localStorage'a kaydet
+          localStorage.setItem('adminUser', JSON.stringify(userData));
+          
+          // Cookie'ye kaydet
+          setCookie('admin-session', JSON.stringify({
+            id: userData.id,
+            email: userData.email,
+            role: userData.role
+          }), {
+            maxAge: 60 * 60 * 8, // 8 saat
+            path: '/',
+          });
+          
+          // Yönlendirme
           router.push('/dashboard');
-          router.refresh(); // Session'ı güncellemek için
+        } else {
+          throw new Error('Kullanıcı bilgileri alınamadı');
         }
       }
     } catch (err: unknown) {
       console.error('Login error:', err);
+      
       // Türkçe hata mesajları
       if (err instanceof Error) {
         if (err.message.includes('Invalid login credentials')) {
@@ -60,7 +100,7 @@ export default function LoginPage() {
         } else if (err.message.includes('Email not confirmed')) {
           setError('Email adresi onaylanmamış');
         } else {
-          setError('Giriş yapılırken bir hata oluştu: ' + err.message);
+          setError(`Giriş yapılırken bir hata oluştu: ${err.message}`);
         }
       } else {
         setError('Giriş yapılırken bir hata oluştu');
@@ -70,11 +110,6 @@ export default function LoginPage() {
     }
   }
   
-  // Demo kullanıcı bilgilerini göster
-  const showDemo = () => {
-    alert("Demo Kullanıcılar:\n\nAdmin: admin@example.com / admin123\nEditör: editor@example.com / editor123");
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
@@ -130,21 +165,10 @@ export default function LoginPage() {
           </button>
         </form>
         
-        {DEMO_MODE && (
-          <div className="mt-4">
-            <button 
-              onClick={showDemo}
-              className="w-full text-center text-sm text-blue-600 hover:text-blue-800"
-            >
-              Demo kullanıcı bilgilerini göster
-            </button>
-          </div>
-        )}
-        
-        <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <Link 
             href="/" 
-            className="block text-center text-sm text-gray-600 hover:text-gray-800"
+            className="text-sm text-gray-600 hover:text-gray-800"
           >
             Ana Sayfaya Dön
           </Link>
