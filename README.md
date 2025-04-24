@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Admin Dashboard
+
+A modern admin dashboard built with Next.js, Tailwind CSS, and Supabase.
+
+## Features
+
+- User authentication and role-based access control
+- Dashboard overview with key metrics
+- User management
+- Product management
+- Analytics and reports
+- Settings configuration
+
+## Technologies Used
+
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- Supabase (Authentication & Database)
+- React Query (for data fetching)
+- Zustand (for state management)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 16+ and npm/yarn
+- Supabase account (for authentication and database)
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd admin-dashboard
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Configure environment variables:
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+4. Run the development server:
 
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a new Supabase project
+2. Set up the following tables:
+   - users (extends the built-in auth.users table)
+   - products
+   - orders
+   - settings
+3. Configure authentication providers in Supabase
+4. Set up Row Level Security (RLS) policies for each table
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+- `/src/app`: Main application routes and pages
+- `/src/app/dashboard`: Admin dashboard pages
+- `/src/components`: Reusable React components
+- `/src/lib`: Utility functions and shared code
+- `/src/lib/supabase.ts`: Supabase client and API functions
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+MIT
 
-## Deploy on Vercel
+## Contributing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
