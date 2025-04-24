@@ -12,7 +12,8 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [userName, setUserName] = useState('Admin User');
+  const [userName, setUserName] = useState('Yönetici');
+  const [schoolName, setSchoolName] = useState('Hüsniye Özdilek');
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           const storedUser = localStorage.getItem('demoAuthUser');
           if (storedUser) {
             const user = JSON.parse(storedUser);
-            setUserName(user.name || user.email?.split('@')[0] || 'Admin User');
+            setUserName(user.name || user.email?.split('@')[0] || 'Yönetici');
           }
         }
         
@@ -33,7 +34,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         /*
         const user = await getCurrentUser();
         if (user) {
-          setUserName(user.user_metadata?.name || user.email?.split('@')[0] || 'Admin User');
+          setUserName(user.user_metadata?.name || user.email?.split('@')[0] || 'Yönetici');
         }
         */
       } catch (error) {
@@ -83,7 +84,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         } fixed inset-y-0 left-0 z-30 w-64 bg-indigo-700 transition duration-300 ease-in-out transform md:translate-x-0 md:static md:inset-auto md:h-full`}
       >
         <div className="flex items-center justify-center h-16 bg-indigo-800">
-          <span className="text-xl font-semibold text-white">Hüsniye Özdilek</span>
+          <span className="text-xl font-semibold text-white">{schoolName}</span>
         </div>
         <div className="flex items-center justify-center h-10 bg-indigo-700">
           <span className="text-base font-medium text-white">Bilişim Alanı Şeflik</span>

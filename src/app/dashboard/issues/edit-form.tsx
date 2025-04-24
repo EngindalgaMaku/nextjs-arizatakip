@@ -9,7 +9,6 @@ const deviceTypes = [
   { value: 'akilli_tahta', label: 'Akıllı Tahta' },
   { value: 'bilgisayar', label: 'Bilgisayar' },
   { value: 'yazici', label: 'Yazıcı' },
-  { value: 'projektor', label: 'Projektör' },
   { value: 'diger', label: 'Diğer' }
 ];
 

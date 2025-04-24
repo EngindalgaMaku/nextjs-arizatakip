@@ -6,7 +6,7 @@ import { addIssue } from '@/lib/supabase';
 
 // Form verileri için şema ve tip
 const formSchema = z.object({
-  device_type: z.enum(['akilli_tahta', 'bilgisayar', 'yazici', 'projektor', 'diger']),
+  device_type: z.enum(['akilli_tahta', 'bilgisayar', 'yazici', 'diger']),
   device_name: z.string().min(2, 'Cihaz adı en az 2 karakter olmalıdır'),
   device_location: z.enum(['sinif', 'laboratuvar', 'idare', 'ogretmenler_odasi', 'diger']),
   room_number: z.string().min(1, 'Oda numarası girilmelidir'),
@@ -128,7 +128,7 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
         </div>
       )}
       
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2">
         <div>
           <label htmlFor="device_type" className="block text-sm font-medium text-gray-700">
             Cihaz Türü <span className="text-red-500">*</span>
@@ -145,7 +145,6 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
             <option value="akilli_tahta">Akıllı Tahta</option>
             <option value="bilgisayar">Bilgisayar</option>
             <option value="yazici">Yazıcı</option>
-            <option value="projektor">Projektör</option>
             <option value="diger">Diğer</option>
           </select>
           {errors.device_type && (
@@ -161,7 +160,7 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
             type="text"
             id="device_name"
             name="device_name"
-            placeholder="Örn: Smart Board 7000, Epson L3150"
+            placeholder="Ör: 10A Akıllı Tahtası"
             className={`mt-1 block w-full rounded-md border shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
               errors.device_name ? 'border-red-300' : 'border-gray-300'
             }`}
@@ -225,7 +224,7 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
         <textarea
           id="description"
           name="description"
-          rows={4}
+          rows={5}
           placeholder="Arızanın detaylı açıklamasını giriniz. Örn: Cihaz açılmıyor, ekranda görüntü yok, kağıt sıkışması var vb."
           className={`mt-1 block w-full rounded-md border shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
             errors.description ? 'border-red-300' : 'border-gray-300'

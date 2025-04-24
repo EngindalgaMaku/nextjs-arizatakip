@@ -34,12 +34,12 @@ export default function TeacherIssuesPage() {
   const router = useRouter();
   
   // Arızaları yükle
-  const loadIssues = useCallback(async () => {
+  const loadIssues = useCallback(async (teacherName: string) => {
     try {
       setIsLoading(true);
       
       // API çağrısı
-      const { data, error } = await getIssuesForTeacher(teacher?.name || '');
+      const { data, error } = await getIssuesForTeacher(teacherName || '');
       
       if (error) {
         console.error('Arızalar yüklenirken hata oluştu:', error);
@@ -80,7 +80,7 @@ export default function TeacherIssuesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [teacher]);
+  }, []);
 
   // Öğretmen giriş kontrolü
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function TeacherIssuesPage() {
             router.push('/teacher/login');
           } else {
             // Öğretmen bilgisi geçerliyse arızaları yükle
-            loadIssues();
+            loadIssues(parsedTeacher.name);
           }
         } catch (error) {
           console.error('Öğretmen verisi ayrıştırılamadı:', error);
@@ -196,7 +196,9 @@ export default function TeacherIssuesPage() {
   const handleAddSuccess = () => {
     setIsAddFormSubmitted(true);
     setIsAddModalOpen(false);
-    loadIssues();
+    if (teacher) {
+      loadIssues(teacher.name);
+    }
   };
 
   // Modal kapatma fonksiyonu  
@@ -544,10 +546,10 @@ export default function TeacherIssuesPage() {
       {isAddModalOpen && (
         <div className="modal-overlay" onClick={closeAddModal}>
           <div
-            className="modal-content max-w-2xl bg-white rounded-lg shadow-lg overflow-y-auto"
+            className="modal-content max-w-4xl bg-white rounded-lg shadow-lg overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="px-8 py-5 bg-gray-50 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900">Yeni Arıza Bildir</h2>
                 <button
@@ -572,7 +574,7 @@ export default function TeacherIssuesPage() {
               </div>
             </div>
             
-            <div className="px-6 py-4">
+            <div className="px-8 py-6">
               <AddIssueForm
                 onSuccess={handleAddSuccess}
                 onCancel={closeAddModal}

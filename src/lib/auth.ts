@@ -33,7 +33,7 @@ export async function getUser() {
 export async function demoSignIn(email: string, password: string) {
   // Test kullanıcıları
   const testUsers = [
-    { email: 'admin@example.com', password: 'admin123', role: 'admin', name: 'Admin User' },
+    { email: 'admin@example.com', password: 'admin123', role: 'admin', name: 'Teknik Destek' },
     { email: 'editor@example.com', password: 'editor123', role: 'editor', name: 'Editor User' },
   ];
   

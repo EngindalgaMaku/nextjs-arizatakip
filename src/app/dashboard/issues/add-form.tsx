@@ -9,7 +9,6 @@ const deviceTypes = [
   { value: 'akilli_tahta', label: 'Akıllı Tahta' },
   { value: 'bilgisayar', label: 'Bilgisayar' },
   { value: 'yazici', label: 'Yazıcı' },
-  { value: 'projektor', label: 'Projektör' },
   { value: 'diger', label: 'Diğer' }
 ];
 
@@ -172,7 +171,7 @@ export default function AddIssueForm({ onClose, onSuccess }: AddIssueFormProps) 
               value={formData.device_name}
               onChange={handleChange}
               className={`w-full p-2 border rounded-md ${formErrors.device_name ? 'border-red-500' : 'border-gray-300'}`}
-              placeholder="Cihaz adını girin"
+              placeholder="Cihaz adını girin. Ör: 10A Akıllı tahta"
             />
             {formErrors.device_name && (
               <p className="mt-1 text-sm text-red-500">{formErrors.device_name}</p>
