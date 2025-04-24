@@ -9,12 +9,26 @@ import { deleteCookie } from 'cookies-next';
 import Modal from '@/components/Modal';
 
 // Format date function
-const formatDate = (date: Date): string => {
-  return new Intl.DateTimeFormat('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
+const formatDate = (date: Date | string | null): string => {
+  try {
+    if (!date) return '-';
+    
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Geçerli bir tarih değeri mi kontrol et
+    if (isNaN(dateObj.getTime())) {
+      return '-';
+    }
+    
+    return new Intl.DateTimeFormat('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(dateObj);
+  } catch (error) {
+    console.error('Tarih formatı hatası:', error);
+    return '-';
+  }
 };
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
@@ -622,7 +636,7 @@ export default function TeacherIssuesPage() {
                                 </span>
                                 <span className="flex items-center">
                                   <ClockIcon className="h-3.5 w-3.5 mr-1" />
-                                  {formatDate(issue.created_at ? new Date(issue.created_at) : new Date())}
+                                  {formatDate(issue.created_at)}
                                 </span>
                               </div>
                             </div>
@@ -747,7 +761,7 @@ export default function TeacherIssuesPage() {
                     <div className="flex items-center space-x-2">
                       <ClockIcon className="h-5 w-5 text-gray-500" />
                       <p className="text-base text-gray-800">
-                        {currentIssue.created_at && formatDate(new Date(currentIssue.created_at))}
+                        {currentIssue.created_at && formatDate(currentIssue.created_at)}
                       </p>
                     </div>
                   </div>
