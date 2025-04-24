@@ -595,7 +595,10 @@ export default function TeacherIssuesPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             className="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-50 transition-colors"
-                            onClick={() => viewIssueDetails(issue)}
+                            onClick={() => {
+                              setCurrentIssue(issue);
+                              setIsViewModalOpen(true);
+                            }}
                             title="Detay Görüntüle"
                           >
                             <EyeIcon className="w-5 h-5" />
@@ -689,20 +692,8 @@ export default function TeacherIssuesPage() {
           onClose={closeViewModal}
           title="Arıza Detayı"
         >
-          <div className="p-4 max-w-4xl mx-auto bg-white rounded-lg">
+          <div className="p-4 bg-white rounded-lg">
             <div className="flex flex-col space-y-4">
-              <div className="flex justify-between items-center border-b pb-4">
-                <h2 className="text-xl font-bold text-gray-800">Arıza Detayı</h2>
-                <button
-                  onClick={() => setIsViewModalOpen(false)}
-                  className="p-1 rounded-full hover:bg-gray-100"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
