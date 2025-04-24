@@ -4,8 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIssuesForTeacher, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
 import AddIssueForm from './add-form';
-import { EyeIcon, PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
+import Modal from '@/components/Modal';
+
+// Format date function
+const formatDate = (date: Date): string => {
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+};
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -17,6 +27,46 @@ interface TeacherUser {
   name: string;
   role: string;
   loginTime: string;
+}
+
+// Helper functions for display
+function getDeviceTypeName(type: DeviceType) {
+  switch (type) {
+    case 'bilgisayar': return 'Bilgisayar';
+    case 'projektor': return 'Projektör';
+    case 'yazici': return 'Yazıcı';
+    case 'diger': return 'Diğer';
+    default: return type;
+  }
+}
+
+function getLocationName(location: DeviceLocation) {
+  switch (location) {
+    case 'sinif': return 'Sınıf';
+    case 'ogretmenler_odasi': return 'Öğretmenler Odası';
+    case 'lab': return 'Laboratuvar';
+    case 'diger': return 'Diğer';
+    default: return location;
+  }
+}
+
+function getIssuePriorityName(priority: IssuePriority) {
+  switch (priority) {
+    case 'kritik': return 'Kritik';
+    case 'normal': return 'Normal';
+    case 'dusuk': return 'Düşük';
+    default: return priority;
+  }
+}
+
+function getStatusName(status: IssueStatus) {
+  switch (status) {
+    case 'acik': return 'Açık';
+    case 'inceleniyor': return 'İnceleniyor';
+    case 'atandi': return 'Atandı';
+    case 'kapatildi': return 'Kapatıldı';
+    default: return status;
+  }
 }
 
 export default function TeacherIssuesPage() {
@@ -31,6 +81,7 @@ export default function TeacherIssuesPage() {
   const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
   const [isAddFormSubmitted, setIsAddFormSubmitted] = useState(false);
   const [teacher, setTeacher] = useState<TeacherUser | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<IssueData | null>(null);
   const router = useRouter();
   
   // Arızaları yükle
@@ -263,43 +314,7 @@ export default function TeacherIssuesPage() {
     setIsViewModalOpen(false);
   };
 
-  // Cihaz tipi çeviri fonksiyonu
-  const getDeviceTypeName = (type: DeviceType): string => {
-    const typeNames: Record<DeviceType, string> = {
-      'akilli_tahta': 'Akıllı Tahta',
-      'bilgisayar': 'Bilgisayar',
-      'yazici': 'Yazıcı',
-      'projektor': 'Projektör',
-      'diger': 'Diğer'
-    };
-    return typeNames[type] || type;
-  };
-
-  // Konum çeviri fonksiyonu
-  const getLocationName = (location: DeviceLocation): string => {
-    const locationNames: Record<DeviceLocation, string> = {
-      'sinif': 'Sınıf',
-      'laboratuvar': 'Laboratuvar',
-      'idare': 'İdare',
-      'ogretmenler_odasi': 'Öğretmenler Odası',
-      'diger': 'Diğer'
-    };
-    return locationNames[location] || location;
-  };
-
   // Durum çeviri fonksiyonu
-  const getStatusName = (status: IssueStatus): string => {
-    const statusNames: Record<IssueStatus, string> = {
-      'beklemede': 'Beklemede',
-      'atandi': 'Atandı',
-      'inceleniyor': 'İnceleniyor',
-      'cozuldu': 'Çözüldü',
-      'kapatildi': 'Kapatıldı'
-    };
-    return statusNames[status] || status;
-  };
-
-  // Durum rengi belirleme fonksiyonu
   const getStatusColor = (status: IssueStatus): string => {
     const colors: Record<IssueStatus, string> = {
       'beklemede': 'status-badge status-badge-beklemede',
@@ -394,28 +409,32 @@ export default function TeacherIssuesPage() {
             </button>
           </div>
           
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <input
-                  type="search"
-                  id="search"
-                  placeholder="Cihaz adı, arıza açıklaması veya oda numarası ile ara"
-                  className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+          {/* Arama */}
+          <div className="mb-4">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                </svg>
               </div>
+              <input
+                type="search"
+                id="search"
+                placeholder="Cihaz adı, arıza açıklaması veya oda numarası ile ara"
+                className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            
-            <div className="flex gap-2 flex-wrap md:flex-nowrap">
+          </div>
+          
+          {/* Filtreler */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label htmlFor="status-filter" className="block text-xs text-gray-500 mb-1">Durum</label>
               <select
-                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                id="status-filter"
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
               >
@@ -426,9 +445,13 @@ export default function TeacherIssuesPage() {
                 <option value="cozuldu">Çözüldü</option>
                 <option value="kapatildi">Kapatıldı</option>
               </select>
+            </div>
 
+            <div>
+              <label htmlFor="type-filter" className="block text-xs text-gray-500 mb-1">Cihaz Türü</label>
               <select
-                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                id="type-filter"
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
               >
@@ -439,9 +462,13 @@ export default function TeacherIssuesPage() {
                 <option value="projektor">Projektör</option>
                 <option value="diger">Diğer</option>
               </select>
+            </div>
 
+            <div>
+              <label htmlFor="location-filter" className="block text-xs text-gray-500 mb-1">Konum</label>
               <select
-                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                id="location-filter"
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
               >
@@ -452,7 +479,9 @@ export default function TeacherIssuesPage() {
                 <option value="ogretmenler_odasi">Öğretmenler Odası</option>
                 <option value="diger">Diğer</option>
               </select>
-              
+            </div>
+
+            <div className="flex items-end">
               <button 
                 type="button"
                 onClick={() => {
@@ -461,16 +490,16 @@ export default function TeacherIssuesPage() {
                   setSelectedType('all');
                   setSelectedLocation('all');
                 }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="w-full inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
               >
-                <AdjustmentsHorizontalIcon className="w-4 h-4 mr-2" />
+                <AdjustmentsHorizontalIcon className="w-4 h-4 mr-1" />
                 Sıfırla
               </button>
             </div>
           </div>
         </div>
       
-        {/* Arıza Tablosu */}
+        {/* Arıza Tablosu/Kartları */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           {filteredIssues.length === 0 ? (
             <div className="px-6 py-12 text-center">
@@ -497,166 +526,268 @@ export default function TeacherIssuesPage() {
               )}
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cihaz
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Konum
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durum
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Bildirim Tarihi
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredIssues.map((issue) => (
-                  <tr key={issue.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <span className="text-blue-700 font-medium">{getDeviceTypeName(issue.device_type as DeviceType).charAt(0)}</span>
+            <>
+              {/* Masaüstü için Tablo Görünümü - Sadece md boyutunun üzerinde görünür */}
+              <div className="hidden md:block">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cihaz
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Konum
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Durum
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Bildirim Tarihi
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        İşlemler
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredIssues.map((issue) => (
+                      <tr key={issue.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <span className="text-blue-700 font-medium">{getDeviceTypeName(issue.device_type as DeviceType).charAt(0)}</span>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
+                              <div className="text-sm text-gray-500">{getDeviceTypeName(issue.device_type as DeviceType)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{getLocationName(issue.device_location as DeviceLocation)}</div>
+                          <div className="text-sm text-gray-500">{issue.room_number}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={getStatusColor(issue.status as IssueStatus)}>
+                            {getStatusName(issue.status as IssueStatus)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {issue.created_at}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                            onClick={() => viewIssueDetails(issue)}
+                            title="Detay Görüntüle"
+                          >
+                            <EyeIcon className="w-5 h-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Mobile View */}
+              <div className="xl:hidden">
+                <div className="space-y-4">
+                  {filteredIssues.map((issue) => (
+                    <div 
+                      key={issue.id} 
+                      className="bg-white overflow-hidden shadow-sm rounded-lg hover:shadow-md transition-shadow divide-y divide-gray-200"
+                    >
+                      <div className="px-4 py-4 sm:px-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            {issue.device_type === "bilgisayar" ? (
+                              <ComputerDesktopIcon className="h-6 w-6 text-gray-500" />
+                            ) : issue.device_type === "projektor" ? (
+                              <FilmIcon className="h-6 w-6 text-gray-500" />
+                            ) : issue.device_type === "yazici" ? (
+                              <PrinterIcon className="h-6 w-6 text-gray-500" />
+                            ) : (
+                              <DevicePhoneMobileIcon className="h-6 w-6 text-gray-500" />
+                            )}
+                            <div>
+                              <h2 className="text-base font-semibold">{issue.device_name}</h2>
+                              <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
+                                <span className="flex items-center">
+                                  <MapPinIcon className="h-3.5 w-3.5 mr-1" />
+                                  {getLocationName(issue.device_location as DeviceLocation)} {issue.room_number}
+                                </span>
+                                <span className="flex items-center">
+                                  <ClockIcon className="h-3.5 w-3.5 mr-1" />
+                                  {formatDate(issue.created_at ? new Date(issue.created_at) : new Date())}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <span className={`${getStatusColor(issue.status as IssueStatus)}`}>
+                            {getStatusName(issue.status as IssueStatus)}
+                          </span>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
-                          <div className="text-sm text-gray-500">{getDeviceTypeName(issue.device_type as DeviceType)}</div>
+                        
+                        <div className="mt-3 text-sm text-gray-800 line-clamp-2">
+                          {issue.description}
+                        </div>
+                        
+                        <div className="mt-4 flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => viewIssueDetails(issue)}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
+                          >
+                            <EyeIcon className="w-3.5 h-3.5 mr-1.5" />
+                            Detaylar
+                          </button>
+                          <button
+                            onClick={() => {
+                              setCurrentIssue(issue);
+                              setIsAddModalOpen(true);
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
+                          >
+                            <PencilSquareIcon className="w-3.5 h-3.5 mr-1.5" />
+                            Düzenle
+                          </button>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{getLocationName(issue.device_location as DeviceLocation)}</div>
-                      <div className="text-sm text-gray-500">{issue.room_number}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={getStatusColor(issue.status as IssueStatus)}>
-                        {getStatusName(issue.status as IssueStatus)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {issue.created_at}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-50 transition-colors"
-                        onClick={() => viewIssueDetails(issue)}
-                        title="Detay Görüntüle"
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </main>
 
       {/* View Modal */}
       {isViewModalOpen && currentIssue && (
-        <div className="modal-overlay" onClick={closeViewModal}>
-          <div
-            className="modal-content max-w-2xl bg-white rounded-lg shadow-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Arıza Detayları</h2>
+        <Modal
+          isOpen={isViewModalOpen}
+          onClose={closeViewModal}
+          title="Arıza Detayı"
+        >
+          <div className="p-4 max-w-4xl mx-auto bg-white rounded-lg">
+            <div className="flex flex-col space-y-4">
+              <div className="flex justify-between items-center border-b pb-4">
+                <h2 className="text-xl font-bold text-gray-800">Arıza Detayı</h2>
                 <button
-                  onClick={closeViewModal}
-                  className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="p-1 rounded-full hover:bg-gray-100"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-            </div>
-            
-            <div className="px-6 py-4">
-              <dl className="divide-y divide-gray-200">
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Cihaz Türü</dt>
-                  <dd className="text-sm text-gray-900 col-span-2">{getDeviceTypeName(currentIssue.device_type as DeviceType)}</dd>
+              
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Cihaz Adı</h3>
+                    <p className="text-base text-gray-800">{currentIssue.device_name}</p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Cihaz Türü</h3>
+                    <div className="flex items-center space-x-2">
+                      {currentIssue.device_type === "bilgisayar" ? (
+                        <ComputerDesktopIcon className="h-5 w-5 text-gray-500" />
+                      ) : currentIssue.device_type === "projektor" ? (
+                        <FilmIcon className="h-5 w-5 text-gray-500" />
+                      ) : currentIssue.device_type === "yazici" ? (
+                        <PrinterIcon className="h-5 w-5 text-gray-500" />
+                      ) : (
+                        <DevicePhoneMobileIcon className="h-5 w-5 text-gray-500" />
+                      )}
+                      <p className="text-base text-gray-800">{getDeviceTypeName(currentIssue.device_type as DeviceType)}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Konum</h3>
+                    <div className="flex items-center space-x-2">
+                      <MapPinIcon className="h-5 w-5 text-gray-500" />
+                      <p className="text-base text-gray-800">{getLocationName(currentIssue.device_location as DeviceLocation)}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Öncelik</h3>
+                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      currentIssue.priority === 'kritik' ? 'bg-red-100 text-red-800' :
+                      currentIssue.priority === 'normal' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {getIssuePriorityName(currentIssue.priority as IssuePriority)}
+                    </div>
+                  </div>
                 </div>
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Cihaz Adı</dt>
-                  <dd className="text-sm text-gray-900 col-span-2">{currentIssue.device_name}</dd>
-                </div>
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Konum</dt>
-                  <dd className="text-sm text-gray-900 col-span-2">{getLocationName(currentIssue.device_location as DeviceLocation)} - {currentIssue.room_number}</dd>
-                </div>
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Bildiren</dt>
-                  <dd className="text-sm text-gray-900 col-span-2">{currentIssue.reported_by}</dd>
-                </div>
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Durum</dt>
-                  <dd className="text-sm text-gray-900 col-span-2">
-                    <span className={getStatusColor(currentIssue.status as IssueStatus)}>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Durum</h3>
+                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      currentIssue.status === 'inceleniyor' ? 'bg-yellow-100 text-yellow-800' :
+                      currentIssue.status === 'kapatildi' ? 'bg-green-100 text-green-800' :
+                      currentIssue.status === 'atandi' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
                       {getStatusName(currentIssue.status as IssueStatus)}
-                    </span>
-                  </dd>
-                </div>
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Bildirim Tarihi</dt>
-                  <dd className="text-sm text-gray-900 col-span-2">{currentIssue.created_at}</dd>
-                </div>
-                <div className="py-3 grid grid-cols-3 gap-4">
-                  <dt className="text-sm font-medium text-gray-500">Açıklama</dt>
-                  <dd className="text-sm text-gray-900 col-span-2 whitespace-pre-wrap">{currentIssue.description}</dd>
-                </div>
-                {currentIssue.notes && (
-                  <div className="py-3 grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-500">Teknik Notlar</dt>
-                    <dd className="text-sm text-gray-900 col-span-2 whitespace-pre-wrap">{currentIssue.notes}</dd>
+                    </div>
                   </div>
-                )}
-                {currentIssue.assigned_to && (
-                  <div className="py-3 grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-500">Atanan Kişi</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">{currentIssue.assigned_to}</dd>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Bildirim Tarihi</h3>
+                    <div className="flex items-center space-x-2">
+                      <ClockIcon className="h-5 w-5 text-gray-500" />
+                      <p className="text-base text-gray-800">
+                        {currentIssue.created_at && formatDate(new Date(currentIssue.created_at))}
+                      </p>
+                    </div>
                   </div>
-                )}
-                {currentIssue.resolved_at && (
-                  <div className="py-3 grid grid-cols-3 gap-4">
-                    <dt className="text-sm font-medium text-gray-500">Çözüldüğü Tarih</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">{currentIssue.resolved_at}</dd>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Bildiren</h3>
+                    <p className="text-base text-gray-800">{currentIssue.reported_by}</p>
                   </div>
-                )}
-              </dl>
-            </div>
-            
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-              <button
-                onClick={closeViewModal}
-                className="w-full bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Kapat
-              </button>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Atanan</h3>
+                    <p className="text-base text-gray-800">{currentIssue.assigned_to || 'Henüz atanmadı'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-gray-500">Açıklama</h3>
+                <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{currentIssue.description}</p>
+                </div>
+              </div>
+              
+              {currentIssue.notes && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-500">Notlar</h3>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{currentIssue.notes}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-end space-x-3 mt-4 pt-4 border-t">
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md"
+                >
+                  Kapat
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Add Modal */}
