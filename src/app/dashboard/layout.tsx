@@ -123,20 +123,24 @@ export default function DashboardLayout({
       
       {/* Sidebar */}
       <div 
-        className={`fixed inset-y-0 left-0 w-72 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-20 ${
+        className={`fixed inset-y-0 left-0 w-72 bg-blue-800 shadow-lg transform transition-transform duration-300 ease-in-out z-20 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 md:static md:w-72`}
       >
         <div className="flex flex-col h-full">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-indigo-700">HÖ-NextDB</h1>
-            <p className="text-sm text-gray-500">Admin Paneli</p>
+          <div className="px-6 py-4 border-b border-blue-700">
+            <h1 className="text-2xl font-bold text-white">Arıza Takip Sistemi</h1>
+            <p className="text-sm text-blue-200">Yönetici Paneli</p>
           </div>
           
           <nav className="flex-1 px-4 py-4 space-y-1">
             <Link
               href="/dashboard"
-              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                pathname === "/dashboard"
+                  ? "bg-blue-700 text-white"
+                  : "text-gray-100 hover:bg-blue-700 hover:text-white"
+              }`}
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -152,12 +156,16 @@ export default function DashboardLayout({
                   d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                 />
               </svg>
-              Dashboard
+              Gösterge Paneli
             </Link>
 
             <Link
               href="/dashboard/issues"
-              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                pathname.includes("/issues")
+                  ? "bg-blue-700 text-white"
+                  : "text-gray-100 hover:bg-blue-700 hover:text-white"
+              }`}
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -173,12 +181,16 @@ export default function DashboardLayout({
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                 />
               </svg>
-              Arıza Takip
+              Arızalar
             </Link>
 
             <Link
               href="/dashboard/users"
-              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                pathname.includes("/users")
+                  ? "bg-blue-700 text-white"
+                  : "text-gray-100 hover:bg-blue-700 hover:text-white"
+              }`}
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -199,7 +211,11 @@ export default function DashboardLayout({
 
             <Link
               href="/dashboard/reports"
-              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                pathname.includes("/reports")
+                  ? "bg-blue-700 text-white"
+                  : "text-gray-100 hover:bg-blue-700 hover:text-white"
+              }`}
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -220,7 +236,11 @@ export default function DashboardLayout({
 
             <Link
               href="/dashboard/settings"
-              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                pathname.includes("/settings")
+                  ? "bg-blue-700 text-white"
+                  : "text-gray-100 hover:bg-blue-700 hover:text-white"
+              }`}
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -249,7 +269,7 @@ export default function DashboardLayout({
           {/* Mobile Sign Out Button */}
           <button
             onClick={handleSignOut}
-            className="md:hidden my-2 mx-4 flex items-center px-4 py-3 text-sm font-medium rounded-md text-red-600 hover:bg-red-50 transition-colors"
+            className="md:hidden my-2 mx-4 flex items-center px-4 py-3 text-sm font-medium rounded-md text-white hover:bg-red-600 transition-colors"
           >
             <LogOutIcon className="mr-3 h-5 w-5" />
             Çıkış Yap
@@ -344,7 +364,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 ml-0 md:ml-72">
           {children}
         </main>
       </div>
