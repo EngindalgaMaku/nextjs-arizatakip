@@ -171,41 +171,32 @@ export async function deleteUser(id: string) {
 }
 
 // Arıza İşlemleri
-export async function getIssues(filters?: Partial<Issue>) {
+export const getIssues = async (limit?: number) => {
   try {
-    let query = supabase.from('issues').select('*');
+    let query = supabase
+      .from('issues')
+      .select('*');
     
-    // Filtreler uygulanıyor
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          query = query.eq(key, value);
-        }
-      });
+    if (limit) {
+      query = query.limit(limit);
     }
     
-    const result = await query.order('created_at', { ascending: false });
+    const { data, error } = await query;
     
-    // Supabase hatası durumunda
-    if (result.error) {
-      // PostgreSQL hata kodlarına göre daha spesifik hata mesajları
-      if (result.error.code === '42P01') {
-        // Tablo bulunamadı hatası
-        console.error('Issues tablosu veritabanında bulunamadı. Tablo oluşturuldu mu?');
-      } else if (result.error.code === '42501') {
-        // Yetki hatası
-        console.error('Issues tablosuna erişim yetkisi yok. RLS politikaları kontrol edin.');
-      }
-      
-      throw new Error(`Veritabanı hatası: ${result.error.message}`);
+    if (error) {
+      console.error('Error fetching issues:', error);
+      return { error, data: null };
     }
     
-    return result;
+    return { data, error: null };
   } catch (error) {
-    console.error('getIssues hatası:', error);
-    throw error;
+    console.error('Exception fetching issues:', error);
+    return { 
+      error: error instanceof Error ? error : new Error('Unknown error fetching issues'), 
+      data: null 
+    };
   }
-}
+};
 
 export async function getIssue(id: string) {
   try {
