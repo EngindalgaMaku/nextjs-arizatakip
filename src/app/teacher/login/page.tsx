@@ -1,17 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { setCookie } from 'cookies-next';
-import { getTeacherAccessCode } from '@/lib/supabase';
+import { getTeacherAccessCode, getSystemSetting } from '@/lib/supabase';
 
 export default function TeacherLoginPage() {
   const [teacherName, setTeacherName] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [siteName, setSiteName] = useState('Öğretmen Arıza Bildirim Sistemi');
   const router = useRouter();
+
+  // Site adını yükle
+  useEffect(() => {
+    async function loadSiteName() {
+      try {
+        // "site_name" ayarını getir
+        const { data, error } = await getSystemSetting('site_name');
+        
+        if (!error && data?.value) {
+          setSiteName(data.value + ' - Öğretmen Girişi');
+        } else {
+          // Varsayılan değer
+          setSiteName('Öğretmen Arıza Bildirim Sistemi');
+        }
+      } catch (err) {
+        console.error('Site adı yüklenirken hata:', err);
+        // Hata durumunda varsayılan değer
+        setSiteName('Öğretmen Arıza Bildirim Sistemi');
+      }
+    }
+    
+    loadSiteName();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,7 +160,7 @@ export default function TeacherLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-center mb-6">
-          Öğretmen Arıza Bildirim Sistemi
+          {siteName}
         </h1>
         
         {error && (

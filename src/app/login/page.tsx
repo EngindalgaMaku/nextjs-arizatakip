@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn } from '@/lib/supabase';
+import { signIn, getSystemSetting } from '@/lib/supabase';
 import { setCookie } from 'cookies-next';
 
 export default function LoginPage() {
@@ -11,10 +11,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [siteName, setSiteName] = useState('Yönetici Paneli');
   const router = useRouter();
   
   // Demo modunu kontrol edecek değişken (Supabase kurulumu yoksa true yapın)
   const DEMO_MODE = false;
+
+  // Site adını yükle
+  useEffect(() => {
+    async function loadSiteName() {
+      try {
+        // "site_name" ayarını getir
+        const { data, error } = await getSystemSetting('site_name');
+        
+        if (!error && data?.value) {
+          setSiteName(data.value);
+        } else {
+          // Varsayılan değer
+          setSiteName('Hüsniye Özdilek Bilişim Alanı Şeflik Yönetici Paneli');
+        }
+      } catch (err) {
+        console.error('Site adı yüklenirken hata:', err);
+        // Hata durumunda varsayılan değer
+        setSiteName('Hüsniye Özdilek Bilişim Alanı Şeflik Yönetici Paneli');
+      }
+    }
+    
+    loadSiteName();
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -114,7 +138,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-center mb-6">
-          Hüsniye Özdilek Bilişim Alanı Şeflik Yönetici Paneli
+          {siteName}
         </h1>
         
         {error && (
