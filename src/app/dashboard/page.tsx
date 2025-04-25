@@ -33,50 +33,53 @@ export default function DashboardPage() {
       try {
         setIsLoading(true);
         
-        if (DEMO_MODE) {
-          // Demo verisi
-          console.log("Demo modunda panel verileri yükleniyor...");
-          setTimeout(() => {
-            setCounts({
-              openIssuesCount: 8,
-              resolvedIssuesCount: 42,
-              usersCount: 15,
-              totalIssuesCount: 50
-            });
-            setIsLoading(false);
-          }, 800);
-          return;
+        // Supabase'den gerçek verileri çek
+        const { getIssues, getUsers } = await import('@/lib/supabase');
+        
+        // Arızaları çek
+        const issuesResult = await getIssues();
+        if (issuesResult.error) {
+          console.error('Arızalar yüklenirken hata:', issuesResult.error);
+          alert('Arıza verileri yüklenirken hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin.');
+          throw issuesResult.error;
         }
         
-        // Gerçek API'den veri çekme - Demo modunda bu kısım gerekmediği için yorum satırı haline getirdim
-        /*
-        const { data, error } = await getCounts();
-        
-        if (error) {
-          console.error('Veriler yüklenirken hata oluştu:', error);
-          throw error;
+        // Kullanıcıları çek
+        const usersResult = await getUsers();
+        if (usersResult.error) {
+          console.error('Kullanıcılar yüklenirken hata:', usersResult.error);
+          alert('Kullanıcı verileri yüklenirken hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin.');
+          throw usersResult.error;
         }
+        
+        // İstatistikleri hesapla
+        const issues = issuesResult.data || [];
+        const users = usersResult.data || [];
+        
+        const openIssues = issues.filter(issue => 
+          issue.status !== 'cozuldu' && issue.status !== 'kapatildi'
+        );
+        
+        const resolvedIssues = issues.filter(issue => 
+          issue.status === 'cozuldu' || issue.status === 'kapatildi'
+        );
         
         setCounts({
-          openIssuesCount: data.openIssuesCount,
-          resolvedIssuesCount: data.resolvedIssuesCount,
-          usersCount: data.usersCount,
-          totalIssuesCount: data.totalIssuesCount
+          openIssuesCount: openIssues.length,
+          resolvedIssuesCount: resolvedIssues.length,
+          usersCount: users.length,
+          totalIssuesCount: issues.length
         });
-        */
-        throw new Error("API bağlantısı yok - Demo modu aktif");
       } catch (err) {
         console.error('Dashboard verileri yüklenemedi:', err);
         
-        if (typeof window !== 'undefined') {
-          console.warn('Demo verilerine geçiliyor...');
-          setCounts({
-            openIssuesCount: 5,
-            resolvedIssuesCount: 15,
-            usersCount: 10,
-            totalIssuesCount: 20
-          });
-        }
+        // Hata durumunda sıfır değerler göster
+        setCounts({
+          openIssuesCount: 0,
+          resolvedIssuesCount: 0,
+          usersCount: 0,
+          totalIssuesCount: 0
+        });
       } finally {
         setIsLoading(false);
       }
@@ -87,14 +90,9 @@ export default function DashboardPage() {
       if (typeof window !== 'undefined') {
         const adminSession = localStorage.getItem('adminUser');
         
-        if (!adminSession && !DEMO_MODE) {
+        if (!adminSession) {
           router.push('/admin/login');
           return false;
-        }
-        
-        if (DEMO_MODE) {
-          console.log("Demo mod aktif: Yetkilendirme kontrolü atlandı");
-          return true;
         }
         
         try {
@@ -118,7 +116,7 @@ export default function DashboardPage() {
     
     const isAuthenticated = checkAuth();
     
-    if (isAuthenticated || DEMO_MODE) {
+    if (isAuthenticated) {
       loadDashboardData();
     }
   }, [router]);
@@ -265,9 +263,9 @@ export default function DashboardPage() {
               <div className="bg-gray-50 px-4 py-5 sm:p-6">
                 <div className="text-center py-10">
                   <BellAlertIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Demo modunda çalışıyor</h3>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Yakında Eklenecek</h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Canlı veriye erişim için API bağlantısı gerekiyor.
+                    Bu özellik yakında aktif olacaktır.
                   </p>
                   <div className="mt-6">
                     <Link 
@@ -292,9 +290,9 @@ export default function DashboardPage() {
               <div className="bg-gray-50 px-4 py-5 sm:p-6">
                 <div className="text-center py-10">
                   <PresentationChartLineIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Demo modunda çalışıyor</h3>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Yakında Eklenecek</h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Grafikler ve istatistikler için veritabanı bağlantısı gerekiyor.
+                    Grafikler ve detaylı istatistikler yakında eklenecektir.
                   </p>
                   <div className="mt-6">
                     <Link 

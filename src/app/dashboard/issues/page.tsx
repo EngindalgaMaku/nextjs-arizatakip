@@ -291,177 +291,404 @@ export default function IssuesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Arıza Takip Sistemi</h1>
-        <p className="mt-1 text-gray-500">Okuldaki tüm cihazların arıza kayıtlarını yönetin</p>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">Arıza Takip Sistemi</h1>
+        <p className="text-gray-500 text-sm sm:text-base">Okuldaki tüm cihazların arıza kayıtlarını yönetin</p>
       </div>
       
-      {/* Filtreler ve Arama */}
-      <div className="flex flex-wrap gap-4 mb-6">
-        <div className="flex-1">
-          <label htmlFor="search" className="sr-only">
-            Arıza ara
-          </label>
-          <input
-            type="search"
-            id="search"
-            placeholder="Cihaz adı, arıza açıklaması veya oda numarası ile ara"
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* Filtreler ve Arama - Mobil Responsive */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+          <div className="w-full md:w-1/2 mb-4 md:mb-0">
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+              Arama
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <input
+                type="search"
+                id="search"
+                placeholder="Cihaz adı, açıklama veya oda numarası"
+                className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-full md:w-auto px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            onClick={() => openAddModal()}
+          >
+            <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Arıza Ekle
+          </button>
         </div>
+        
+        {/* Filtreler - Mobil için açılır/kapanır tasarım */}
+        <div className="mt-4">
+          <details className="md:hidden">
+            <summary className="text-sm font-medium text-indigo-600 cursor-pointer p-2 border rounded-md hover:bg-indigo-50 transition-colors">
+              Filtreleme Seçenekleri
+            </summary>
+            <div className="mt-3 space-y-3 p-3 border rounded-md bg-gray-50">
+              <div>
+                <label htmlFor="mobile-status" className="block text-sm font-medium text-gray-700 mb-1">
+                  Durum
+                </label>
+                <select
+                  id="mobile-status"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                >
+                  <option value="all">Tüm Durumlar</option>
+                  <option value="beklemede">Beklemede</option>
+                  <option value="atandi">Atandı</option>
+                  <option value="inceleniyor">İnceleniyor</option>
+                  <option value="cozuldu">Çözüldü</option>
+                  <option value="kapatildi">Kapatıldı</option>
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="mobile-type" className="block text-sm font-medium text-gray-700 mb-1">
+                  Cihaz Türü
+                </label>
+                <select
+                  id="mobile-type"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                >
+                  <option value="all">Tüm Cihazlar</option>
+                  <option value="akilli_tahta">Akıllı Tahta</option>
+                  <option value="bilgisayar">Bilgisayar</option>
+                  <option value="yazici">Yazıcı</option>
+                  <option value="projektor">Projektör</option>
+                  <option value="diger">Diğer</option>
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="mobile-location" className="block text-sm font-medium text-gray-700 mb-1">
+                  Konum
+                </label>
+                <select
+                  id="mobile-location"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                >
+                  <option value="all">Tüm Konumlar</option>
+                  <option value="sinif">Sınıf</option>
+                  <option value="laboratuvar">Laboratuvar</option>
+                  <option value="idare">İdare</option>
+                  <option value="ogretmenler_odasi">Öğretmenler Odası</option>
+                  <option value="diger">Diğer</option>
+                </select>
+              </div>
+              
+              <button 
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedStatus('all');
+                  setSelectedType('all');
+                  setSelectedLocation('all');
+                }}
+                className="w-full inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Filtreleri Sıfırla
+              </button>
+            </div>
+          </details>
+          
+          {/* Masaüstü için yatay filtreler */}
+          <div className="hidden md:grid md:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                Durum
+              </label>
+              <select
+                id="status"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              >
+                <option value="all">Tüm Durumlar</option>
+                <option value="beklemede">Beklemede</option>
+                <option value="atandi">Atandı</option>
+                <option value="inceleniyor">İnceleniyor</option>
+                <option value="cozuldu">Çözüldü</option>
+                <option value="kapatildi">Kapatıldı</option>
+              </select>
+            </div>
 
-        <select
-          className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-        >
-          <option value="all">Tüm Durumlar</option>
-          <option value="beklemede">Beklemede</option>
-          <option value="atandi">Atandı</option>
-          <option value="inceleniyor">İnceleniyor</option>
-          <option value="cozuldu">Çözüldü</option>
-          <option value="kapatildi">Kapatıldı</option>
-        </select>
+            <div>
+              <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                Cihaz Türü
+              </label>
+              <select
+                id="type"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+              >
+                <option value="all">Tüm Cihazlar</option>
+                <option value="akilli_tahta">Akıllı Tahta</option>
+                <option value="bilgisayar">Bilgisayar</option>
+                <option value="yazici">Yazıcı</option>
+                <option value="projektor">Projektör</option>
+                <option value="diger">Diğer</option>
+              </select>
+            </div>
 
-        <select
-          className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-        >
-          <option value="all">Tüm Cihazlar</option>
-          <option value="akilli_tahta">Akıllı Tahta</option>
-          <option value="bilgisayar">Bilgisayar</option>
-          <option value="yazici">Yazıcı</option>
-          <option value="projektor">Projektör</option>
-          <option value="diger">Diğer</option>
-        </select>
+            <div>
+              <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+                Konum
+              </label>
+              <select
+                id="location"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              >
+                <option value="all">Tüm Konumlar</option>
+                <option value="sinif">Sınıf</option>
+                <option value="laboratuvar">Laboratuvar</option>
+                <option value="idare">İdare</option>
+                <option value="ogretmenler_odasi">Öğretmenler Odası</option>
+                <option value="diger">Diğer</option>
+              </select>
+            </div>
 
-        <select
-          className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          value={selectedLocation}
-          onChange={(e) => setSelectedLocation(e.target.value)}
-        >
-          <option value="all">Tüm Konumlar</option>
-          <option value="sinif">Sınıf</option>
-          <option value="laboratuvar">Laboratuvar</option>
-          <option value="idare">İdare</option>
-          <option value="ogretmenler_odasi">Öğretmenler Odası</option>
-          <option value="diger">Diğer</option>
-        </select>
-
-        <button
-          type="button"
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          onClick={() => openAddModal()}
-        >
-          Arıza Ekle
-        </button>
+            <div className="flex items-end">
+              <button 
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedStatus('all');
+                  setSelectedType('all');
+                  setSelectedLocation('all');
+                }}
+                className="w-full inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Filtreleri Sıfırla
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       
-      {/* Arıza Tablosu */}
+      {/* Arıza İçeriği */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Cihaz
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Konum
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Durum
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Öncelik
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Tarih
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                İşlemler
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredIssues.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                  Arama kriterlerinize uygun arıza kaydı bulunamadı
-                </td>
-              </tr>
-            ) : (
-              filteredIssues.map((issue) => (
-                <tr key={issue.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => viewIssueDetails(issue)}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                        <span className="text-indigo-700">{getDeviceTypeName(issue.device_type as DeviceType).charAt(0)}</span>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
-                        <div className="text-sm text-gray-500">{getDeviceTypeName(issue.device_type as DeviceType)}</div>
+        {filteredIssues.length === 0 ? (
+          <div className="py-10 px-4 text-center">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">Arıza kaydı bulunamadı</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Arama kriterlerinize uygun arıza kaydı bulunamadı
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Masaüstü Tablo Görünümü - md boyutundan büyük ekranlar için */}
+            <div className="hidden md:block">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cihaz
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Konum
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Durum
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Öncelik
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tarih
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      İşlemler
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredIssues.map((issue) => (
+                    <tr key={issue.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => viewIssueDetails(issue)}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <span className="text-indigo-700">{getDeviceTypeName(issue.device_type as any).charAt(0)}</span>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
+                            <div className="text-sm text-gray-500">{getDeviceTypeName(issue.device_type as any)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{getLocationName(issue.device_location as any)}</div>
+                        <div className="text-sm text-gray-500">{issue.room_number}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(issue.status as any)}`}>
+                          {getStatusName(issue.status as any)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(issue.priority as any)}`}>
+                          {(issue.priority as any) === 'dusuk' ? 'Düşük' :
+                            (issue.priority as any) === 'normal' ? 'Normal' :
+                            (issue.priority as any) === 'yuksek' ? 'Yüksek' :
+                            (issue.priority as any) === 'kritik' ? 'Kritik' : issue.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {issue.created_at}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          className="text-indigo-600 hover:text-indigo-900 mr-3 p-1 rounded-full hover:bg-indigo-100 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            viewIssueDetails(issue);
+                          }}
+                          title="Detay Görüntüle"
+                        >
+                          <EyeIcon className="w-5 h-5" />
+                        </button>
+                        <button
+                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteIssue(issue.id);
+                          }}
+                          title="Sil"
+                        >
+                          <TrashIcon className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Mobil Kart Görünümü - md boyutundan küçük ekranlar için */}
+            <div className="md:hidden">
+              <ul className="divide-y divide-gray-200">
+                {filteredIssues.map((issue) => (
+                  <li key={issue.id} className="px-4 py-4">
+                    <div 
+                      className="bg-white overflow-hidden border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                      onClick={() => viewIssueDetails(issue)}
+                    >
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                              <span className="text-indigo-700 font-medium">{getDeviceTypeName(issue.device_type as any).charAt(0)}</span>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
+                              <div className="text-xs text-gray-500">{getDeviceTypeName(issue.device_type as any)}</div>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${getStatusColor(issue.status as any)}`}>
+                            {getStatusName(issue.status as any)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-wrap text-sm text-gray-500 mt-2">
+                          <div className="w-1/2 mb-1">
+                            <span className="font-medium">Konum:</span> {getLocationName(issue.device_location as any)} ({issue.room_number})
+                          </div>
+                          <div className="w-1/2 mb-1">
+                            <span className="font-medium">Öncelik:</span> <span className={`px-1.5 py-0.5 rounded-full text-xs ${getPriorityColor(issue.priority as any)}`}>
+                              {(issue.priority as any) === 'dusuk' ? 'Düşük' :
+                                (issue.priority as any) === 'normal' ? 'Normal' :
+                                (issue.priority as any) === 'yuksek' ? 'Yüksek' :
+                                (issue.priority as any) === 'kritik' ? 'Kritik' : issue.priority}
+                            </span>
+                          </div>
+                          <div className="w-full mb-1">
+                            <span className="font-medium">Oluşturan:</span> {issue.reported_by}
+                          </div>
+                          <div className="w-full">
+                            <span className="font-medium">Tarih:</span> {issue.created_at}
+                          </div>
+                        </div>
+                        
+                        <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end space-x-2">
+                          <button
+                            className="p-2 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              viewIssueDetails(issue);
+                            }}
+                            title="Detay Görüntüle"
+                          >
+                            <EyeIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            className="p-2 rounded-md text-red-600 hover:bg-red-50 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteIssue(issue.id);
+                            }}
+                            title="Sil"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{getLocationName(issue.device_location as DeviceLocation)}</div>
-                    <div className="text-sm text-gray-500">{issue.room_number}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(issue.status as IssueStatus)}`}>
-                      {getStatusName(issue.status as IssueStatus)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(issue.priority as IssuePriority)}`}>
-                      {issue.priority === 'dusuk' ? 'Düşük' :
-                        issue.priority === 'normal' ? 'Normal' :
-                        issue.priority === 'yuksek' ? 'Yüksek' :
-                        issue.priority === 'kritik' ? 'Kritik' : issue.priority}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {issue.created_at}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      className="text-indigo-600 hover:text-indigo-900 mr-3 p-1 rounded-full hover:bg-indigo-100 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        viewIssueDetails(issue);
-                      }}
-                      title="Detay Görüntüle"
-                    >
-                      <EyeIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteIssue(issue.id);
-                      }}
-                      title="Sil"
-                    >
-                      <TrashIcon className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
       </div>
 
       {/* View Modal */}
       {isViewModalOpen && currentIssue && (
         <div className="modal-overlay" onClick={closeViewModal}>
           <div
-            className="modal-content max-w-2xl mx-auto mt-20 p-5 rounded-lg shadow-lg bg-white"
+            className="modal-content max-w-2xl mx-auto mt-4 sm:mt-20 p-4 sm:p-5 rounded-lg shadow-lg bg-white overflow-y-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold mb-4">Arıza Detayları</h2>
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+              <h2 className="text-xl font-bold">Arıza Detayları</h2>
+              <button
+                onClick={closeViewModal}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <ViewIssueForm 
               issue={currentIssue} 
               onEdit={() => {
@@ -469,12 +696,21 @@ export default function IssuesPage() {
                 setIsEditModalOpen(true);
               }}
             />
-            <div className="mt-4 flex justify-end">
+            <div className="mt-6 flex justify-end">
               <button
                 onClick={closeViewModal}
-                className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 mr-2"
               >
                 Kapat
+              </button>
+              <button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setIsEditModalOpen(true);
+                }}
+                className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                Düzenle
               </button>
             </div>
           </div>
@@ -485,28 +721,17 @@ export default function IssuesPage() {
       {isEditModalOpen && currentIssue && (
         <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
           <div
-            className="modal-content max-w-2xl mx-auto mt-20 p-5 rounded-lg shadow-lg bg-white overflow-y-auto max-h-[90vh]"
+            className="modal-content max-w-2xl mx-auto mt-4 sm:mt-20 p-4 sm:p-5 rounded-lg shadow-lg bg-white overflow-y-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
               <h2 className="text-xl font-bold">Arıza Düzenle</h2>
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -525,11 +750,24 @@ export default function IssuesPage() {
       {/* Add Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={closeAddModal}>
-          <div className="bg-white rounded-lg shadow-xl overflow-hidden max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
-            <AddIssueForm 
-              onClose={closeAddModal} 
-              onSuccess={handleAddSuccess}
-            />
+          <div className="bg-white rounded-lg shadow-xl overflow-hidden max-w-2xl w-full overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Yeni Arıza Ekle</h2>
+              <button
+                onClick={closeAddModal}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <AddIssueForm 
+                onClose={closeAddModal} 
+                onSuccess={handleAddSuccess}
+              />
+            </div>
           </div>
         </div>
       )}

@@ -3,16 +3,23 @@
 import { useState } from 'react';
 import { z } from 'zod';
 import { addIssue } from '@/lib/supabase';
+import { getDeviceTypeName, getLocationName } from '@/lib/helpers';
 
-// Form verileri için şema ve tip
+// Form tipini doğrudan form elemanları için kullanacağız
+// Bu tip veritabanı etkileşimi için değil, form için kullanılacak
+type FormDeviceType = 'akilli_tahta' | 'bilgisayar' | 'yazici' | 'projektor' | 'diger';
+type FormDeviceLocation = 'sinif' | 'laboratuvar' | 'idare' | 'ogretmenler_odasi' | 'diger';
+
+// Form verileri için şema
 const formSchema = z.object({
-  device_type: z.enum(['akilli_tahta', 'bilgisayar', 'yazici', 'diger']),
+  device_type: z.enum(['akilli_tahta', 'bilgisayar', 'yazici', 'projektor', 'diger'] as const),
   device_name: z.string().min(2, 'Cihaz adı en az 2 karakter olmalıdır'),
-  device_location: z.enum(['sinif', 'laboratuvar', 'idare', 'ogretmenler_odasi', 'diger']),
+  device_location: z.enum(['sinif', 'laboratuvar', 'idare', 'ogretmenler_odasi', 'diger'] as const),
   room_number: z.string().min(1, 'Oda numarası girilmelidir'),
   description: z.string().min(10, 'Açıklama en az 10 karakter olmalıdır'),
 });
 
+// Form alanları için tip
 type FormData = z.infer<typeof formSchema>;
 
 interface AddIssueFormProps {
@@ -20,6 +27,23 @@ interface AddIssueFormProps {
   onCancel: (e?: React.MouseEvent) => void;
   teacherName: string;
 }
+
+// Cihaz türleri için seçenekler
+const deviceTypes = [
+  { value: 'akilli_tahta', label: 'Akıllı Tahta' },
+  { value: 'bilgisayar', label: 'Bilgisayar' },
+  { value: 'yazici', label: 'Yazıcı' },
+  { value: 'diger', label: 'Diğer' }
+];
+
+// Cihaz konumları için seçenekler
+const deviceLocations = [
+  { value: 'sinif', label: 'Sınıf' },
+  { value: 'laboratuvar', label: 'Laboratuvar' },
+  { value: 'idare', label: 'İdare' },
+  { value: 'ogretmenler_odasi', label: 'Öğretmenler Odası' },
+  { value: 'diger', label: 'Diğer' }
+];
 
 export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIssueFormProps) {
   const [formData, setFormData] = useState<FormData>({
@@ -88,58 +112,30 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
     try {
       setIsLoading(true);
       
-      // Demo modu etkinleştir
-      const DEMO_MODE = false;
-      
-      if (DEMO_MODE) {
-        // Demo modunda API çağrısı yapmadan başarılı olduğunu varsay
-        console.log("Demo modunda arıza kaydı oluşturuluyor:", {
-          ...formData,
-          reported_by: teacherName,
-          status: 'beklemede',
-          priority: 'normal'
-        });
-        
-        // 1 saniye gecikme ile başarılı olduğunu bildir (gerçekçilik için)
-        setTimeout(() => {
-          setIsLoading(false);
-          onSuccess();
-        }, 1000);
-        
-        return;
-      }
-      
-      // Gerçek API çağrısında gerekli verileri hazırla
-      const issueData = {
+      // TypeScript'in any kullanımı burada bilerek yapılıyor
+      // Tip çakışmalarını önlemek için
+      const issueData: any = {
         ...formData,
         reported_by: teacherName,
-        // Varsayılan olarak durumu "beklemede" olarak ayarla
-        status: 'beklemede' as const,
-        // Varsayılan olarak önceliği "normal" olarak ayarla
-        priority: 'normal' as const,
+        status: 'beklemede',
+        priority: 'normal',
       };
       
-      const { error } = await addIssue(issueData);
-      
-      if (error) {
-        throw error;
-      }
-      
-      onSuccess();
+      await addIssue(issueData)
+        .then(({ error }) => {
+          if (error) throw error;
+          onSuccess();
+        })
+        .catch((error) => {
+          console.error('Arıza eklenirken hata oluştu:', error);
+          setSubmitError('Arıza eklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     } catch (error) {
       console.error('Arıza eklenirken hata oluştu:', error);
       setSubmitError('Arıza eklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-      
-      // Demo modunda hataya rağmen başarılı olduğunu bildir
-      if (typeof window !== 'undefined') {
-        console.warn('Demo modunda devam ediliyor...');
-        setTimeout(() => {
-          setIsLoading(false);
-          onSuccess();
-        }, 1000);
-        return;
-      }
-    } finally {
       setIsLoading(false);
     }
   };
@@ -173,10 +169,9 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
             value={formData.device_type}
             onChange={handleInputChange}
           >
-            <option value="akilli_tahta">Akıllı Tahta</option>
-            <option value="bilgisayar">Bilgisayar</option>
-            <option value="yazici">Yazıcı</option>
-            <option value="diger">Diğer</option>
+            {deviceTypes.map(type => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
           </select>
           {errors.device_type && (
             <p className="mt-2 text-sm text-red-600">{errors.device_type}</p>
@@ -216,11 +211,9 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
             value={formData.device_location}
             onChange={handleInputChange}
           >
-            <option value="sinif">Sınıf</option>
-            <option value="laboratuvar">Laboratuvar</option>
-            <option value="idare">İdare</option>
-            <option value="ogretmenler_odasi">Öğretmenler Odası</option>
-            <option value="diger">Diğer</option>
+            {deviceLocations.map(location => (
+              <option key={location.value} value={location.value}>{location.label}</option>
+            ))}
           </select>
           {errors.device_location && (
             <p className="mt-2 text-sm text-red-600">{errors.device_location}</p>

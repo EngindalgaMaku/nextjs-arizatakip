@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+// import { DeviceType, DeviceLocation, IssueStatus, IssuePriority } from './enums';
 
 // .env.local'den ortam değişkenleri
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gcxbfmqyvqchcrudxpmh.supabase.co";
@@ -241,7 +242,7 @@ export async function updateIssue(id: string, data: Partial<Issue>) {
   const updatedData = {
     ...data,
     updated_at: new Date().toISOString(),
-    ...(data.status === 'cozuldu' && !data.resolved_at ? { resolved_at: new Date().toISOString() } : {})
+    ...(data.status === 'cozuldu' as any && !data.resolved_at ? { resolved_at: new Date().toISOString() } : {})
   };
   
   return supabase.from('issues').update(updatedData).eq('id', id);
@@ -417,5 +418,46 @@ export async function updateSystemSetting(key: string, value: string, userId: st
   } catch (err) {
     console.error('Ayar güncellenirken hata:', err);
     throw err;
+  }
+}
+
+// Mevcut kullanıcı bilgilerini getir
+export async function loadUserData() {
+  try {
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+    
+    if (sessionError || !user) {
+      throw sessionError || new Error('Kullanıcı oturumu bulunamadı');
+    }
+    
+    // Kullanıcı detaylarını veritabanından al
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    if (error) {
+      console.error('Kullanıcı verisi alınamadı:', error);
+      // Temel bilgilerle devam et
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.email?.split('@')[0] || 'Kullanıcı',
+        role: 'admin' as const
+      };
+    }
+    
+    return data as User;
+  } catch (error) {
+    console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+    // Demo ortamında temel kullanıcı verisi döndür
+    if (DEMO_MODE && typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('demoAuthUser');
+      if (storedUser) {
+        return JSON.parse(storedUser);
+      }
+    }
+    return null;
   }
 } 

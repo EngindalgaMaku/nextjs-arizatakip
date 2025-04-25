@@ -2,7 +2,18 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
+import { 
+  DeviceType, 
+  DeviceLocation, 
+  IssueStatus, 
+  IssuePriority 
+} from '@/lib/supabase';
+import {
+  getDeviceTypeName,
+  getLocationName,
+  getStatusName,
+  getPriorityName
+} from '@/lib/helpers';
 
 // Constants for device types and locations
 const deviceTypes = [

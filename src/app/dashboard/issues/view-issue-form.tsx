@@ -1,9 +1,16 @@
 'use client';
 
 import React from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { tr } from 'date-fns/locale';
-import { Issue as SupabaseIssue, IssueStatus, IssuePriority } from '@/lib/supabase';
+import { Issue as SupabaseIssue } from '@/lib/supabase';
+import { 
+  getStatusName, 
+  getPriorityName, 
+  getStatusColor, 
+  getPriorityColor, 
+  formatDate,
+  getDeviceTypeName,
+  getLocationName
+} from '@/lib/helpers';
 
 // Use the interface that matches IssueData from page.tsx
 interface Issue extends Omit<SupabaseIssue, 'created_at' | 'updated_at' | 'resolved_at'> {
@@ -16,110 +23,6 @@ interface ViewIssueFormProps {
   issue: Issue;
   onClose?: () => void;
   onEdit?: () => void;
-}
-
-// Helper function to get priority label
-function getPriorityLabel(priority: IssuePriority): string {
-  switch (priority) {
-    case 'dusuk':
-      return 'Düşük';
-    case 'normal':
-      return 'Normal';
-    case 'yuksek':
-      return 'Yüksek';
-    case 'kritik':
-      return 'Kritik';
-    default:
-      return priority;
-  }
-}
-
-// Helper function to get status label
-function getStatusLabel(status: IssueStatus): string {
-  switch (status) {
-    case 'beklemede':
-      return 'Beklemede';
-    case 'atandi':
-      return 'Atandı';
-    case 'inceleniyor':
-      return 'İnceleniyor';
-    case 'cozuldu':
-      return 'Çözüldü';
-    case 'kapatildi':
-      return 'Kapatıldı';
-    default:
-      return status;
-  }
-}
-
-// Helper function to get status color
-function getStatusColor(status: IssueStatus): string {
-  switch (status) {
-    case 'beklemede':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'atandi':
-      return 'bg-blue-100 text-blue-800';
-    case 'inceleniyor':
-      return 'bg-purple-100 text-purple-800';
-    case 'cozuldu':
-      return 'bg-green-100 text-green-800';
-    case 'kapatildi':
-      return 'bg-gray-100 text-gray-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
-
-// Helper function to get priority color
-function getPriorityColor(priority: IssuePriority): string {
-  switch (priority) {
-    case 'dusuk':
-      return 'bg-blue-100 text-blue-800';
-    case 'normal':
-      return 'bg-green-100 text-green-800';
-    case 'yuksek':
-      return 'bg-orange-100 text-orange-800';
-    case 'kritik':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
-
-// Helper function to format date
-function formatDate(dateString: string | null): string {
-  if (!dateString) return 'Belirtilmemiş';
-  
-  try {
-    // Önce standart tarih formatını deneyelim
-    let date = new Date(dateString);
-    
-    // Eğer geçersiz bir tarih oluştuysa ve format "DD.MM.YYYY" veya "DD.MM.YYYY HH:MM" gibi ise
-    if (isNaN(date.getTime()) && dateString.includes('.')) {
-      const parts = dateString.split(' ');
-      const datePart = parts[0];
-      const timePart = parts.length > 1 ? parts[1] : '';
-      
-      const [day, month, year] = datePart.split('.').map(part => parseInt(part, 10));
-      
-      if (timePart) {
-        const [hours, minutes] = timePart.split(':').map(part => parseInt(part, 10));
-        date = new Date(year, month - 1, day, hours, minutes);
-      } else {
-        date = new Date(year, month - 1, day);
-      }
-    }
-    
-    // Son kontrol: Hala geçersiz bir tarih mi?
-    if (isNaN(date.getTime())) {
-      return 'Geçersiz tarih formatı';
-    }
-    
-    return `${date.toLocaleDateString('tr-TR')} ${date.toLocaleTimeString('tr-TR')} (${formatDistanceToNow(date, { addSuffix: true, locale: tr })})`;
-  } catch (e) {
-    console.error('Tarih işleme hatası:', e, 'Tarih değeri:', dateString);
-    return 'Tarih işlenemedi';
-  }
 }
 
 export default function ViewIssueForm({ issue, onClose, onEdit }: ViewIssueFormProps) {
@@ -142,10 +45,10 @@ export default function ViewIssueForm({ issue, onClose, onEdit }: ViewIssueFormP
           <h3 className="text-xl font-semibold mb-2">{issue.device_name}</h3>
           <div className="flex flex-wrap gap-2 mb-3">
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(issue.status)}`}>
-              {getStatusLabel(issue.status)}
+              {getStatusName(issue.status)}
             </span>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(issue.priority)}`}>
-              {getPriorityLabel(issue.priority)}
+              {getPriorityName(issue.priority)}
             </span>
           </div>
           <p className="text-gray-700 whitespace-pre-wrap">{issue.description}</p>
@@ -155,10 +58,10 @@ export default function ViewIssueForm({ issue, onClose, onEdit }: ViewIssueFormP
           <div>
             <h4 className="font-medium text-gray-700">Cihaz Bilgileri</h4>
             <p className="text-gray-600">
-              <span className="font-medium">Tür:</span> {issue.device_type || 'Belirtilmemiş'}
+              <span className="font-medium">Tür:</span> {issue.device_type ? getDeviceTypeName(issue.device_type) : 'Belirtilmemiş'}
             </p>
             <p className="text-gray-600">
-              <span className="font-medium">Konum:</span> {issue.device_location || 'Belirtilmemiş'}
+              <span className="font-medium">Konum:</span> {issue.device_location ? getLocationName(issue.device_location) : 'Belirtilmemiş'}
             </p>
           </div>
 

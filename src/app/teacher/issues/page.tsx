@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
 import AddIssueForm from './add-form';
-import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon, PresentationChartBarIcon, DeviceTabletIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
 
 // Format date function
@@ -63,7 +63,7 @@ interface TeacherUser {
 }
 
 // Helper functions for display
-function getDeviceTypeName(type: DeviceType) {
+function getDeviceTypeName(type: any) {
   switch (type) {
     case 'bilgisayar': return 'Bilgisayar';
     case 'projektor': return 'Projektör';
@@ -480,21 +480,21 @@ export default function TeacherIssuesPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                              <span className="text-blue-700 font-medium">{getDeviceTypeName(issue.device_type as DeviceType).charAt(0)}</span>
+                              <span className="text-blue-700 font-medium">{getDeviceTypeName(issue.device_type as any).charAt(0)}</span>
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
-                              <div className="text-sm text-gray-500">{getDeviceTypeName(issue.device_type as DeviceType)}</div>
+                              <div className="text-sm text-gray-500">{getDeviceTypeName(issue.device_type as any)}</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{getLocationName(issue.device_location as DeviceLocation)}</div>
+                          <div className="text-sm text-gray-900">{getLocationName(issue.device_location as any)}</div>
                           <div className="text-sm text-gray-500">{issue.room_number}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={getStatusColor(issue.status as IssueStatus)}>
-                            {getStatusName(issue.status as IssueStatus)}
+                          <span className={`${getStatusColor(issue.status as any)}`}>
+                            {getStatusName(issue.status as any)}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -510,7 +510,7 @@ export default function TeacherIssuesPage() {
                           {formatDate(issue.created_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {issue.status === 'beklemede' && (
+                          {(issue.status as any) === 'beklemede' && (
                             <button
                               className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 transition-colors"
                               onClick={() => handleDeleteIssue(issue.id)}
@@ -537,21 +537,21 @@ export default function TeacherIssuesPage() {
                       <div className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            {issue.device_type === "bilgisayar" ? (
-                              <ComputerDesktopIcon className="h-6 w-6 text-gray-500" />
-                            ) : issue.device_type === "projektor" ? (
-                              <FilmIcon className="h-6 w-6 text-gray-500" />
-                            ) : issue.device_type === "yazici" ? (
-                              <PrinterIcon className="h-6 w-6 text-gray-500" />
+                            {(issue.device_type as any) === 'bilgisayar' ? (
+                              <ComputerDesktopIcon className="h-10 w-10 text-blue-500" />
+                            ) : (issue.device_type as any) === 'projektor' ? (
+                              <PresentationChartBarIcon className="h-10 w-10 text-purple-500" />
+                            ) : (issue.device_type as any) === 'yazici' ? (
+                              <PrinterIcon className="h-10 w-10 text-green-500" />
                             ) : (
-                              <DevicePhoneMobileIcon className="h-6 w-6 text-gray-500" />
+                              <DeviceTabletIcon className="h-10 w-10 text-red-500" />
                             )}
                             <div>
                               <h2 className="text-base font-semibold">{issue.device_name}</h2>
                               <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
                                 <span className="flex items-center">
                                   <MapPinIcon className="h-3.5 w-3.5 mr-1" />
-                                  {getLocationName(issue.device_location as DeviceLocation)} {issue.room_number}
+                                  {getLocationName(issue.device_location as any)} {issue.room_number}
                                 </span>
                                 <span className="flex items-center">
                                   <ClockIcon className="h-3.5 w-3.5 mr-1" />
@@ -560,8 +560,8 @@ export default function TeacherIssuesPage() {
                               </div>
                             </div>
                           </div>
-                          <span className={`${getStatusColor(issue.status as IssueStatus)}`}>
-                            {getStatusName(issue.status as IssueStatus)}
+                          <span className={`${getStatusColor(issue.status as any)}`}>
+                            {getStatusName(issue.status as any)}
                           </span>
                         </div>
                         
@@ -577,7 +577,7 @@ export default function TeacherIssuesPage() {
                         </div>
                         
                         <div className="mt-4 flex items-center justify-end space-x-2">
-                          {issue.status === 'beklemede' && (
+                          {(issue.status as any) === 'beklemede' && (
                             <button
                               onClick={() => handleDeleteIssue(issue.id)}
                               className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
