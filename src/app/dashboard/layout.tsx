@@ -136,11 +136,7 @@ export default function DashboardLayout({
           <nav className="flex-1 px-4 py-4 space-y-1">
             <Link
               href="/dashboard"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                pathname === "/dashboard"
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -161,11 +157,7 @@ export default function DashboardLayout({
 
             <Link
               href="/dashboard/issues"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                pathname.includes("/issues")
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -186,11 +178,7 @@ export default function DashboardLayout({
 
             <Link
               href="/dashboard/users"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                pathname.includes("/users")
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -211,11 +199,7 @@ export default function DashboardLayout({
 
             <Link
               href="/dashboard/reports"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                pathname.includes("/reports")
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             >
               <svg
                 className="mr-3 h-5 w-5"
@@ -236,11 +220,7 @@ export default function DashboardLayout({
 
             <Link
               href="/dashboard/settings"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                pathname.includes("/settings")
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
+              className="flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             >
               <svg
                 className="mr-3 h-5 w-5"
