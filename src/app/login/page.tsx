@@ -43,7 +43,7 @@ export default function LoginPage() {
           
           localStorage.setItem('adminUser', JSON.stringify(userData));
           setCookie('admin-session', JSON.stringify(userData), {
-            maxAge: 60 * 60 * 8, // 8 saat
+            maxAge: 60 * 60 * 24 * 365, // 1 yıl
             path: '/',
           });
           
@@ -80,7 +80,7 @@ export default function LoginPage() {
             email: userData.email,
             role: userData.role
           }), {
-            maxAge: 60 * 60 * 8, // 8 saat
+            maxAge: 60 * 60 * 24 * 365, // 1 yıl
             path: '/',
           });
           

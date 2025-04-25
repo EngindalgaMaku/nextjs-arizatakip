@@ -22,18 +22,18 @@ export function middleware(request: NextRequest) {
         const adminSessionCookie = request.cookies.get('admin-session');
         if (!adminSessionCookie?.value) {
           // Session yoksa login sayfasına yönlendir
-          return NextResponse.redirect(new URL('/admin/login', request.url));
+          return NextResponse.redirect(new URL('/login', request.url));
         }
         
         try {
           // Session değerini ayrıştır
           const session = JSON.parse(adminSessionCookie.value);
           if (!session || !session.role || session.role !== 'admin') {
-            return NextResponse.redirect(new URL('/admin/login', request.url));
+            return NextResponse.redirect(new URL('/login', request.url));
           }
         } catch (error) {
           console.error('Admin session ayrıştırma hatası:', error);
-          return NextResponse.redirect(new URL('/admin/login', request.url));
+          return NextResponse.redirect(new URL('/login', request.url));
         }
       }
     } else if (path.startsWith('/teacher')) {

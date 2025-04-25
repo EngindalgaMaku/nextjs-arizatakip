@@ -85,7 +85,19 @@ export default function DashboardLayout({
 
   const handleSignOut = async () => {
     try {
+      // Clear localStorage and cookies
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('adminUser');
+      }
+      
+      // Clear cookies using import
+      const { deleteCookie } = await import('cookies-next');
+      deleteCookie('admin-session');
+      
+      // Call Supabase signOut
       await signOut();
+      
+      // Redirect to login page
       router.push("/login");
     } catch (error) {
       console.error("Error signing out:", error);

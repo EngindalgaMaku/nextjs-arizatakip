@@ -91,7 +91,7 @@ export default function DashboardPage() {
         const adminSession = localStorage.getItem('adminUser');
         
         if (!adminSession) {
-          router.push('/admin/login');
+          router.push('/login');
           return false;
         }
         
@@ -100,14 +100,14 @@ export default function DashboardPage() {
           const isValid = parsedSession && parsedSession.role === 'admin';
           
           if (!isValid) {
-            router.push('/admin/login');
+            router.push('/login');
             return false;
           }
           
           return true;
         } catch (error) {
           console.error('Admin verisi ayrıştırılamadı:', error);
-          router.push('/admin/login');
+          router.push('/login');
           return false;
         }
       }

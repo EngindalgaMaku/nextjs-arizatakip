@@ -56,7 +56,7 @@ export default function TeacherLoginPage() {
         
         // Cookie'ye kaydet (middleware için)
         setCookie('teacher-session', JSON.stringify(teacherData), {
-          maxAge: 60 * 60 * 8, // 8 saat
+          maxAge: 60 * 60 * 24 * 365, // 1 yıl
           path: '/',
         });
         
@@ -91,7 +91,7 @@ export default function TeacherLoginPage() {
       
       // Cookie'ye kaydet (middleware için)
       setCookie('teacher-session', JSON.stringify(teacherData), {
-        maxAge: 60 * 60 * 8, // 8 saat
+        maxAge: 60 * 60 * 24 * 365, // 1 yıl
         path: '/',
       });
       
@@ -117,7 +117,7 @@ export default function TeacherLoginPage() {
         
         // Cookie'ye kaydet
         setCookie('teacher-session', JSON.stringify(teacherData), {
-          maxAge: 60 * 60 * 8, // 8 saat
+          maxAge: 60 * 60 * 24 * 365, // 1 yıl
           path: '/',
         });
         

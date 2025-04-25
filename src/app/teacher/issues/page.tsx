@@ -171,16 +171,7 @@ export default function TeacherIssuesPage() {
           const parsedTeacher = JSON.parse(teacherData) as TeacherUser;
           setTeacher(parsedTeacher);
           
-          // Giriş süresi kontrolü (örn: 8 saat sonra otomatik çıkış)
-          const loginTime = new Date(parsedTeacher.loginTime).getTime();
-          const currentTime = new Date().getTime();
-          const hoursPassed = (currentTime - loginTime) / (1000 * 60 * 60);
-          
-          if (hoursPassed > 8) {
-            // Oturum süresi dolmuş
-            localStorage.removeItem('teacherUser');
-            router.push('/teacher/login');
-          }
+          // Login süresi kontrolü kaldırıldı - Kullanıcı logout olana kadar oturumu açık kalacak
         } catch (error) {
           console.error('Öğretmen verisi ayrıştırılamadı:', error);
           localStorage.removeItem('teacherUser');
@@ -248,14 +239,20 @@ export default function TeacherIssuesPage() {
   // Öğretmen oturumunu kapatma
   const handleLogout = () => {
     if (window.confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
-      // Local Storage'dan sil
-      localStorage.removeItem('teacherUser');
-      
-      // Cookie'den sil  
-      deleteCookie('teacher-session', { path: '/' });
-      
-      // Login sayfasına yönlendir
-      router.push('/teacher/login');
+      try {
+        // Local Storage'dan sil
+        localStorage.removeItem('teacherUser');
+        
+        // Cookie'den sil  
+        deleteCookie('teacher-session', { path: '/' });
+        
+        // Login sayfasına yönlendir
+        router.push('/teacher/login');
+      } catch (error) {
+        console.error('Çıkış yaparken hata:', error);
+        // Hata olsa bile login sayfasına yönlendir
+        router.push('/teacher/login');
+      }
     }
   };
 
