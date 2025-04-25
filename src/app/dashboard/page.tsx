@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, BellAlertIcon, UsersIcon, DocumentTextIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, PrinterIcon, FilmIcon, DeviceTabletIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
+import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 // Temporary fix for missing getCounts - this will be implemented in supabase.ts
 // import { getCounts } from '@/lib/supabase';
 // Sidebar artık layout'tan geldiği için import etmeye gerek yok
@@ -28,6 +29,9 @@ export default function DashboardPage() {
     totalIssuesCount: 0
   });
   const [recentIssues, setRecentIssues] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<{id: string; message: string; isRead: boolean}[]>([]);
+  const [showNotification, setShowNotification] = useState(false);
+  const supabaseSubscription = useRef<any>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -138,8 +142,104 @@ export default function DashboardPage() {
     
     if (isAuthenticated) {
       loadDashboardData();
+      setupRealtimeSubscription();
     }
+
+    return () => {
+      // Aboneliği temizle
+      if (supabaseSubscription.current) {
+        supabaseSubscription.current.unsubscribe();
+      }
+    };
   }, [router]);
+
+  // Gerçek zamanlı abonelik kurulumu
+  const setupRealtimeSubscription = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      
+      // issues tablosundaki yeni kayıtları dinle
+      supabaseSubscription.current = supabase
+        .channel('issues-channel')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'issues' 
+        }, (payload) => {
+          // Yeni bir arıza oluşturulduğunda
+          const newIssue = payload.new;
+          
+          // Bildirim oluştur
+          const notification = {
+            id: newIssue.id,
+            message: `Yeni arıza bildirimi: ${newIssue.device_name} (${getDeviceTypeName(newIssue.device_type)}) - ${newIssue.reported_by} tarafından`,
+            isRead: false
+          };
+          
+          // Bildirimleri güncelle
+          setNotifications(prev => [notification, ...prev]);
+          
+          // Bildirim göster
+          setShowNotification(true);
+          
+          // Sayıları güncelle
+          setCounts(prev => ({
+            ...prev,
+            openIssuesCount: prev.openIssuesCount + 1,
+            totalIssuesCount: prev.totalIssuesCount + 1
+          }));
+          
+          // Son arızaları güncelle
+          const formattedIssue = {
+            id: newIssue.id,
+            device_type: newIssue.device_type,
+            device_name: newIssue.device_name,
+            description: newIssue.description,
+            status: newIssue.status,
+            reported_by: newIssue.reported_by,
+            room_number: newIssue.room_number || 'Belirtilmedi',
+            created_at: newIssue.created_at
+          };
+          
+          setRecentIssues(prev => [formattedIssue, ...prev].slice(0, 5));
+          
+          // Sesli bildirim
+          playNotificationSound();
+        })
+        .subscribe();
+      
+    } catch (error) {
+      console.error('Gerçek zamanlı abonelik kurulurken hata:', error);
+    }
+  };
+
+  // Bildirim sesi çal
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('/notification.mp3');
+      audio.play().catch(e => console.log('Ses çalma hatası:', e));
+    } catch (error) {
+      console.error('Bildirim sesi çalınamadı:', error);
+    }
+  };
+
+  // Bildirimi kapat
+  const closeNotification = () => {
+    setShowNotification(false);
+  };
+
+  // Bildirime tıklama
+  const handleNotificationClick = (id: string) => {
+    // Bildirimi okundu olarak işaretle
+    setNotifications(prev => 
+      prev.map(notif => 
+        notif.id === id ? { ...notif, isRead: true } : notif
+      )
+    );
+    
+    // İlgili arıza detayına yönlendir
+    router.push(`/dashboard/issues?id=${id}`);
+  };
 
   if (isLoading) {
     return (
@@ -203,6 +303,48 @@ export default function DashboardPage() {
   return (
     <div className="admin-content">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Bildirim alanı */}
+        {showNotification && notifications.length > 0 && (
+          <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <BellIcon className="h-6 w-6 text-blue-600" aria-hidden="true" />
+                </div>
+                <div className="ml-3 w-0 flex-1 pt-0.5">
+                  <p className="text-sm font-medium text-gray-900">Yeni arıza bildirimi</p>
+                  <p className="mt-1 text-sm text-gray-500">{notifications[0].message}</p>
+                  <div className="mt-3 flex space-x-3">
+                    <button
+                      type="button"
+                      className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      onClick={() => handleNotificationClick(notifications[0].id)}
+                    >
+                      Görüntüle
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      onClick={closeNotification}
+                    >
+                      Kapat
+                    </button>
+                  </div>
+                </div>
+                <div className="ml-4 flex-shrink-0 flex">
+                  <button
+                    className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    onClick={closeNotification}
+                  >
+                    <span className="sr-only">Kapat</span>
+                    <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="py-6">
           <h1 className="text-3xl font-bold text-gray-900">Yönetim Paneli</h1>
           <p className="mt-1 text-gray-500">
