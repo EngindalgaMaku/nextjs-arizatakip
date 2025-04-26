@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 export default function PWAGuidePage() {
   const [deviceType, setDeviceType] = useState<'ios' | 'android'>('ios');
+  const router = useRouter();
   
   const isIOS = () => {
     if (typeof window !== 'undefined') {
@@ -110,12 +111,12 @@ export default function PWAGuidePage() {
       </div>
       
       <div className="mt-4 text-center">
-        <Link 
-          href="/"
+        <button 
+          onClick={() => router.push('/')}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           Ana Sayfaya Dön
-        </Link>
+        </button>
       </div>
       
       <div className="mt-8 text-center text-sm text-gray-500">

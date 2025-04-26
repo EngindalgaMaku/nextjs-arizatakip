@@ -214,20 +214,20 @@ export default function LoginPage() {
         </form>
         
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-          <Link 
-            href="/" 
+          <button 
+            onClick={() => router.push('/')}
             className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center mr-4"
           >
             <HomeIcon className="w-4 h-4 mr-1" />
             Ana Sayfaya Dön
-          </Link>
-          <Link 
-            href="/pwa-guide" 
+          </button>
+          <button 
+            onClick={() => router.push('/pwa-guide')}
             className="text-sm text-indigo-600 hover:text-indigo-800 inline-flex items-center"
           >
             <DevicePhoneMobileIcon className="w-4 h-4 mr-1" />
             Uygulamayı Ana Ekrana Ekle
-          </Link>
+          </button>
         </div>
       </div>
     </div>

@@ -376,15 +376,21 @@ export default function TeacherLoginPage() {
         </form>
         
         <div className="mt-6 text-center text-sm text-gray-600">
-          <Link href="/" className="inline-flex items-center text-blue-600 hover:text-blue-800">
+          <button 
+            onClick={() => router.push('/')}
+            className="inline-flex items-center text-blue-600 hover:text-blue-800"
+          >
             <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
             Yönetici Girişi
-          </Link>
+          </button>
           <div className="mt-2">
-            <Link href="/pwa-guide" className="inline-flex items-center text-green-600 hover:text-green-800">
+            <button 
+              onClick={() => router.push('/pwa-guide')}
+              className="inline-flex items-center text-green-600 hover:text-green-800"
+            >
               <PhoneIcon className="h-4 w-4 mr-1" />
               Uygulamayı Telefona Ekle
-            </Link>
+            </button>
           </div>
         </div>
       </div>
