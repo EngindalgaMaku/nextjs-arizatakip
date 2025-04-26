@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { z } from 'zod';
 import { addIssue } from '@/lib/supabase';
 import { getDeviceTypeName, getLocationName } from '@/lib/helpers';
+import Swal from 'sweetalert2';
 
 // Form tipini doğrudan form elemanları için kullanacağız
 // Bu tip veritabanı etkileşimi için değil, form için kullanılacak
@@ -125,11 +126,27 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
         .then(({ error, data }) => {
           if (error) throw error;
           
+          // Bildirim ve başarı işlemleri
+          Swal.fire({
+            title: 'Başarılı!',
+            text: 'Arıza bildirimi başarıyla oluşturuldu. Bildirimin durumu hakkında güncelleme almak için bu sayfayı kontrol edebilirsiniz.',
+            icon: 'success',
+            confirmButtonText: 'Tamam',
+            confirmButtonColor: '#3085d6'
+          });
+          
           // Başarı bildirimini çağır
           onSuccess();
         })
         .catch((error) => {
           console.error('Arıza eklenirken hata oluştu:', error);
+          Swal.fire({
+            title: 'Hata!',
+            text: 'Arıza eklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+            icon: 'error',
+            confirmButtonText: 'Tamam',
+            confirmButtonColor: '#3085d6'
+          });
           setSubmitError('Arıza eklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
         })
         .finally(() => {
@@ -137,6 +154,13 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
         });
     } catch (error) {
       console.error('Arıza eklenirken hata oluştu:', error);
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Arıza eklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+        icon: 'error',
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#3085d6'
+      });
       setSubmitError('Arıza eklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
       setIsLoading(false);
     }

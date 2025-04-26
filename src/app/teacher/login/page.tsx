@@ -11,7 +11,7 @@ export default function TeacherLoginPage() {
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [siteName, setSiteName] = useState('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Öğretmen Girişi');
+  const [siteName, setSiteName] = useState('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
   const router = useRouter();
 
   // Site adını yükle
@@ -22,15 +22,17 @@ export default function TeacherLoginPage() {
         const { data, error } = await getSystemSetting('site_name');
         
         if (!error && data?.value) {
-          setSiteName(data.value + ' - Öğretmen Girişi');
+          // Sadece okul adını kullan
+          const schoolName = data.value.split('-')[0].trim();
+          setSiteName(`${schoolName} - ATSİS`);
         } else {
           // Varsayılan değer
-          setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Öğretmen Girişi');
+          setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
         }
       } catch (err) {
         console.error('Site adı yüklenirken hata:', err);
         // Hata durumunda varsayılan değer
-        setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Öğretmen Girişi');
+        setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
       }
     }
     

@@ -11,7 +11,7 @@ export default function HomePage() {
         </h1>
         
         <h2 className="text-xl font-semibold text-center mb-6">
-          ATSİS - Arıza Takip Sistemi
+          Arıza Takip Sistemi
         </h2>
         
         <div className="space-y-4">

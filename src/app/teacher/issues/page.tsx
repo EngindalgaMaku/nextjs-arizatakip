@@ -6,6 +6,7 @@ import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceTyp
 import AddIssueForm from './add-form';
 import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon, PresentationChartBarIcon, DeviceTabletIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
+import Swal from 'sweetalert2';
 
 // Format date function
 const formatDate = (date: Date | string | null): string => {
@@ -231,6 +232,87 @@ export default function TeacherIssuesPage() {
     loadIssues();
   };
 
+  // Öğretmen oturumunu kapatma
+  const handleLogout = () => {
+    Swal.fire({
+      title: 'Çıkış yapmak istediğinizden emin misiniz?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Evet, çıkış yap',
+      cancelButtonText: 'İptal',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        try {
+          // Local Storage'dan sil
+          localStorage.removeItem('teacherUser');
+          
+          // Cookie'den sil  
+          deleteCookie('teacher-session', { path: '/' });
+          
+          // Login sayfasına yönlendir
+          router.push('/teacher/login');
+        } catch (error) {
+          console.error('Çıkış yaparken hata:', error);
+          // Hata olsa bile login sayfasına yönlendir
+          router.push('/teacher/login');
+        }
+      }
+    });
+  };
+
+  // Arıza silme fonksiyonu
+  const handleDeleteIssue = async (issueId: string) => {
+    Swal.fire({
+      title: 'Bu arıza kaydını silmek istediğinizden emin misiniz?',
+      text: 'Bu işlem geri alınamaz!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Evet, sil',
+      cancelButtonText: 'İptal',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const { error } = await deleteIssueFromDB(issueId);
+          
+          if (error) {
+            Swal.fire({
+              title: 'Hata!',
+              text: 'Arıza silinirken bir hata oluştu: ' + error.message,
+              icon: 'error',
+              confirmButtonText: 'Tamam',
+              confirmButtonColor: '#3085d6'
+            });
+            return;
+          }
+          
+          // Başarılı silme işlemi sonrası listeyi güncelle
+          setIssues(prev => prev.filter(issue => issue.id !== issueId));
+          
+          Swal.fire({
+            title: 'Başarılı!',
+            text: 'Arıza başarıyla silindi',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+          });
+        } catch (err) {
+          console.error('Arıza silme hatası:', err);
+          Swal.fire({
+            title: 'Hata!',
+            text: 'Arıza silinirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+            icon: 'error',
+            confirmButtonText: 'Tamam',
+            confirmButtonColor: '#3085d6'
+          });
+        }
+      }
+    });
+  };
+
   // Modal kapatma fonksiyonu  
   const closeAddModal = (e?: React.MouseEvent) => {
     if (isAddFormSubmitted) {
@@ -238,50 +320,20 @@ export default function TeacherIssuesPage() {
       return;
     }
     
-    if (window.confirm('Form kapatılacak. Devam etmek istiyor musunuz? Girdiğiniz bilgiler kaybolacak.')) {
-      setIsAddModalOpen(false);
-    }
-  };
-
-  // Öğretmen oturumunu kapatma
-  const handleLogout = () => {
-    if (window.confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
-      try {
-        // Local Storage'dan sil
-        localStorage.removeItem('teacherUser');
-        
-        // Cookie'den sil  
-        deleteCookie('teacher-session', { path: '/' });
-        
-        // Login sayfasına yönlendir
-        router.push('/teacher/login');
-      } catch (error) {
-        console.error('Çıkış yaparken hata:', error);
-        // Hata olsa bile login sayfasına yönlendir
-        router.push('/teacher/login');
+    Swal.fire({
+      title: 'Form kapatılacak',
+      text: 'Devam etmek istiyor musunuz? Girdiğiniz bilgiler kaybolacak.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Evet',
+      cancelButtonText: 'Hayır',
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setIsAddModalOpen(false);
       }
-    }
-  };
-
-  // Arıza silme fonksiyonu
-  const handleDeleteIssue = async (issueId: string) => {
-    if (window.confirm('Bu arıza kaydını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
-      try {
-        const { error } = await deleteIssueFromDB(issueId);
-        
-        if (error) {
-          alert('Arıza silinirken bir hata oluştu: ' + error.message);
-          return;
-        }
-        
-        // Başarılı silme işlemi sonrası listeyi güncelle
-        setIssues(prev => prev.filter(issue => issue.id !== issueId));
-        alert('Arıza başarıyla silindi');
-      } catch (err) {
-        console.error('Arıza silme hatası:', err);
-        alert('Arıza silinirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-      }
-    }
+    });
   };
 
   if (isLoading) {
@@ -306,7 +358,7 @@ export default function TeacherIssuesPage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Hüsniye Özdilek Ticaret M.T.A.L.</h1>
-              <p className="mt-1 text-gray-500">Merhaba, {teacher.name}! ATSİS - Arıza Takip Sistemi</p>
+              <p className="mt-1 text-gray-500">Merhaba, {teacher.name}! ATSİS</p>
             </div>
             {/* Masaüstünde göster, mobilde gizle */}
             <button

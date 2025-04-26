@@ -27,6 +27,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.56.1",
     "react-i18next": "^15.5.1",
+    "sweetalert2": "^11.19.1",
     "tailwind-merge": "^3.2.0",
     "tamagui": "^1.126.1",
     "zod": "^3.24.3",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

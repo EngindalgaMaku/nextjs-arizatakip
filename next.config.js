@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false,
+  swcMinify: true,
   // ESLint yapılandırması - build'i durdurmayacak şekilde ayarla
   eslint: {
     // Build sırasında hataları göster ama başarısız olmasına izin verme

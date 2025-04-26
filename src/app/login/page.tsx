@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [siteName, setSiteName] = useState('ATSİS Yönetici Paneli');
+  const [siteName, setSiteName] = useState('ATSİS');
   const router = useRouter();
   
   // Demo modunu kontrol edecek değişken (Supabase kurulumu yoksa true yapın)
@@ -25,15 +25,17 @@ export default function LoginPage() {
         const { data, error } = await getSystemSetting('site_name');
         
         if (!error && data?.value) {
-          setSiteName(data.value);
+          // Sadece okul adını kullan, "ATSİS" kısmını çıkar
+          const schoolName = data.value.split('-')[0].trim();
+          setSiteName(`${schoolName} - ATSİS`);
         } else {
           // Varsayılan değer
-          setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Yönetici Paneli');
+          setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
         }
       } catch (err) {
         console.error('Site adı yüklenirken hata:', err);
         // Hata durumunda varsayılan değer
-        setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Yönetici Paneli');
+        setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
       }
     }
     

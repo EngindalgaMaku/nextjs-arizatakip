@@ -6,6 +6,7 @@ import AddIssueForm from './add-form';
 import EditIssueForm from './edit-form';
 import ViewIssueForm from './view-issue-form';
 import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import Swal from 'sweetalert2';
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -68,7 +69,12 @@ export default function IssuesPage() {
       setIssues(formattedIssues);
     } catch (err) {
       console.error('Arızalar yüklenirken hata oluştu:', err);
-      alert('Arızalar yüklenirken bir hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin veya yönetici ile iletişime geçin.');
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Arızalar yüklenirken bir hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin veya yönetici ile iletişime geçin.',
+        icon: 'error',
+        confirmButtonText: 'Tamam'
+      });
       // Boş liste göster
       setIssues([]);
     } finally {
@@ -97,7 +103,12 @@ export default function IssuesPage() {
             
             if (error || !data) {
               console.error('Arıza detayları yüklenirken hata oluştu:', error);
-              alert('Arıza detayları yüklenirken bir hata oluştu.');
+              Swal.fire({
+                title: 'Hata!',
+                text: 'Arıza detayları yüklenirken bir hata oluştu.',
+                icon: 'error',
+                confirmButtonText: 'Tamam'
+              });
               return;
             }
             
@@ -155,20 +166,42 @@ export default function IssuesPage() {
   });
 
   const handleDeleteIssue = async (issueId: string) => {
-    if (!window.confirm("Bu arıza kaydını silmek istediğinizden emin misiniz?")) {
-      return;
-    }
-
-    try {
-      const { error } = await deleteIssue(issueId);
-      if (error) throw error;
-      
-      // UI'dan arızayı kaldır (optimistic update)
-      setIssues(issues.filter(issue => issue.id !== issueId));
-    } catch (error) {
-      console.error('Arıza kaydı silinirken hata oluştu:', error);
-      alert('Arıza kaydı silinirken bir hata oluştu. Lütfen tekrar deneyin.');
-    }
+    Swal.fire({
+      title: 'Bu arıza kaydını silmek istediğinizden emin misiniz?',
+      text: 'Bu işlem geri alınamaz!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Evet, sil',
+      cancelButtonText: 'İptal',
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const { error } = await deleteIssue(issueId);
+          if (error) throw error;
+          
+          // UI'dan arızayı kaldır (optimistic update)
+          setIssues(issues.filter(issue => issue.id !== issueId));
+          
+          Swal.fire({
+            title: 'Başarılı!',
+            text: 'Arıza kaydı başarıyla silindi',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+          });
+        } catch (error) {
+          console.error('Arıza kaydı silinirken hata oluştu:', error);
+          Swal.fire({
+            title: 'Hata!',
+            text: 'Arıza kaydı silinirken bir hata oluştu. Lütfen tekrar deneyin.',
+            icon: 'error',
+            confirmButtonText: 'Tamam'
+          });
+        }
+      }
+    });
   };
 
   const viewIssueDetails = (issue: IssueData) => {

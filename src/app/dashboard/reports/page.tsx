@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { saveAs } from 'file-saver';
+import Swal from 'sweetalert2';
 
+// Libraries will be loaded client-side
 interface ReportInfo {
   id: string;
   name: string;
@@ -22,10 +25,18 @@ interface ReportStatistics {
   activeIncrease: number;
 }
 
+// Type definitions for loaded libraries
+type JsPDFType = any;
+type XLSXType = any;
+
 export default function ReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastGeneratedReport, setLastGeneratedReport] = useState<string | null>(null);
+  const [issues, setIssues] = useState<any[]>([]);
+  const [jsPDF, setJsPDF] = useState<JsPDFType>(null);
+  const [xlsxLib, setXlsxLib] = useState<XLSXType>(null);
   const [statistics, setStatistics] = useState<ReportStatistics>({
     totalIssues: 0,
     resolvedIssues: 0,
@@ -38,43 +49,69 @@ export default function ReportsPage() {
   });
   const router = useRouter();
   
+  // Load libraries client-side
+  useEffect(() => {
+    // Workaround for TypeScript
+    const loadLibraries = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          // Dynamic imports
+          const jsPDFModule = await import('jspdf');
+          const XLSXModule = await import('xlsx');
+          
+          // Set state with loaded libraries
+          setJsPDF(jsPDFModule.default);
+          setXlsxLib(XLSXModule);
+        } catch (error) {
+          console.error('Error loading report libraries:', error);
+        }
+      }
+    };
+    
+    loadLibraries();
+  }, []);
+  
   const reports: ReportInfo[] = [
     {
       id: 'issues',
       name: 'Arıza Bildirimleri Raporu',
       description: 'Belirli dönemdeki arıza bildirimlerinin özeti ve durumları',
-      lastGenerated: '2023-12-10',
+      lastGenerated: formatDate(new Date()),
       format: 'PDF'
     },
     {
       id: 'devices',
       name: 'Cihaz Envanteri Raporu',
       description: 'Okuldaki tüm cihazların türü, konumu ve durumu hakkında detaylı bilgiler',
-      lastGenerated: '2023-12-08',
+      lastGenerated: formatDate(new Date()),
       format: 'Excel'
     },
     {
       id: 'technicians',
       name: 'Teknisyen Performans Raporu',
       description: 'Teknisyenlerin çözdüğü arıza sayısı ve ortalama çözüm süreleri',
-      lastGenerated: '2023-12-05',
+      lastGenerated: formatDate(new Date()),
       format: 'CSV'
     },
     {
       id: 'departments',
       name: 'Departman Bazlı Arıza Raporu',
       description: 'Okul bölümlerine göre arıza yoğunluğu analizi',
-      lastGenerated: '2023-12-01',
+      lastGenerated: formatDate(new Date()),
       format: 'PDF'
     },
     {
       id: 'monthly',
       name: 'Aylık Arıza Özeti',
       description: 'Ay içinde bildirilen ve çözülen arızaların özet raporu',
-      lastGenerated: '2023-11-30',
+      lastGenerated: formatDate(new Date()),
       format: 'Excel'
     }
   ];
+
+  function formatDate(date: Date) {
+    return date.toLocaleDateString('tr-TR');
+  }
 
   useEffect(() => {
     const loadReportData = async () => {
@@ -112,11 +149,18 @@ export default function ReportsPage() {
         const issuesResult = await getIssues();
         if (issuesResult.error) {
           console.error('Arızalar yüklenirken hata:', issuesResult.error);
-          alert('Arıza verileri yüklenirken hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin.');
+          Swal.fire({
+            title: 'Hata!',
+            text: 'Arıza verileri yüklenirken hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin.',
+            icon: 'error',
+            confirmButtonText: 'Tamam',
+            confirmButtonColor: '#3085d6'
+          });
           throw issuesResult.error;
         }
         
         const issues = issuesResult.data || [];
+        setIssues(issues);
         
         // İstatistikleri hesapla
         const now = new Date();
@@ -185,20 +229,286 @@ export default function ReportsPage() {
     loadReportData();
   }, [router, selectedPeriod]);
 
-  const handleGenerateReport = async (reportId: string) => {
+  const getDeviceTypeName = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      'akilli_tahta': 'Akıllı Tahta',
+      'bilgisayar': 'Bilgisayar',
+      'yazici': 'Yazıcı',
+      'projektor': 'Projektör',
+      'diger': 'Diğer'
+    };
+    return typeMap[type] || type;
+  };
+
+  const getLocationName = (location: string): string => {
+    const locationMap: Record<string, string> = {
+      'sinif': 'Sınıf',
+      'ogretmenler_odasi': 'Öğretmenler Odası',
+      'laboratuvar': 'Laboratuvar',
+      'idare': 'İdare',
+      'diger': 'Diğer'
+    };
+    return locationMap[location] || location;
+  };
+
+  const getStatusName = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'beklemede': 'Beklemede',
+      'inceleniyor': 'İnceleniyor',
+      'atandi': 'Atandı',
+      'cozuldu': 'Çözüldü',
+      'kapatildi': 'Kapatıldı'
+    };
+    return statusMap[status] || status;
+  };
+
+  const createPDF = (reportType: string) => {
+    // Ensure jsPDF is loaded
+    if (typeof jsPDF === 'function') {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      
+      // Add title and header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      
+      // Logo and header
+      doc.text('Hüsniye Özdilek Ticaret M.T.A.L.', 105, 20, { align: 'center' });
+      doc.text('ATSİS - Arıza Takip Sistemi', 105, 30, { align: 'center' });
+      
+      // Report title
+      doc.setFontSize(14);
+      doc.text(`${reportType}`, 105, 45, { align: 'center' });
+      
+      // Add date
+      doc.setFontSize(10);
+      doc.text(`Tarih: ${formatDate(new Date())}`, 20, 55);
+      
+      // Add statistics
+      doc.setFontSize(12);
+      doc.text('Genel İstatistikler:', 20, 65);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`Toplam Arıza Sayısı: ${statistics.totalIssues}`, 25, 75);
+      doc.text(`Çözülen Arıza Sayısı: ${statistics.resolvedIssues}`, 25, 81);
+      doc.text(`Aktif Arıza Sayısı: ${statistics.activeIssues}`, 25, 87);
+      doc.text(`Ortalama Çözüm Süresi: ${statistics.averageResolutionDays} gün`, 25, 93);
+      
+      // Add table headers
+      doc.setFont("helvetica", "bold");
+      doc.text('ID', 20, 105);
+      doc.text('Cihaz', 40, 105);
+      doc.text('Konum', 75, 105);
+      doc.text('Durum', 110, 105);
+      doc.text('Bildiren', 140, 105);
+      doc.text('Tarih', 170, 105);
+      
+      // Add horizontal line
+      doc.line(20, 108, 190, 108);
+      
+      doc.setFont("helvetica", "normal");
+      
+      // Add data
+      let y = 115;
+      let filteredIssues = [...issues];
+      
+      // Filter by period if needed
+      if (selectedPeriod === 'week') {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        filteredIssues = issues.filter(issue => new Date(issue.created_at) >= oneWeekAgo);
+      } else if (selectedPeriod === 'month') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        filteredIssues = issues.filter(issue => new Date(issue.created_at) >= oneMonthAgo);
+      } else if (selectedPeriod === 'year') {
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        filteredIssues = issues.filter(issue => new Date(issue.created_at) >= oneYearAgo);
+      }
+      
+      // Sort by creation date (newest first)
+      filteredIssues.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Only show top 20 for PDF
+      const issuesToShow = filteredIssues.slice(0, 20);
+      
+      issuesToShow.forEach((issue, index) => {
+        if (y > 270) {
+          // Add new page if we're at the bottom
+          doc.addPage();
+          y = 20;
+          
+          // Add table headers again on new page
+          doc.setFont("helvetica", "bold");
+          doc.text('ID', 20, y);
+          doc.text('Cihaz', 40, y);
+          doc.text('Konum', 75, y);
+          doc.text('Durum', 110, y);
+          doc.text('Bildiren', 140, y);
+          doc.text('Tarih', 170, y);
+          
+          // Add horizontal line
+          doc.line(20, y + 3, 190, y + 3);
+          doc.setFont("helvetica", "normal");
+          y += 10;
+        }
+        
+        // Truncate ID
+        const shortId = issue.id.substring(0, 8) + '...';
+        
+        doc.text(shortId, 20, y);
+        doc.text(getDeviceTypeName(issue.device_type), 40, y);
+        doc.text(getLocationName(issue.device_location), 75, y);
+        doc.text(getStatusName(issue.status), 110, y);
+        doc.text(issue.reported_by || 'N/A', 140, y);
+        doc.text(formatDate(new Date(issue.created_at)), 170, y);
+        
+        y += 8;
+      });
+      
+      // Add footer
+      doc.setFontSize(8);
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.text(`Sayfa ${i} / ${totalPages}`, 105, 290, { align: 'center' });
+        doc.text('© Hüsniye Özdilek Ticaret M.T.A.L. ATSİS', 105, 295, { align: 'center' });
+      }
+      
+      // Save the PDF
+      const reportName = `ATSIS_${reportType.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      setLastGeneratedReport(reportName);
+      doc.save(reportName);
+      return reportName;
+    }
+    return null;
+  };
+  
+  const createExcel = (reportType: string) => {
+    if (typeof xlsxLib === 'object' && xlsxLib.utils) {
+      // Use the loaded XLSX library
+      const XLSX = xlsxLib;
+      
+      // Filter issues based on selected period
+      let filteredIssues = [...issues];
+      
+      if (selectedPeriod === 'week') {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        filteredIssues = issues.filter(issue => new Date(issue.created_at) >= oneWeekAgo);
+      } else if (selectedPeriod === 'month') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        filteredIssues = issues.filter(issue => new Date(issue.created_at) >= oneMonthAgo);
+      } else if (selectedPeriod === 'year') {
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        filteredIssues = issues.filter(issue => new Date(issue.created_at) >= oneYearAgo);
+      }
+      
+      // Format issues for Excel
+      const formattedIssues = filteredIssues.map(issue => ({
+        'ID': issue.id,
+        'Cihaz Türü': getDeviceTypeName(issue.device_type),
+        'Cihaz Adı': issue.device_name,
+        'Konum': getLocationName(issue.device_location),
+        'Oda/Sınıf': issue.room_number,
+        'Durum': getStatusName(issue.status),
+        'Öncelik': issue.priority,
+        'Bildiren': issue.reported_by,
+        'Atanan': issue.assigned_to || 'Atanmadı',
+        'Açıklama': issue.description,
+        'Notlar': issue.notes || '',
+        'Oluşturulma Tarihi': formatDate(new Date(issue.created_at)),
+        'Güncellenme Tarihi': issue.updated_at ? formatDate(new Date(issue.updated_at)) : 'Güncellenmedi',
+        'Çözülme Tarihi': issue.resolved_at ? formatDate(new Date(issue.resolved_at)) : 'Çözülmedi'
+      }));
+      
+      // Create worksheet and workbook
+      const worksheet = XLSX.utils.json_to_sheet(formattedIssues);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Arızalar");
+      
+      // Create statistics sheet
+      const statsData = [
+        { 'İstatistik': 'Toplam Arıza Sayısı', 'Değer': statistics.totalIssues },
+        { 'İstatistik': 'Çözülen Arıza Sayısı', 'Değer': statistics.resolvedIssues },
+        { 'İstatistik': 'Aktif Arıza Sayısı', 'Değer': statistics.activeIssues },
+        { 'İstatistik': 'Ortalama Çözüm Süresi (gün)', 'Değer': statistics.averageResolutionDays }
+      ];
+      const statsSheet = XLSX.utils.json_to_sheet(statsData);
+      XLSX.utils.book_append_sheet(workbook, statsSheet, "İstatistikler");
+      
+      // Generate Excel file
+      const reportName = `ATSIS_${reportType.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      setLastGeneratedReport(reportName);
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const data = new Blob([excelBuffer], { type: 'application/octet-stream' });
+      saveAs(data, reportName);
+      return reportName;
+    }
+    return null;
+  };
+  
+  const handleGenerateReport = async (reportId: string, format: string) => {
     setIsGenerating(true);
     
     try {
-      // Gerçek bir API'ye bağlanabilir veya PDF/Excel oluşturabilir
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let filename = null;
       
-      // Şu an sadece simülasyon amaçlı
-      alert(`${reportId} raporu başarıyla oluşturuldu. Şimdi indirebilirsiniz.`);
+      if (format === 'PDF') {
+        filename = createPDF(reportId);
+      } else if (format === 'Excel') {
+        filename = createExcel(reportId);
+      } else if (format === 'CSV') {
+        // For CSV, use Excel export for now
+        filename = createExcel(reportId);
+      }
+      
+      if (filename) {
+        Swal.fire({
+          title: 'Başarılı!',
+          text: `${reportId} raporu başarıyla oluşturuldu ve indirildi.`,
+          icon: 'success',
+          timer: 2000,
+          timerProgressBar: true,
+          showConfirmButton: false
+        });
+      } else {
+        throw new Error('Rapor oluşturulamadı.');
+      }
     } catch (error) {
       console.error('Rapor oluşturma hatası:', error);
-      alert('Rapor oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Rapor oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.',
+        icon: 'error',
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#3085d6'
+      });
     } finally {
       setIsGenerating(false);
+    }
+  };
+  
+  const handleDownloadReport = () => {
+    if (lastGeneratedReport) {
+      // The report has already been downloaded, but we can alert the user
+      Swal.fire({
+        title: 'Bilgi',
+        text: 'Son oluşturulan rapor zaten indirildi. Yeni bir rapor oluşturmak için "Oluştur" butonunu kullanın.',
+        icon: 'info',
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#3085d6'
+      });
+    } else {
+      Swal.fire({
+        title: 'Uyarı',
+        text: 'Lütfen önce "Oluştur" butonunu kullanarak bir rapor oluşturun.',
+        icon: 'warning',
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#3085d6'
+      });
     }
   };
 
@@ -231,7 +541,7 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Raporlar</h1>
-        <p className="mt-1 text-gray-500">Okul arıza yönetim sistemi raporlarını oluşturun ve indirin</p>
+        <p className="mt-1 text-gray-500">Hüsniye Özdilek Ticaret M.T.A.L. ATSİS raporlarını oluşturun ve indirin</p>
       </div>
       
       {/* Zaman aralığı seçici */}
@@ -273,6 +583,7 @@ export default function ReportsPage() {
           <button
             type="button"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            onClick={() => handleGenerateReport('Özel Rapor', 'PDF')}
           >
             Özel Rapor Oluştur
           </button>
@@ -304,13 +615,14 @@ export default function ReportsPage() {
                       <button
                         type="button"
                         className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        onClick={() => handleGenerateReport(report.name)}
+                        onClick={() => handleGenerateReport(report.name, report.format)}
                         disabled={isGenerating}
                       >
                         {isGenerating ? 'Oluşturuluyor...' : 'Oluştur'}
                       </button>
                       <button
                         type="button"
+                        onClick={handleDownloadReport}
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         İndir

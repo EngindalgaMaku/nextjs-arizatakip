@@ -14,6 +14,7 @@ import {
   getStatusName,
   getPriorityName
 } from '@/lib/helpers';
+import Swal from 'sweetalert2';
 
 // Constants for device types and locations
 const deviceTypes = [
@@ -132,6 +133,15 @@ export default function AddIssueForm({ onClose, onSuccess }: AddIssueFormProps) 
         throw error;
       }
       
+      // Show success message
+      Swal.fire({
+        title: 'Başarılı!',
+        text: 'Arıza kaydı başarıyla oluşturuldu.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
       // Call success callback
       onSuccess();
       
@@ -140,8 +150,20 @@ export default function AddIssueForm({ onClose, onSuccess }: AddIssueFormProps) 
     } catch (error) {
       if (error instanceof Error) {
         setSubmitError(error.message);
+        Swal.fire({
+          title: 'Hata!',
+          text: error.message,
+          icon: 'error',
+          confirmButtonText: 'Tamam'
+        });
       } else {
         setSubmitError('Arıza kaydı oluşturulurken bir hata oluştu.');
+        Swal.fire({
+          title: 'Hata!',
+          text: 'Arıza kaydı oluşturulurken bir hata oluştu.',
+          icon: 'error',
+          confirmButtonText: 'Tamam'
+        });
       }
     } finally {
       setIsSubmitting(false);

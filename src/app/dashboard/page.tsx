@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, BellAlertIcon, UsersIcon, DocumentTextIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, PrinterIcon, FilmIcon, DeviceTabletIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
+import { getSession, getIssues, getUsers } from '@/lib/supabase';
+import { Alert, Card, Title, Text, Tab, TabList, TabGroup, TabPanel, TabPanels, Flex, Table, TableRow, TableCell, TableHead, TableHeaderCell, TableBody, Badge, Button } from '@tremor/react';
+import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/lib/helpers';
+import { ChartContainer } from '@/components/ChartContainer';
+import Swal from 'sweetalert2';
 // Temporary fix for missing getCounts - this will be implemented in supabase.ts
 // import { getCounts } from '@/lib/supabase';
 // Sidebar artık layout'tan geldiği için import etmeye gerek yok
@@ -36,49 +41,61 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const loadDashboardData = async () => {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        
-        // Supabase'den gerçek verileri çek
-        const { getIssues, getUsers } = await import('@/lib/supabase');
-        
-        // Arızaları çek
-        const issuesResult = await getIssues();
-        if (issuesResult.error) {
-          console.error('Arızalar yüklenirken hata:', issuesResult.error);
-          alert('Arıza verileri yüklenirken hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin.');
-          throw issuesResult.error;
+        const session = await getSession();
+        if (!session) {
+          router.push('/login');
+          return;
         }
         
-        // Kullanıcıları çek
-        const usersResult = await getUsers();
-        if (usersResult.error) {
-          console.error('Kullanıcılar yüklenirken hata:', usersResult.error);
-          alert('Kullanıcı verileri yüklenirken hata oluştu. Lütfen Supabase ayarlarınızı kontrol edin.');
-          throw usersResult.error;
+        // Supabase'den verileri getir
+        const { data: issues, error: issuesError } = await getIssues();
+        const { data: users, error: usersError } = await getUsers();
+        
+        if (issuesError) {
+          console.error('Arızalar yüklenirken hata oluştu:', issuesError);
+          Swal.fire({
+            title: 'Hata!',
+            text: 'Veriler yüklenirken bir hata oluştu. Supabase bağlantınızı kontrol edin.',
+            icon: 'error',
+            confirmButtonText: 'Tamam',
+            confirmButtonColor: '#3085d6'
+          });
+          
+          // Hata durumunda sayıları sıfırla
+          setCounts({
+            openIssuesCount: 0,
+            resolvedIssuesCount: 0,
+            usersCount: 0,
+            totalIssuesCount: 0
+          });
+          setRecentIssues([]);
+          setIsLoading(false);
+          return;
         }
         
         // İstatistikleri hesapla
-        const issues = issuesResult.data || [];
-        const users = usersResult.data || [];
+        const issuesData = issues || [];
+        const usersData = users || [];
         
-        const openIssues = issues.filter(issue => 
+        const openIssues = issuesData.filter(issue => 
           issue.status !== 'cozuldu' && issue.status !== 'kapatildi'
         );
         
-        const resolvedIssues = issues.filter(issue => 
+        const resolvedIssues = issuesData.filter(issue => 
           issue.status === 'cozuldu' || issue.status === 'kapatildi'
         );
         
         setCounts({
           openIssuesCount: openIssues.length,
           resolvedIssuesCount: resolvedIssues.length,
-          usersCount: users.length,
-          totalIssuesCount: issues.length
+          usersCount: usersData.length,
+          totalIssuesCount: issuesData.length
         });
 
         // Son eklenen 5 arızayı al - yeni arızalar en üstte
-        const sortedIssues = [...issues]
+        const sortedIssues = [...issuesData]
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, 5)
           .map(issue => ({
@@ -257,54 +274,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  // Helper functions for display
-  const getDeviceTypeName = (type: string) => {
-    switch (type) {
-      case 'akilli_tahta': return 'Akıllı Tahta';
-      case 'bilgisayar': return 'Bilgisayar';
-      case 'yazici': return 'Yazıcı';
-      case 'projektor': return 'Projektör';
-      case 'diger': return 'Diğer';
-      default: return type;
-    }
-  };
-
-  const getStatusName = (status: string) => {
-    switch (status) {
-      case 'beklemede': return 'Beklemede';
-      case 'atandi': return 'Atandı';
-      case 'inceleniyor': return 'İnceleniyor';
-      case 'cozuldu': return 'Çözüldü';
-      case 'kapatildi': return 'Kapatıldı';
-      default: return status;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'beklemede': return 'bg-yellow-100 text-yellow-800';
-      case 'atandi': return 'bg-blue-100 text-blue-800';
-      case 'inceleniyor': return 'bg-purple-100 text-purple-800';
-      case 'cozuldu': return 'bg-green-100 text-green-800';
-      case 'kapatildi': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString('tr-TR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
 
   return (
     <div className="admin-content">
