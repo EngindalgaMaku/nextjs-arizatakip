@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
+import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority, supabase } from '@/lib/supabase';
 import AddIssueForm from './add-form';
 import TeacherEditForm from './edit-form';
 import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon, PresentationChartBarIcon, DeviceTabletIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
 import Swal from 'sweetalert2';
+import { showIssueUpdateNotification, showBrowserNotification } from '@/lib/notification';
 
 // Format date function
 const formatDate = (date: Date | string | null): string => {
@@ -114,6 +115,7 @@ export default function TeacherIssuesPage() {
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [subscription, setSubscription] = useState<any>(null);
   const router = useRouter();
   
   // Arızaları yükle
@@ -413,6 +415,79 @@ export default function TeacherIssuesPage() {
       }
     });
   };
+
+  // Bildirim izni iste
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      try {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+          if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            const permission = await Notification.requestPermission();
+            console.log('Bildirim izni:', permission);
+          }
+        }
+      } catch (error) {
+        console.error('Bildirim izni istenirken hata:', error);
+      }
+    };
+    
+    requestNotificationPermission();
+  }, []);
+
+  // Supabase realtime aboneliği
+  useEffect(() => {
+    if (!teacher?.name) return;
+    
+    // Öğretmenin bildirdiği arızaları dinlemek için abonelik oluştur
+    const issueSubscription = supabase
+      .channel('teacher-issues-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'issues',
+          filter: `reported_by=eq.${teacher.name}`
+        },
+        (payload) => {
+          console.log('Arıza güncellendi:', payload);
+          const updatedIssue = payload.new as Issue;
+          const oldIssue = payload.old as Issue;
+          
+          // Bildirim göster
+          showIssueUpdateNotification(updatedIssue, oldIssue.status);
+          
+          // State'i güncelle
+          setIssues(prev => prev.map(issue => 
+            issue.id === updatedIssue.id ? {...issue, ...updatedIssue} : issue
+          ));
+        }
+      )
+      .subscribe();
+    
+    // Aboneliği kaydet
+    setSubscription(issueSubscription);
+    
+    // Temizlik fonksiyonu
+    return () => {
+      if (issueSubscription) {
+        // Aboneliği sonlandır
+        supabase.removeChannel(issueSubscription);
+        setSubscription(null);
+      }
+    };
+  }, [teacher?.name]);
+
+  // Hoş Geldiniz bildirimi (sayfa ilk yüklendiğinde)
+  useEffect(() => {
+    if (teacher?.name && !isLoading && issues.length >= 0) {
+      showBrowserNotification({
+        title: 'Öğretmen Paneline Hoş Geldiniz',
+        body: `${teacher.name}, açık arıza sayınız: ${issues.filter(i => i.status !== 'cozuldu' && i.status !== 'kapatildi').length}`,
+        sound: 'none'
+      });
+    }
+  }, [teacher?.name, isLoading, issues.length]);
 
   if (isLoading) {
     return (

@@ -39,7 +39,7 @@ export default function TeacherLoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [siteName, setSiteName] = useState('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
-  const [rememberDevice, setRememberDevice] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [isAutoLoginChecking, setIsAutoLoginChecking] = useState(true);
   const router = useRouter();
   
@@ -389,15 +389,11 @@ export default function TeacherLoginPage() {
             <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
             Yönetici Girişi
           </button>
-          <div className="mt-2">
-            <button 
-              onClick={() => navigateTo('/pwa-guide')}
-              className="inline-flex items-center text-green-600 hover:text-green-800"
-            >
-              <PhoneIcon className="h-4 w-4 mr-1" />
-              Uygulamayı Telefona Ekle
-            </button>
-          </div>
+        </div>
+        
+        <div className="mt-4 pt-3 border-t border-gray-200 text-center text-gray-500 text-xs">
+          <p>Bilişim Teknolojileri Alanı Teknik Destek</p>
+          <p>© {new Date().getFullYear()} Tüm hakları saklıdır</p>
         </div>
       </div>
     </div>

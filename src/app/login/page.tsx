@@ -222,18 +222,16 @@ export default function LoginPage() {
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <button 
             onClick={() => navigateTo('/')}
-            className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center mr-4"
+            className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center"
           >
             <HomeIcon className="w-4 h-4 mr-1" />
             Ana Sayfaya Dön
           </button>
-          <button 
-            onClick={() => navigateTo('/pwa-guide')}
-            className="text-sm text-indigo-600 hover:text-indigo-800 inline-flex items-center"
-          >
-            <DevicePhoneMobileIcon className="w-4 h-4 mr-1" />
-            Uygulamayı Ana Ekrana Ekle
-          </button>
+        </div>
+        
+        <div className="mt-4 pt-3 border-t border-gray-200 text-center text-gray-500 text-xs">
+          <p>Bilişim Teknolojileri Alanı Teknik Destek</p>
+          <p>© {new Date().getFullYear()} Tüm hakları saklıdır</p>
         </div>
       </div>
     </div>
