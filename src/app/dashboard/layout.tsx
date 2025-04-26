@@ -27,6 +27,7 @@ export default function DashboardLayout({
     if (pathname === "/dashboard") return "Dashboard";
     if (pathname.includes("/issues")) return "Arıza Takip";
     if (pathname.includes("/users")) return "Kullanıcılar";
+    if (pathname.includes("/teachers")) return "Öğretmenler";
     if (pathname.includes("/reports")) return "Raporlar";
     if (pathname.includes("/settings")) return "Ayarlar";
     return "Dashboard";
@@ -196,6 +197,31 @@ export default function DashboardLayout({
                   />
                 </svg>
                 Arızalar
+              </Link>
+
+              <Link
+                href="/dashboard/teachers"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.includes("/teachers")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <svg
+                  className="mr-3 h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                  />
+                </svg>
+                Öğretmenler
               </Link>
 
               <Link

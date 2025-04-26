@@ -21,6 +21,7 @@ export default function IssuesPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
+  const [selectedReporter, setSelectedReporter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -173,8 +174,9 @@ export default function IssuesPage() {
     const matchesStatus = selectedStatus === 'all' || issue.status === selectedStatus;
     const matchesType = selectedType === 'all' || issue.device_type === selectedType;
     const matchesLocation = selectedLocation === 'all' || issue.device_location === selectedLocation;
+    const matchesReporter = selectedReporter === 'all' || issue.reported_by === selectedReporter;
     
-    return matchesSearch && matchesStatus && matchesType && matchesLocation;
+    return matchesSearch && matchesStatus && matchesType && matchesLocation && matchesReporter;
   });
 
   const handleDeleteIssue = async (issueId: string) => {
@@ -358,7 +360,7 @@ export default function IssuesPage() {
               <input
                 type="search"
                 id="search"
-                placeholder="Cihaz adı, açıklama veya oda numarası"
+                placeholder="Cihaz adı, açıklama, oda numarası veya gönderen"
                 className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -442,6 +444,23 @@ export default function IssuesPage() {
                 </select>
               </div>
               
+              <div>
+                <label htmlFor="mobile-reporter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Gönderen
+                </label>
+                <select
+                  id="mobile-reporter"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  value={selectedReporter}
+                  onChange={(e) => setSelectedReporter(e.target.value)}
+                >
+                  <option value="all">Tüm Gönderenler</option>
+                  {Array.from(new Set(issues.map(issue => issue.reported_by))).sort().map(reporter => (
+                    <option key={reporter} value={reporter}>{reporter}</option>
+                  ))}
+                </select>
+              </div>
+              
               <button 
                 type="button"
                 onClick={() => {
@@ -449,6 +468,7 @@ export default function IssuesPage() {
                   setSelectedStatus('all');
                   setSelectedType('all');
                   setSelectedLocation('all');
+                  setSelectedReporter('all');
                 }}
                 className="w-full inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
               >
@@ -461,7 +481,7 @@ export default function IssuesPage() {
           </details>
           
           {/* Masaüstü için yatay filtreler */}
-          <div className="hidden md:grid md:grid-cols-4 gap-4">
+          <div className="hidden md:grid md:grid-cols-5 gap-4">
             <div>
               <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
                 Durum
@@ -518,6 +538,23 @@ export default function IssuesPage() {
                 <option value="diger">Diğer</option>
               </select>
             </div>
+            
+            <div>
+              <label htmlFor="reporter" className="block text-sm font-medium text-gray-700 mb-1">
+                Gönderen
+              </label>
+              <select
+                id="reporter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                value={selectedReporter}
+                onChange={(e) => setSelectedReporter(e.target.value)}
+              >
+                <option value="all">Tüm Gönderenler</option>
+                {Array.from(new Set(issues.map(issue => issue.reported_by))).sort().map(reporter => (
+                  <option key={reporter} value={reporter}>{reporter}</option>
+                ))}
+              </select>
+            </div>
 
             <div className="flex items-end">
               <button 
@@ -527,6 +564,7 @@ export default function IssuesPage() {
                   setSelectedStatus('all');
                   setSelectedType('all');
                   setSelectedLocation('all');
+                  setSelectedReporter('all');
                 }}
                 className="w-full inline-flex justify-center items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
               >
@@ -549,7 +587,7 @@ export default function IssuesPage() {
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900">Arıza kaydı bulunamadı</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || selectedStatus !== 'all' || selectedType !== 'all' || selectedLocation !== 'all' 
+              {searchTerm || selectedStatus !== 'all' || selectedType !== 'all' || selectedLocation !== 'all' || selectedReporter !== 'all' 
                 ? 'Arama kriterlerinize uygun arıza kaydı bulunamadı' 
                 : 'Henüz arıza kaydı bulunmamaktadır'}
             </p>
@@ -566,6 +604,9 @@ export default function IssuesPage() {
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Konum
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Gönderen
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Durum
@@ -598,6 +639,9 @@ export default function IssuesPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{getLocationName(issue.device_location as any)}</div>
                         <div className="text-sm text-gray-500">{issue.room_number}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{issue.reported_by}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(issue.status as any)}`}>
@@ -718,7 +762,7 @@ export default function IssuesPage() {
             </div>
             
             {/* Pagination */}
-            {(searchTerm === '' && selectedStatus === 'all' && selectedType === 'all' && selectedLocation === 'all') && totalPages > 1 && (
+            {(searchTerm === '' && selectedStatus === 'all' && selectedType === 'all' && selectedLocation === 'all' && selectedReporter === 'all') && totalPages > 1 && (
               <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                   <div>
