@@ -23,9 +23,10 @@ export default function LoginPage() {
   // Demo modunu kontrol edecek değişken (Supabase kurulumu yoksa true yapın)
   const DEMO_MODE = false;
 
-  // PWA modunda direkt URL navigasyonu için
+  // PWA modunda tam URL ile navigasyon için
   const navigateTo = (path: string) => {
-    window.location.href = path;
+    // Tarayıcı geçmişinden tamamen yeni bir sayfa olarak açmak için replace kullanıyoruz
+    window.location.replace(window.location.origin + path);
   };
 
   // Site adını yükle

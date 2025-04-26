@@ -44,7 +44,8 @@ export default function HomePage() {
 
   // PWA modunda direkt URL navigasyonu için
   const navigateTo = (path: string) => {
-    window.location.href = path;
+    // Tarayıcı geçmişinden tamamen yeni bir sayfa olarak açmak için replace kullanıyoruz
+    window.location.replace(window.location.origin + path);
   };
 
   // Oturum kontrolü devam ediyorsa yükleniyor ekranını göster

@@ -10,7 +10,8 @@ export default function PWAGuidePage() {
   
   // PWA modunda direkt URL navigasyonu için
   const navigateTo = (path: string) => {
-    window.location.href = path;
+    // Tarayıcı geçmişinden tamamen yeni bir sayfa olarak açmak için replace kullanıyoruz
+    window.location.replace(window.location.origin + path);
   };
   
   const isIOS = () => {

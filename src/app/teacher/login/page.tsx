@@ -43,9 +43,10 @@ export default function TeacherLoginPage() {
   const [isAutoLoginChecking, setIsAutoLoginChecking] = useState(true);
   const router = useRouter();
   
-  // PWA modunda direkt URL navigasyonu için
+  // PWA modunda tam URL ile navigasyon için
   const navigateTo = (path: string) => {
-    window.location.href = path;
+    // Tarayıcı geçmişinden tamamen yeni bir sayfa olarak açmak için replace kullanıyoruz
+    window.location.replace(window.location.origin + path);
   };
   
   // Sayfa yüklendiğinde otomatik giriş kontrolü yap
@@ -382,7 +383,7 @@ export default function TeacherLoginPage() {
         
         <div className="mt-6 text-center text-sm text-gray-600">
           <button 
-            onClick={() => navigateTo('/')}
+            onClick={() => navigateTo('/login')}
             className="inline-flex items-center text-blue-600 hover:text-blue-800"
           >
             <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
