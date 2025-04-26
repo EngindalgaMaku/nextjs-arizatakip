@@ -302,7 +302,12 @@ export default function UsersPage() {
         <button
           type="button"
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => Swal.fire({
+            title: 'Bilgi',
+            text: 'Bu işlem güvenlik amaçlı buradan yapılamaz. Ana yöneticinize başvurun',
+            icon: 'info',
+            confirmButtonText: 'Tamam'
+          })}
         >
           Kullanıcı Ekle
         </button>
@@ -382,7 +387,7 @@ export default function UsersPage() {
                       className="text-indigo-600 hover:text-indigo-900 mr-3"
                       onClick={() => Swal.fire({
                         title: 'Bilgi',
-                        text: 'Bu işlem güvenlik tedbiri olarak supabase panelinden yapılmaktadır',
+                        text: 'Bu işlem güvenlik amaçlı buradan yapılamaz. Ana yöneticinize başvurun',
                         icon: 'info',
                         confirmButtonText: 'Tamam'
                       })}
@@ -391,7 +396,12 @@ export default function UsersPage() {
                     </button>
                     <button
                       className="text-red-600 hover:text-red-900"
-                      onClick={() => handleDeleteUser(user.id)}
+                      onClick={() => Swal.fire({
+                        title: 'Bilgi',
+                        text: 'Bu işlem güvenlik amaçlı buradan yapılamaz. Ana yöneticinize başvurun',
+                        icon: 'info',
+                        confirmButtonText: 'Tamam'
+                      })}
                     >
                       Sil
                     </button>
