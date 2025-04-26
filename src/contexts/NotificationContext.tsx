@@ -95,6 +95,44 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           
           // Sesli bildirim (sadece yeni arıza oluşturulduğunda)
           playAlertSound();
+          
+          // DOM üzerinden doğrudan ses çal (ek güvenlik önlemi)
+          try {
+            // Varsa eski ses elementini temizle
+            const existingSound = document.getElementById('notification-sound');
+            if (existingSound) {
+              document.body.removeChild(existingSound);
+            }
+            
+            // Yeni ses elementi oluştur
+            const audioElement = document.createElement('audio');
+            audioElement.id = 'notification-sound';
+            audioElement.src = '/notification-alert.mp3';
+            audioElement.autoplay = true;
+            audioElement.volume = 1.0;
+            
+            // Kullanıcı etkileşimi ile tetiklenecek bir click event listener ekle
+            audioElement.addEventListener('canplaythrough', () => {
+              const playPromise = audioElement.play();
+              if (playPromise !== undefined) {
+                playPromise
+                  .then(() => console.log('DOM audio element başarıyla çaldı'))
+                  .catch(error => console.error('DOM audio element çalma hatası:', error));
+              }
+            });
+            
+            // Temizlik için süre ayarla
+            audioElement.onended = () => {
+              if (document.body.contains(audioElement)) {
+                document.body.removeChild(audioElement);
+              }
+            };
+            
+            // DOM'a ekle
+            document.body.appendChild(audioElement);
+          } catch (audioError) {
+            console.error('Doğrudan DOM ses çalma hatası:', audioError);
+          }
         })
         .subscribe((status) => {
           console.log('Realtime notification subscription durumu:', status);
