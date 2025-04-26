@@ -116,6 +116,11 @@ export async function getCurrentSession() {
   return session;
 }
 
+// Dashboard sayfası için getSession fonksiyonu ekliyoruz
+export async function getSession() {
+  return getCurrentSession();
+}
+
 export async function registerUser(email: string, password: string, userData: Partial<User>) {
   const { data, error } = await supabase.auth.signUp({
     email,
