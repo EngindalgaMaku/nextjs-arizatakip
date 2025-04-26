@@ -136,7 +136,7 @@ export default function AddIssueForm({ onClose, onSuccess }: AddIssueFormProps) 
       // Show success message
       Swal.fire({
         title: 'Başarılı!',
-        text: 'Arıza kaydı başarıyla oluşturuldu.',
+        text: 'Arıza kaydedildi.',
         icon: 'success',
         timer: 1500,
         showConfirmButton: false

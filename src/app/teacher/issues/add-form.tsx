@@ -129,7 +129,7 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
           // Bildirim ve başarı işlemleri
           Swal.fire({
             title: 'Başarılı!',
-            text: 'Arıza bildirimi başarıyla oluşturuldu. Bildirimin durumu hakkında güncelleme almak için bu sayfayı kontrol edebilirsiniz.',
+            text: 'Arıza bildirimi kaydedildi.',
             icon: 'success',
             confirmButtonText: 'Tamam',
             confirmButtonColor: '#3085d6'
