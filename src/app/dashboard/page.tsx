@@ -77,7 +77,7 @@ export default function DashboardPage() {
           totalIssuesCount: issues.length
         });
 
-        // Son eklenen 5 arızayı al
+        // Son eklenen 5 arızayı al - yeni arızalar en üstte
         const sortedIssues = [...issues]
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, 5)
@@ -158,6 +158,8 @@ export default function DashboardPage() {
     try {
       const { supabase } = await import('@/lib/supabase');
       
+      console.log('Realtime subscription kurulumu başlatılıyor...');
+      
       // issues tablosundaki yeni kayıtları dinle
       supabaseSubscription.current = supabase
         .channel('issues-channel')
@@ -166,6 +168,8 @@ export default function DashboardPage() {
           schema: 'public', 
           table: 'issues' 
         }, (payload) => {
+          console.log('Yeni arıza bildirimi alındı:', payload);
+          
           // Yeni bir arıza oluşturulduğunda
           const newIssue = payload.new;
           
@@ -201,12 +205,14 @@ export default function DashboardPage() {
             created_at: newIssue.created_at
           };
           
-          setRecentIssues(prev => [formattedIssue, ...prev].slice(0, 5));
+          setRecentIssues(prev => [formattedIssue, ...prev.slice(0, 4)]);
           
           // Sesli bildirim
           playNotificationSound();
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('Realtime subscription durumu:', status);
+        });
       
     } catch (error) {
       console.error('Gerçek zamanlı abonelik kurulurken hata:', error);

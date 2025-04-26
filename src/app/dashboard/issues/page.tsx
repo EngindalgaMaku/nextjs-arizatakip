@@ -46,22 +46,24 @@ export default function IssuesPage() {
       }
       
       // API'den gelen veriyi formata
-      const formattedIssues = data.map(issue => ({
-        id: issue.id,
-        device_type: issue.device_type,
-        device_name: issue.device_name,
-        device_location: issue.device_location,
-        room_number: issue.room_number,
-        reported_by: issue.reported_by,
-        assigned_to: issue.assigned_to,
-        description: issue.description,
-        status: issue.status,
-        priority: issue.priority,
-        notes: issue.notes,
-        created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-        updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-        resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
-      }));
+      const formattedIssues = data
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // En yeni arızalar önce
+        .map(issue => ({
+          id: issue.id,
+          device_type: issue.device_type,
+          device_name: issue.device_name,
+          device_location: issue.device_location,
+          room_number: issue.room_number,
+          reported_by: issue.reported_by,
+          assigned_to: issue.assigned_to,
+          description: issue.description,
+          status: issue.status,
+          priority: issue.priority,
+          notes: issue.notes,
+          created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
+          updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
+          resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
+        }));
       
       setIssues(formattedIssues);
     } catch (err) {

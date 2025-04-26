@@ -129,22 +129,25 @@ export default function TeacherIssuesPage() {
       }
       
       // API'den gelen veriyi formata
-      const formattedIssues = data.map(issue => ({
-        id: issue.id,
-        device_type: issue.device_type,
-        device_name: issue.device_name,
-        device_location: issue.device_location,
-        room_number: issue.room_number,
-        reported_by: issue.reported_by,
-        assigned_to: issue.assigned_to,
-        description: issue.description,
-        status: issue.status,
-        priority: issue.priority,
-        notes: issue.notes,
-        created_at: issue.created_at, // Ham tarih verisi
-        updated_at: issue.updated_at,
-        resolved_at: issue.resolved_at
-      }));
+      const formattedIssues = data
+        // En yeni arızalar önce sırala
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .map(issue => ({
+          id: issue.id,
+          device_type: issue.device_type,
+          device_name: issue.device_name,
+          device_location: issue.device_location,
+          room_number: issue.room_number,
+          reported_by: issue.reported_by,
+          assigned_to: issue.assigned_to,
+          description: issue.description,
+          status: issue.status,
+          priority: issue.priority,
+          notes: issue.notes,
+          created_at: issue.created_at, // Ham tarih verisi
+          updated_at: issue.updated_at,
+          resolved_at: issue.resolved_at
+        }));
       
       setIssues(formattedIssues);
     } catch (err) {
