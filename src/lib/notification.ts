@@ -17,23 +17,70 @@ export const playAlertSound = () => {
     
     console.log('Bildirim sesi çalınıyor: notification-alert.mp3');
     
+    // Yeni bir ses nesnesi oluştur
     const sound = new Audio(NOTIFICATION_ALERT_SOUND);
+    
+    // Ses seviyesini maksimuma ayarla
+    sound.volume = 1.0;
+    
+    // Önce ses dosyasını yükle
+    sound.load();
     
     // Ses dosyası yükleme hatası
     sound.onerror = (error) => {
       console.error('Bildirim sesi çalınamadı (onError):', error);
     };
     
-    // Sesi çal
-    sound.play()
-      .then(() => {
-        console.log('Bildirim sesi başarıyla çalındı');
-      })
-      .catch(error => {
-        console.error('Bildirim sesi çalınamadı (promise):', error);
-      });
+    // Alternatif yöntem 1: Doğrudan play metodu
+    const playPromise = sound.play();
+    
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log('Bildirim sesi başarıyla çalındı');
+        })
+        .catch(error => {
+          console.error('Bildirim sesi çalınamadı (promise):', error);
+          
+          // Alternatif yöntem 2: Yeni bir Audio nesnesi ile tekrar dene
+          try {
+            const alternativeSound = new Audio('/notification-alert.mp3');
+            alternativeSound.volume = 1.0;
+            alternativeSound.play()
+              .then(() => console.log('Alternatif yöntemle ses çalındı'))
+              .catch(err => console.error('Alternatif yöntem de başarısız oldu:', err));
+          } catch (fallbackError) {
+            console.error('Tüm ses çalma yöntemleri başarısız oldu:', fallbackError);
+          }
+        });
+    }
   } catch (error) {
     console.error('Bildirim sesi çalınamadı (genel hata):', error);
+    
+    // Son çare olarak direkt bir ses nesnesi oluşturup çal
+    try {
+      const emergencySound = document.createElement('audio');
+      emergencySound.src = '/notification-alert.mp3';
+      emergencySound.volume = 1.0;
+      document.body.appendChild(emergencySound);
+      
+      // Hemen oynat
+      emergencySound.play()
+        .then(() => {
+          // Oynatma başarılı olduğunda elementi temizle
+          setTimeout(() => {
+            document.body.removeChild(emergencySound);
+          }, 2000); // 2 saniye sonra temizle
+          console.log('Acil yöntemle ses çalındı');
+        })
+        .catch(() => {
+          // Temizleme
+          document.body.removeChild(emergencySound);
+          console.error('Acil yöntem de başarısız oldu');
+        });
+    } catch (emergencyError) {
+      console.error('Hiçbir ses çalma yöntemi çalışmıyor:', emergencyError);
+    }
   }
 };
 
