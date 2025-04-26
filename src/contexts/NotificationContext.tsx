@@ -163,30 +163,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Promise temelli çalma işlemi
       const playSequentially = async () => {
         try {
-          // İlk sesi çal ve tamamlanmasını bekle
-          console.log('Bildirim sesi başlatılıyor: notification.mp3');
-          await notificationAudio.play();
+          // İlk sesi çal ve tamamlanmasını bekle (sıra değişti - önce alert)
+          console.log('Uyarı sesi başlatılıyor: notification-alert.mp3');
+          await alertAudio.play();
           
           // İlk ses bittiğinde çalışacak
           return new Promise<void>((resolve) => {
-            notificationAudio.onended = async () => {
-              console.log('Bildirim sesi tamamlandı, uyarı sesi başlatılıyor: notification-alert.mp3');
+            alertAudio.onended = async () => {
+              console.log('Uyarı sesi tamamlandı, bildirim sesi başlatılıyor: notification.mp3');
               
               try {
                 // İkinci sesi çal
-                await alertAudio.play();
-                alertAudio.onended = () => {
-                  console.log('Uyarı sesi tamamlandı');
+                await notificationAudio.play();
+                notificationAudio.onended = () => {
+                  console.log('Bildirim sesi tamamlandı');
                   resolve();
                 };
               } catch (e) {
-                console.error('Uyarı sesi çalma hatası:', e);
+                console.error('Bildirim sesi çalma hatası:', e);
                 resolve(); // Hata durumunda bile promise'i çöz
               }
             };
           });
         } catch (e) {
-          console.error('Bildirim sesi çalma hatası:', e);
+          console.error('Uyarı sesi çalma hatası:', e);
         }
       };
       

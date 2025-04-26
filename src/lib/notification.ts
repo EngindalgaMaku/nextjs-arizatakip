@@ -21,16 +21,16 @@ export const playNotificationSound = (type: 'notification' | 'notification-alert
     console.log(`Bildirim sesi çalınıyor: ${type}`);
     
     if (type === 'notification-sequence') {
-      // Önce notification.mp3, sonra notification-return.mp3 çal
+      // Önce notification-alert.mp3, sonra notification-return.mp3 çal
       console.log('Sıralı bildirim sesi başlatılıyor');
       
-      const notificationAudio = new Audio(NOTIFICATION_SOUND);
-      notificationAudio.play()
+      const alertAudio = new Audio(NOTIFICATION_ALERT_SOUND);
+      alertAudio.play()
         .then(() => {
           console.log('İlk bildirim sesi başarıyla çalındı, ikinci ses bekleniyor');
           
           // İlk ses bittiğinde ikinci sesi çal
-          notificationAudio.onended = () => {
+          alertAudio.onended = () => {
             console.log('İkinci bildirim sesi başlatılıyor');
             const returnAudio = new Audio(NOTIFICATION_RETURN_SOUND);
             returnAudio.play()
@@ -148,15 +148,18 @@ export const showIssueUpdateNotification = (issue: Issue, previousStatus?: strin
     let body = `"${issue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(issue.status)}" olarak güncellendi.`;
     let sound: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' = 'notification';
     
-    // Beklemede durumundan başka bir duruma değiştiyse
-    if (previousStatus === 'beklemede') {
-      title = 'Arıza kaydınız işleme alındı';
-      sound = 'notification-sequence'; // Önce notification.mp3, sonra notification-return.mp3
-    }
-    // Çözüldü durumu için (geriye dönük uyumluluk)
-    else if (issue.status === 'cozuldu') {
+    // Çözüldü durumu için farklı ses
+    if (issue.status === 'cozuldu') {
       title = 'Arıza kaydınız çözüldü!';
       sound = 'notification-alert';
+    }
+    
+    // Öğretmen tarafında durum "beklemede"den başka bir duruma değiştiyse 
+    // (sadece öğretmen panelinde çağrıldığında)
+    if (typeof window !== 'undefined' && 
+        window.location.pathname.includes('/teacher') && 
+        previousStatus === 'beklemede') {
+      sound = 'notification-sequence'; // Önce notification.mp3, sonra notification-return.mp3
     }
     
     showBrowserNotification({
