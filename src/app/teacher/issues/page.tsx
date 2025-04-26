@@ -447,11 +447,11 @@ export default function TeacherIssuesPage() {
     
     // Ses dosyalarını preload
     const preloadNotificationSound = new Audio('/notification.mp3');
-    const preloadNotificationAlertSound = new Audio('/notification-retur.mp3');
+    const preloadNotificationReturnSound = new Audio('/notification-return.mp3');
     
     // Tarayıcıya ses dosyalarını önbelleğe almasını söyle
     preloadNotificationSound.preload = 'auto';
-    preloadNotificationAlertSound.preload = 'auto';
+    preloadNotificationReturnSound.preload = 'auto';
   }, []);
 
   // Supabase realtime aboneliği

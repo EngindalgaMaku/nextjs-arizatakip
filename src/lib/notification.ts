@@ -3,23 +3,58 @@ import { Issue } from './supabase';
 // Ses dosyaları
 const NOTIFICATION_SOUND = '/notification.mp3';
 const NOTIFICATION_ALERT_SOUND = '/notification-alert.mp3';
+const NOTIFICATION_RETURN_SOUND = '/notification-return.mp3';
 
 interface NotificationOptions {
   title: string;
   body: string;
-  sound?: 'notification' | 'notification-alert' | 'none';
+  sound?: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' | 'none';
 }
 
 /**
  * Bildirim sesini çalar
  */
-export const playNotificationSound = (type: 'notification' | 'notification-alert' = 'notification') => {
+export const playNotificationSound = (type: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' = 'notification') => {
   try {
     if (typeof window === 'undefined') return;
     
     console.log(`Bildirim sesi çalınıyor: ${type}`);
     
-    const soundPath = type === 'notification' ? NOTIFICATION_SOUND : NOTIFICATION_ALERT_SOUND;
+    if (type === 'notification-sequence') {
+      // Önce notification.mp3, sonra notification-return.mp3 çal
+      console.log('Sıralı bildirim sesi başlatılıyor');
+      
+      const notificationAudio = new Audio(NOTIFICATION_SOUND);
+      notificationAudio.play()
+        .then(() => {
+          console.log('İlk bildirim sesi başarıyla çalındı, ikinci ses bekleniyor');
+          
+          // İlk ses bittiğinde ikinci sesi çal
+          notificationAudio.onended = () => {
+            console.log('İkinci bildirim sesi başlatılıyor');
+            const returnAudio = new Audio(NOTIFICATION_RETURN_SOUND);
+            returnAudio.play()
+              .then(() => console.log('İkinci bildirim sesi başarıyla çalındı'))
+              .catch(error => console.error('İkinci bildirim sesi çalınamadı:', error));
+          };
+        })
+        .catch(error => {
+          console.error('Sıralı bildirim sesi çalınamadı:', error);
+        });
+      
+      return;
+    }
+    
+    // Tek ses çalma
+    let soundPath;
+    if (type === 'notification') {
+      soundPath = NOTIFICATION_SOUND;
+    } else if (type === 'notification-alert') {
+      soundPath = NOTIFICATION_ALERT_SOUND;
+    } else {
+      soundPath = NOTIFICATION_RETURN_SOUND;
+    }
+    
     console.log(`Ses dosya yolu: ${soundPath}`);
     
     const sound = new Audio(soundPath);
@@ -71,8 +106,8 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
       if (options.sound && options.sound !== 'none') {
         console.log(`Bildirim sesi çalınacak: ${options.sound}`);
         setTimeout(() => {
-          if (options.sound === 'notification' || options.sound === 'notification-alert') {
-            playNotificationSound(options.sound);
+          if (options.sound && options.sound !== 'none') {
+            playNotificationSound(options.sound as 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence');
           }
         }, 100);
       }
@@ -111,10 +146,15 @@ export const showIssueUpdateNotification = (issue: Issue, previousStatus?: strin
   if (previousStatus && previousStatus !== issue.status) {
     let title = 'Arıza kaydınız güncellendi';
     let body = `"${issue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(issue.status)}" olarak güncellendi.`;
-    let sound: 'notification' | 'notification-alert' = 'notification';
+    let sound: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' = 'notification';
     
-    // Çözüldü durumu için farklı ses
-    if (issue.status === 'cozuldu') {
+    // Beklemede durumundan başka bir duruma değiştiyse
+    if (previousStatus === 'beklemede') {
+      title = 'Arıza kaydınız işleme alındı';
+      sound = 'notification-sequence'; // Önce notification.mp3, sonra notification-return.mp3
+    }
+    // Çözüldü durumu için (geriye dönük uyumluluk)
+    else if (issue.status === 'cozuldu') {
       title = 'Arıza kaydınız çözüldü!';
       sound = 'notification-alert';
     }
