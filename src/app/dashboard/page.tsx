@@ -6,9 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, BellAlertIcon, UsersIcon, DocumentTextIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, PrinterIcon, FilmIcon, DeviceTabletIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getSession, getIssues, getUsers } from '@/lib/supabase';
-import { Alert, Card, Title, Text, Tab, TabList, TabGroup, TabPanel, TabPanels, Flex, Table, TableRow, TableCell, TableHead, TableHeaderCell, TableBody, Badge, Button } from '@tremor/react';
 import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/lib/helpers';
-import { ChartContainer } from '@/components/ChartContainer';
 import Swal from 'sweetalert2';
 // Temporary fix for missing getCounts - this will be implemented in supabase.ts
 // import { getCounts } from '@/lib/supabase';
@@ -657,17 +655,43 @@ export default function DashboardPage() {
                       </dt>
                       <dd className="mt-4">
                         <div className="flex h-16 items-end space-x-1">
-                          {[...Array(10)].map((_, index) => {
-                            // Rastgele yükseklik (gerçek uygulamada gerçek verilerle değiştirilmeli)
-                            const height = 30 + Math.floor(Math.random() * 70);
-                            return (
-                              <div 
-                                key={index}
-                                className="w-full bg-blue-500 rounded-t"
-                                style={{ height: `${height}%` }}
-                              ></div>
-                            );
-                          })}
+                          {(() => {
+                            // Son 10 günün tarihlerini oluştur
+                            const last10Days = Array.from({ length: 10 }, (_, i) => {
+                              const date = new Date();
+                              date.setDate(date.getDate() - (9 - i));
+                              return date.toISOString().split('T')[0]; // YYYY-MM-DD formatı
+                            });
+                            
+                            // Her gün için arıza sayısını hesapla
+                            const dailyCounts = last10Days.map(day => {
+                              // O güne ait arızaları say
+                              const count = recentIssues.filter(issue => {
+                                const issueDate = new Date(issue.created_at).toISOString().split('T')[0];
+                                return issueDate === day;
+                              }).length;
+                              
+                              return { day, count };
+                            });
+                            
+                            // Maksimum sayıyı bul (0'a bölme hatasını önlemek için en az 1)
+                            const maxCount = Math.max(1, ...dailyCounts.map(d => d.count));
+                            
+                            // Grafik çubuklarını oluştur
+                            return dailyCounts.map((data, index) => {
+                              // Sayı 0 ise min. %15 göster, değilse orantılı yükseklik
+                              const height = data.count === 0 ? 15 : Math.max(15, (data.count / maxCount) * 100);
+                              
+                              return (
+                                <div 
+                                  key={index}
+                                  className="w-full bg-blue-500 rounded-t"
+                                  style={{ height: `${height}%` }}
+                                  title={`${data.day}: ${data.count} arıza`}
+                                ></div>
+                              );
+                            });
+                          })()}
                         </div>
                         <div className="mt-2 text-xs text-gray-500 text-center">
                           Son 10 gündeki arıza bildirimleri
