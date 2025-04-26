@@ -516,4 +516,32 @@ export async function updateUserProfile(userId: string, userData: Partial<User>)
   
   // Kullanıcı tablosunu güncelleme
   return supabase.from('users').update(userData).eq('id', userId);
+}
+
+// Şifre değiştirme fonksiyonu
+export async function updatePassword(currentPassword: string, newPassword: string) {
+  try {
+    // Önce mevcut şifre ile oturum açma kontrolü yap
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: (await supabase.auth.getUser()).data.user?.email || '',
+      password: currentPassword
+    });
+    
+    if (authError) {
+      // Mevcut şifre yanlış
+      throw new Error('Mevcut şifre doğru değil');
+    }
+    
+    // Şifreyi güncelle
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (error) throw error;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Şifre güncellenirken hata:', error);
+    throw error;
+  }
 } 

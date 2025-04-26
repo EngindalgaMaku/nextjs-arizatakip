@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getUsers, deleteUser, registerUser, updateUser, updateUserProfile } from '@/lib/supabase';
+import Swal from 'sweetalert2';
 
 interface UserData {
   id: number | string;
@@ -258,7 +259,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Kullanıcı Yönetimi</h1>
-        <p className="mt-1 text-gray-500">Kullanıcı hesaplarını ve izinlerini yönetin</p>
+        <p className="mt-1 text-gray-500">Yönetici hesaplarını ve izinlerini yönetin</p>
       </div>
       
       {/* Filtreler ve Arama */}
@@ -349,26 +350,42 @@ export default function UsersPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.role === 'admin' ? 'Yönetici' : 
-                     user.role === 'editor' ? 'Editör' : 'Görüntüleyici'}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      user.role === 'admin' 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : user.role === 'editor' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-green-100 text-green-800'
+                    }`}>
+                      {user.role === 'admin' 
+                        ? 'Yönetici' 
+                        : user.role === 'editor' 
+                          ? 'Editör' 
+                          : 'Görüntüleyici'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      user.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
                       {user.status === 'active' ? 'Aktif' : 'Pasif'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.lastLogin}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.lastLogin}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      onClick={() => openEditModal(user)}
+                      onClick={() => Swal.fire({
+                        title: 'Bilgi',
+                        text: 'Bu işlem güvenlik tedbiri olarak supabase panelinden yapılmaktadır',
+                        icon: 'info',
+                        confirmButtonText: 'Tamam'
+                      })}
                     >
                       Düzenle
                     </button>
