@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getIssues, Issue, IssueStatus } from '@/lib/supabase';
 import { UserIcon, DocumentTextIcon, CheckCircleIcon, ClockIcon, ExclamationTriangleIcon, ChartPieIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import Swal from 'sweetalert2';
+import { useRouter } from 'next/navigation';
 
 interface TeacherStats {
   name: string;
@@ -19,6 +20,11 @@ export default function TeachersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSortBy, setSelectedSortBy] = useState<string>('name');
   const [selectedSortOrder, setSelectedSortOrder] = useState<'asc' | 'desc'>('asc');
+  // Sayfalama için state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10); // Her sayfada 10 öğretmen
+  const [totalPages, setTotalPages] = useState(1);
+  const router = useRouter();
 
   // Öğretmenleri ve arıza istatistiklerini yükle
   const loadTeacherStats = useCallback(async () => {
@@ -83,6 +89,9 @@ export default function TeachersPage() {
       }));
       
       setTeachers(teacherStatsArray);
+      
+      // Toplam sayfa sayısını hesapla
+      setTotalPages(Math.ceil(teacherStatsArray.length / pageSize));
     } catch (err) {
       console.error('Öğretmen istatistikleri yüklenirken hata:', err);
       Swal.fire({
@@ -95,11 +104,21 @@ export default function TeachersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [pageSize]);
 
   useEffect(() => {
     loadTeacherStats();
   }, [loadTeacherStats]);
+  
+  // Sayfa değiştiğinde işlemler
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Öğretmen adına tıklandığında o öğretmenin arızalarını görüntüle
+  const handleViewTeacherIssues = (teacherName: string) => {
+    router.push(`/dashboard/issues?reporter=${encodeURIComponent(teacherName)}`);
+  };
 
   // Arama ve sıralama için filtreleme
   const filteredTeachers = teachers
@@ -127,6 +146,12 @@ export default function TeachersPage() {
       // Sıralama yönü
       return selectedSortOrder === 'asc' ? comparison : -comparison;
     });
+    
+  // Sayfalanmış öğretmenler listesi
+  const paginatedTeachers = filteredTeachers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
   
   // Tüm istatistikler için toplam değerleri hesapla
   const totalStats = teachers.reduce(
@@ -274,7 +299,12 @@ export default function TeachersPage() {
               {topTeachers.map(teacher => (
                 <div key={teacher.name} className="flex flex-col">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium">{teacher.name}</span>
+                    <span 
+                      className="text-sm font-medium text-indigo-600 hover:text-indigo-900 cursor-pointer"
+                      onClick={() => handleViewTeacherIssues(teacher.name)}
+                    >
+                      {teacher.name}
+                    </span>
                     <span className="text-sm font-medium">{teacher.totalIssues} Arıza</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2.5">
@@ -380,80 +410,198 @@ export default function TeachersPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Öğretmen Adı
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Toplam Arıza
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Bekleyen Arıza
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Çözülen Arıza
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Çözülme Oranı
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Son Arıza Tarihi
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTeachers.map((teacher) => (
-                  <tr key={teacher.name} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                          <UserIcon className="h-6 w-6 text-indigo-600" />
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Öğretmen Adı
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Toplam Arıza
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Bekleyen Arıza
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Çözülen Arıza
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Çözülme Oranı
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Son Arıza Tarihi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedTeachers.map((teacher) => (
+                    <tr key={teacher.name} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <UserIcon className="h-6 w-6 text-indigo-600" />
+                          </div>
+                          <div className="ml-4">
+                            <div 
+                              className="text-sm font-medium text-indigo-600 hover:text-indigo-900 cursor-pointer"
+                              onClick={() => handleViewTeacherIssues(teacher.name)}
+                            >
+                              {teacher.name}
+                            </div>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {teacher.totalIssues}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <ClockIcon className="h-5 w-5 text-amber-500 mr-1.5" />
+                          <span className="text-sm font-medium text-amber-700">{teacher.pendingIssues}</span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {teacher.totalIssues}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <ClockIcon className="h-5 w-5 text-amber-500 mr-1.5" />
-                        <span className="text-sm font-medium text-amber-700">{teacher.pendingIssues}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <CheckCircleIcon className="h-5 w-5 text-emerald-500 mr-1.5" />
-                        <span className="text-sm font-medium text-emerald-700">{teacher.resolvedIssues}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${teacher.totalIssues > 0 && teacher.resolvedIssues / teacher.totalIssues >= 0.7 
-                          ? "bg-green-100 text-green-800" 
-                          : teacher.totalIssues > 0 && teacher.resolvedIssues / teacher.totalIssues <= 0.3 
-                            ? "bg-red-100 text-red-800" 
-                            : "bg-blue-100 text-blue-800"
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <CheckCircleIcon className="h-5 w-5 text-emerald-500 mr-1.5" />
+                          <span className="text-sm font-medium text-emerald-700">{teacher.resolvedIssues}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                          ${teacher.totalIssues > 0 && teacher.resolvedIssues / teacher.totalIssues >= 0.7 
+                            ? "bg-green-100 text-green-800" 
+                            : teacher.totalIssues > 0 && teacher.resolvedIssues / teacher.totalIssues <= 0.3 
+                              ? "bg-red-100 text-red-800" 
+                              : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {teacher.totalIssues > 0 
+                            ? `%${Math.round((teacher.resolvedIssues / teacher.totalIssues) * 100)}` 
+                            : '%0'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(teacher.lastReportDate)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Sayfalama */}
+            {totalPages > 1 && (
+              <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Toplam <span className="font-medium">{filteredTeachers.length}</span> öğretmenden{' '}
+                      <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span>-
+                      <span className="font-medium">
+                        {Math.min(currentPage * pageSize, filteredTeachers.length)}
+                      </span>{' '}
+                      arası gösteriliyor
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                          currentPage === 1 
+                            ? 'text-gray-300 cursor-not-allowed' 
+                            : 'text-gray-500 hover:bg-gray-50'
                         }`}
                       >
-                        {teacher.totalIssues > 0 
-                          ? `%${Math.round((teacher.resolvedIssues / teacher.totalIssues) * 100)}` 
-                          : '%0'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(teacher.lastReportDate)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <span className="sr-only">Önceki</span>
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      
+                      {/* Sayfa numaraları */}
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        // Sayfa numaralarını akıllıca hesapla
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                              currentPage === pageNum
+                                ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                      
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                          currentPage === totalPages 
+                            ? 'text-gray-300 cursor-not-allowed' 
+                            : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="sr-only">Sonraki</span>
+                        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+                
+                {/* Mobil sayfalama */}
+                <div className="flex sm:hidden justify-between items-center">
+                  <p className="text-sm text-gray-700">
+                    Sayfa <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span>
+                  </p>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className={`relative inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
+                        currentPage === 1 
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Önceki
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className={`relative inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
+                        currentPage === totalPages 
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Sonraki
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

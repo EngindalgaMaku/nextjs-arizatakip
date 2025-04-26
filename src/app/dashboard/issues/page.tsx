@@ -106,6 +106,7 @@ export default function IssuesPage() {
       const issueId = params.get('id');
       const openAddForm = params.get('open') === 'add';
       const filterStatus = params.get('filter');
+      const filterReporter = params.get('reporter');
       
       // URL'de ID varsa o arıza detayını göster
       if (issueId) {
@@ -159,6 +160,11 @@ export default function IssuesPage() {
       // "filter" parametresi varsa o duruma göre filtrele
       if (filterStatus) {
         setSelectedStatus(filterStatus);
+      }
+
+      // "reporter" parametresi varsa gönderene göre filtrele
+      if (filterReporter) {
+        setSelectedReporter(filterReporter);
       }
     }
   }, [issues, isLoading, loadIssues]);
@@ -342,6 +348,32 @@ export default function IssuesPage() {
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS</h1>
         <p className="text-gray-500 text-sm sm:text-base">Okuldaki tüm cihazların arıza kayıtlarını yönetin</p>
+        
+        {/* Öğretmen Filtresi Aktifse Göster */}
+        {selectedReporter !== 'all' && (
+          <div className="mt-4 bg-blue-50 rounded-lg p-4 flex justify-between items-center">
+            <div>
+              <span className="font-medium text-blue-700">Öğretmen Filtresi Aktif: </span>
+              <span className="text-blue-900">{selectedReporter}</span>
+              <p className="text-sm text-blue-600 mt-1">
+                Bu öğretmenin bildirdiği arıza kayıtlarını görüntülüyorsunuz
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedReporter('all');
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('reporter');
+                  window.history.pushState({}, '', url.toString());
+                }
+              }}
+              className="bg-white border border-blue-300 text-blue-700 px-4 py-2 rounded hover:bg-blue-100 transition-colors"
+            >
+              Filtreyi Kaldır
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Filtreler ve Arama - Mobil Responsive */}
