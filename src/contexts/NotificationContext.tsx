@@ -104,32 +104,54 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               document.body.removeChild(existingSound);
             }
             
-            // Yeni ses elementi oluştur
-            const audioElement = document.createElement('audio');
-            audioElement.id = 'notification-sound';
-            audioElement.src = '/notification-alert.mp3';
-            audioElement.autoplay = true;
-            audioElement.volume = 1.0;
+            // Birinci ses (notification-alert.mp3) için element oluştur
+            const firstAudioElement = document.createElement('audio');
+            firstAudioElement.id = 'notification-sound-1';
+            firstAudioElement.src = '/notification-alert.mp3';
+            firstAudioElement.volume = 1.0;
             
-            // Kullanıcı etkileşimi ile tetiklenecek bir click event listener ekle
-            audioElement.addEventListener('canplaythrough', () => {
-              const playPromise = audioElement.play();
-              if (playPromise !== undefined) {
-                playPromise
-                  .then(() => console.log('DOM audio element başarıyla çaldı'))
-                  .catch(error => console.error('DOM audio element çalma hatası:', error));
-              }
-            });
+            // İkinci ses (notification.mp3) için element oluştur
+            const secondAudioElement = document.createElement('audio');
+            secondAudioElement.id = 'notification-sound-2';
+            secondAudioElement.src = '/notification.mp3';
+            secondAudioElement.volume = 1.0;
             
-            // Temizlik için süre ayarla
-            audioElement.onended = () => {
-              if (document.body.contains(audioElement)) {
-                document.body.removeChild(audioElement);
-              }
+            // İlk ses bittiğinde ikinci sesi çal
+            firstAudioElement.onended = () => {
+              console.log('İlk ses bitti, ikinci ses çalınıyor...');
+              secondAudioElement.play()
+                .then(() => console.log('İkinci ses başarıyla çalındı'))
+                .catch(err => console.error('İkinci ses çalma hatası:', err));
             };
             
-            // DOM'a ekle
-            document.body.appendChild(audioElement);
+            // İkinci ses bittiğinde elementleri temizle
+            secondAudioElement.onended = () => {
+              if (document.body.contains(firstAudioElement)) {
+                document.body.removeChild(firstAudioElement);
+              }
+              if (document.body.contains(secondAudioElement)) {
+                document.body.removeChild(secondAudioElement);
+              }
+              console.log('Bildirim sesi sekansı tamamlandı, elementler temizlendi');
+            };
+            
+            // İlk elementi DOM'a ekleyip ilk sesi çal
+            document.body.appendChild(firstAudioElement);
+            document.body.appendChild(secondAudioElement);
+            
+            // İlk sesi çal
+            const playPromise = firstAudioElement.play();
+            if (playPromise !== undefined) {
+              playPromise
+                .then(() => console.log('İlk ses başarıyla çalıyor'))
+                .catch(error => {
+                  console.error('İlk ses çalma hatası:', error);
+                  // İlk ses çalınamazsa ikinci sesi denemeyi dene
+                  secondAudioElement.play()
+                    .then(() => console.log('İlk ses atlandı, ikinci ses çalıyor'))
+                    .catch(err => console.error('İkinci ses de çalınamadı:', err));
+                });
+            }
           } catch (audioError) {
             console.error('Doğrudan DOM ses çalma hatası:', audioError);
           }
