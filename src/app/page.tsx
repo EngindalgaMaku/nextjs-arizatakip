@@ -42,13 +42,9 @@ export default function HomePage() {
     checkAuth();
   }, [router]);
 
-  // Yönetici ve Öğretmen girişi için yönlendirme fonksiyonları
-  const handleAdminLogin = () => {
-    router.push('/login');
-  };
-
-  const handleTeacherLogin = () => {
-    router.push('/teacher/login');
+  // PWA modunda direkt URL navigasyonu için
+  const navigateTo = (path: string) => {
+    window.location.href = path;
   };
 
   // Oturum kontrolü devam ediyorsa yükleniyor ekranını göster
@@ -88,7 +84,7 @@ export default function HomePage() {
         
         <div className="space-y-3">
           <button 
-            onClick={handleAdminLogin}
+            onClick={() => navigateTo('/login')}
             className="flex items-center justify-center w-full py-2.5 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <UserIcon className="w-5 h-5 mr-2" />
@@ -96,7 +92,7 @@ export default function HomePage() {
           </button>
           
           <button 
-            onClick={handleTeacherLogin}
+            onClick={() => navigateTo('/teacher/login')}
             className="flex items-center justify-center w-full py-2.5 px-4 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
           >
             <AcademicCapIcon className="w-5 h-5 mr-2" />

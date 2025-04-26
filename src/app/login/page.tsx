@@ -23,6 +23,11 @@ export default function LoginPage() {
   // Demo modunu kontrol edecek değişken (Supabase kurulumu yoksa true yapın)
   const DEMO_MODE = false;
 
+  // PWA modunda direkt URL navigasyonu için
+  const navigateTo = (path: string) => {
+    window.location.href = path;
+  };
+
   // Site adını yükle
   useEffect(() => {
     async function loadSiteName() {
@@ -215,14 +220,14 @@ export default function LoginPage() {
         
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <button 
-            onClick={() => router.push('/')}
+            onClick={() => navigateTo('/')}
             className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center mr-4"
           >
             <HomeIcon className="w-4 h-4 mr-1" />
             Ana Sayfaya Dön
           </button>
           <button 
-            onClick={() => router.push('/pwa-guide')}
+            onClick={() => navigateTo('/pwa-guide')}
             className="text-sm text-indigo-600 hover:text-indigo-800 inline-flex items-center"
           >
             <DevicePhoneMobileIcon className="w-4 h-4 mr-1" />

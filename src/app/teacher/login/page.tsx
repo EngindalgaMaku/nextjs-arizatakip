@@ -43,6 +43,11 @@ export default function TeacherLoginPage() {
   const [isAutoLoginChecking, setIsAutoLoginChecking] = useState(true);
   const router = useRouter();
   
+  // PWA modunda direkt URL navigasyonu için
+  const navigateTo = (path: string) => {
+    window.location.href = path;
+  };
+  
   // Sayfa yüklendiğinde otomatik giriş kontrolü yap
   useEffect(() => {
     const checkAutoLogin = async () => {
@@ -377,7 +382,7 @@ export default function TeacherLoginPage() {
         
         <div className="mt-6 text-center text-sm text-gray-600">
           <button 
-            onClick={() => router.push('/')}
+            onClick={() => navigateTo('/')}
             className="inline-flex items-center text-blue-600 hover:text-blue-800"
           >
             <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
@@ -385,7 +390,7 @@ export default function TeacherLoginPage() {
           </button>
           <div className="mt-2">
             <button 
-              onClick={() => router.push('/pwa-guide')}
+              onClick={() => navigateTo('/pwa-guide')}
               className="inline-flex items-center text-green-600 hover:text-green-800"
             >
               <PhoneIcon className="h-4 w-4 mr-1" />

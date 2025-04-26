@@ -8,6 +8,11 @@ export default function PWAGuidePage() {
   const [deviceType, setDeviceType] = useState<'ios' | 'android'>('ios');
   const router = useRouter();
   
+  // PWA modunda direkt URL navigasyonu için
+  const navigateTo = (path: string) => {
+    window.location.href = path;
+  };
+  
   const isIOS = () => {
     if (typeof window !== 'undefined') {
       return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
@@ -112,7 +117,7 @@ export default function PWAGuidePage() {
       
       <div className="mt-4 text-center">
         <button 
-          onClick={() => router.push('/')}
+          onClick={() => navigateTo('/')}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           Ana Sayfaya Dön
