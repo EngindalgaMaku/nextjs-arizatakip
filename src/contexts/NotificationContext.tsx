@@ -108,7 +108,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const playNotificationSound = async () => {
     try {
       // Önce uyarı sesini çal
-      const alertAudio = new Audio('/notification-alert.mp3');
+      const alertAudio = new Audio('/notification-return.mp3');
       await alertAudio.play().catch(e => console.log('Uyarı sesi çalma hatası:', e));
       
       // Uyarı sesi bittikten sonra bildirim sesini çal
