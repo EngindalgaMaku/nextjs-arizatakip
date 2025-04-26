@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIssuesForTeacher, deleteIssue as deleteIssueFromDB, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority } from '@/lib/supabase';
 import AddIssueForm from './add-form';
+import TeacherEditForm from './edit-form';
 import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon, PresentationChartBarIcon, DeviceTabletIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
 import Swal from 'sweetalert2';
@@ -106,6 +107,8 @@ export default function TeacherIssuesPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddFormSubmitted, setIsAddFormSubmitted] = useState(false);
   const [teacher, setTeacher] = useState<TeacherUser | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
   const router = useRouter();
   
   // Arızaları yükle
@@ -264,6 +267,24 @@ export default function TeacherIssuesPage() {
 
   // Arıza silme fonksiyonu
   const handleDeleteIssue = async (issueId: string) => {
+    // Önce arızayı bul
+    const issue = issues.find(issue => issue.id === issueId);
+    
+    if (!issue) return;
+    
+    // Beklemede durumunda değilse silme işlemine izin verme
+    if (issue.status !== 'beklemede') {
+      Swal.fire({
+        title: 'Silme İşlemi Yapılamaz',
+        text: 'Gönderdiğiniz arıza işleme alınmıştır. Silme işlemi yapamazsınız.',
+        icon: 'warning',
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#3085d6'
+      });
+      return;
+    }
+    
+    // Beklemede durumundaysa normal silme işlemine devam et
     Swal.fire({
       title: 'Bu arıza kaydını silmek istediğinizden emin misiniz?',
       text: 'Bu işlem geri alınamaz!',
@@ -311,6 +332,43 @@ export default function TeacherIssuesPage() {
         }
       }
     });
+  };
+
+  // Arıza düzenleme fonksiyonu
+  const handleEditIssue = (issueId: string) => {
+    // Önce arızayı bul
+    const issue = issues.find(issue => issue.id === issueId);
+    
+    if (!issue) return;
+    
+    // Beklemede durumunda değilse düzenleme işlemine izin verme
+    if (issue.status !== 'beklemede') {
+      Swal.fire({
+        title: 'Düzenleme İşlemi Yapılamaz',
+        text: 'Gönderdiğiniz arıza işleme alınmıştır. Düzenleme işlemi yapamazsınız.',
+        icon: 'warning',
+        confirmButtonText: 'Tamam',
+        confirmButtonColor: '#3085d6'
+      });
+      return;
+    }
+    
+    // Beklemede durumundaysa düzenleme modalını aç
+    setCurrentIssue(issue);
+    setIsEditModalOpen(true);
+  };
+
+  // Modal kapatma fonksiyonu
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setCurrentIssue(null);
+  };
+
+  // Düzenleme başarılı olduğunda çağrılacak fonksiyon
+  const handleEditSuccess = () => {
+    setIsEditModalOpen(false);
+    setCurrentIssue(null);
+    loadIssues();
   };
 
   // Modal kapatma fonksiyonu  
@@ -566,7 +624,16 @@ export default function TeacherIssuesPage() {
                           {formatDate(issue.created_at)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {(issue.status as any) === 'beklemede' && (
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                              onClick={() => handleEditIssue(issue.id)}
+                              title="Arızayı Düzenle"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
                             <button
                               className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 transition-colors"
                               onClick={() => handleDeleteIssue(issue.id)}
@@ -574,7 +641,7 @@ export default function TeacherIssuesPage() {
                             >
                               <TrashIcon className="w-5 h-5" />
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -633,15 +700,22 @@ export default function TeacherIssuesPage() {
                         </div>
                         
                         <div className="mt-4 flex items-center justify-end space-x-2">
-                          {(issue.status as any) === 'beklemede' && (
-                            <button
-                              onClick={() => handleDeleteIssue(issue.id)}
-                              className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
-                            >
-                              <TrashIcon className="w-3.5 h-3.5 mr-1.5" />
-                              Sil
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleEditIssue(issue.id)}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
+                          >
+                            <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Düzenle
+                          </button>
+                          <button
+                            onClick={() => handleDeleteIssue(issue.id)}
+                            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5 mr-1.5" />
+                            Sil
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -690,6 +764,51 @@ export default function TeacherIssuesPage() {
                 onSuccess={handleAddSuccess}
                 onCancel={closeAddModal}
                 teacherName={teacher.name}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && currentIssue && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={closeEditModal}>
+          <div
+            className="bg-white rounded-lg shadow-xl overflow-hidden max-w-4xl w-full overflow-y-auto"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <div className="px-8 py-5 bg-gray-50 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-gray-900">Arıza Düzenle</h2>
+                <button
+                  onClick={closeEditModal}
+                  className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="px-8 py-6">
+              <TeacherEditForm
+                issue={currentIssue}
+                onSuccess={handleEditSuccess}
+                onCancel={closeEditModal}
               />
             </div>
           </div>

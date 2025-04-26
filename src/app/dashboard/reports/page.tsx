@@ -451,65 +451,25 @@ export default function ReportsPage() {
   };
   
   const handleGenerateReport = async (reportId: string, format: string) => {
-    setIsGenerating(true);
-    
-    try {
-      let filename = null;
-      
-      if (format === 'PDF') {
-        filename = createPDF(reportId);
-      } else if (format === 'Excel') {
-        filename = createExcel(reportId);
-      } else if (format === 'CSV') {
-        // For CSV, use Excel export for now
-        filename = createExcel(reportId);
-      }
-      
-      if (filename) {
-        Swal.fire({
-          title: 'Başarılı!',
-          text: `${reportId} raporu başarıyla oluşturuldu ve indirildi.`,
-          icon: 'success',
-          timer: 2000,
-          timerProgressBar: true,
-          showConfirmButton: false
-        });
-      } else {
-        throw new Error('Rapor oluşturulamadı.');
-      }
-    } catch (error) {
-      console.error('Rapor oluşturma hatası:', error);
-      Swal.fire({
-        title: 'Hata!',
-        text: 'Rapor oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.',
-        icon: 'error',
-        confirmButtonText: 'Tamam',
-        confirmButtonColor: '#3085d6'
-      });
-    } finally {
-      setIsGenerating(false);
-    }
+    // Kullanıcıya güncelleme yapılıyor mesajı göster
+    Swal.fire({
+      title: 'Güncelleme Yapılıyor',
+      text: 'PDF raporları için güncelleme çalışması yapılmaktadır. Lütfen daha sonra tekrar deneyiniz.',
+      icon: 'info',
+      confirmButtonText: 'Tamam',
+      confirmButtonColor: '#3085d6'
+    });
   };
   
   const handleDownloadReport = () => {
-    if (lastGeneratedReport) {
-      // The report has already been downloaded, but we can alert the user
-      Swal.fire({
-        title: 'Bilgi',
-        text: 'Son oluşturulan rapor zaten indirildi. Yeni bir rapor oluşturmak için "Oluştur" butonunu kullanın.',
-        icon: 'info',
-        confirmButtonText: 'Tamam',
-        confirmButtonColor: '#3085d6'
-      });
-    } else {
-      Swal.fire({
-        title: 'Uyarı',
-        text: 'Lütfen önce "Oluştur" butonunu kullanarak bir rapor oluşturun.',
-        icon: 'warning',
-        confirmButtonText: 'Tamam',
-        confirmButtonColor: '#3085d6'
-      });
-    }
+    // Kullanıcıya güncelleme yapılıyor mesajı göster  
+    Swal.fire({
+      title: 'Güncelleme Yapılıyor',
+      text: 'PDF raporları için güncelleme çalışması yapılmaktadır. Lütfen daha sonra tekrar deneyiniz.',
+      icon: 'info',
+      confirmButtonText: 'Tamam',
+      confirmButtonColor: '#3085d6'
+    });
   };
 
   // Rapor formatına göre arkaplan rengi belirleme
@@ -631,7 +591,7 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div className="mt-2 text-xs text-gray-500">
-                  Son oluşturulma: <time>{report.lastGenerated}</time>
+                  Son oluşturma: <time>{report.lastGenerated}</time>
                 </div>
               </div>
             </li>

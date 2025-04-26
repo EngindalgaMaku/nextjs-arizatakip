@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { setCookie } from 'cookies-next';
 import { getTeacherAccessCode, getSystemSetting } from '@/lib/supabase';
+import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline';
 
 export default function TeacherLoginPage() {
   const [teacherName, setTeacherName] = useState('');
@@ -215,16 +216,24 @@ export default function TeacherLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2 px-4 bg-blue-600 text-white rounded-md ${
+            className={`w-full py-2 px-4 bg-blue-600 text-white rounded-md flex items-center justify-center ${
               loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'
             }`}
           >
-            {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+            {loading ? (
+              'Giriş yapılıyor...'
+            ) : (
+              <>
+                <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" />
+                Giriş Yap
+              </>
+            )}
           </button>
         </form>
         
         <div className="mt-4 text-center">
-          <Link href="/login" className="text-sm text-blue-600 hover:text-blue-800">
+          <Link href="/login" className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center justify-center">
+            <UserIcon className="w-4 h-4 mr-1" />
             Yönetici girişi için tıklayın
           </Link>
         </div>

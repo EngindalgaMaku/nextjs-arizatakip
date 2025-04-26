@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, getSystemSetting } from '@/lib/supabase';
 import { setCookie } from 'cookies-next';
+import { ArrowRightOnRectangleIcon, HomeIcon } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -193,19 +194,27 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2 px-4 bg-blue-600 text-white rounded-md ${
+            className={`w-full py-2 px-4 bg-blue-600 text-white rounded-md flex items-center justify-center ${
               loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'
             }`}
           >
-            {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+            {loading ? (
+              'Giriş yapılıyor...'
+            ) : (
+              <>
+                <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" />
+                Giriş Yap
+              </>
+            )}
           </button>
         </form>
         
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <Link 
             href="/" 
-            className="text-sm text-gray-600 hover:text-gray-800"
+            className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center"
           >
+            <HomeIcon className="w-4 h-4 mr-1" />
             Ana Sayfaya Dön
           </Link>
         </div>

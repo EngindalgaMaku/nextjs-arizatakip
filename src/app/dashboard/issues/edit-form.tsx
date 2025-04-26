@@ -60,7 +60,8 @@ export default function EditIssueForm({ issue, onClose, onSuccess }: EditIssueFo
     status: issue.status || 'beklemede',
     reported_by: issue.reported_by || '',
     assigned_to: issue.assigned_to || '',
-    notes: issue.notes || ''
+    notes: issue.notes || '',
+    resolved_at: issue.resolved_at || null
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -120,6 +121,15 @@ export default function EditIssueForm({ issue, onClose, onSuccess }: EditIssueFo
         assigned_to: formData.assigned_to || null,
         notes: formData.notes || null
       };
+      
+      // Arıza çözüldü olarak işaretlendiğinde resolved_at alanını ayarla
+      if (formData.status === 'cozuldu' && (!issue.resolved_at || issue.status !== 'cozuldu')) {
+        // Sadece yeni çözüldüyse resolved_at tarihini güncelle
+        issueData.resolved_at = new Date().toISOString();
+      } else if (formData.status !== 'cozuldu' && issue.status === 'cozuldu') {
+        // Eğer "çözüldü" durumundan başka bir duruma geçilirse resolved_at'i temizle
+        issueData.resolved_at = null;
+      }
       
       // Update data in Supabase
       const result = await supabase

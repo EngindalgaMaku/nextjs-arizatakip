@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getUsers, deleteUser, registerUser, updateUser } from '@/lib/supabase';
+import { getUsers, deleteUser, registerUser, updateUser, updateUserProfile } from '@/lib/supabase';
 
 interface UserData {
   id: number | string;
-  name: string;
   email: string;
   role: string;
   status: 'active' | 'inactive';
@@ -13,7 +12,6 @@ interface UserData {
 }
 
 interface UserFormData {
-  name: string;
   email: string;
   password: string;
   role: 'admin' | 'editor' | 'viewer';
@@ -30,7 +28,6 @@ export default function UsersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
-    name: '',
     email: '',
     password: '',
     role: 'viewer',
@@ -58,7 +55,6 @@ export default function UsersPage() {
         // API'den gelen veriyi formata
         const formattedUsers = data.map(user => ({
           id: user.id,
-          name: user.name || 'İsimsiz Kullanıcı',
           email: user.email,
           role: user.role,
           status: user.status as 'active' | 'inactive',
@@ -68,12 +64,12 @@ export default function UsersPage() {
       } else {
         // Veri yoksa mock veri kullan (geliştirme için)
         setUsers([
-          { id: 1, name: 'Ahmet Yılmaz', email: 'ahmet@example.com', role: 'admin', status: 'active', lastLogin: '2023-10-25 14:30' },
-          { id: 2, name: 'Ayşe Kaya', email: 'ayse@example.com', role: 'editor', status: 'active', lastLogin: '2023-10-24 09:15' },
-          { id: 3, name: 'Mehmet Demir', email: 'mehmet@example.com', role: 'viewer', status: 'inactive', lastLogin: '2023-10-10 11:45' },
-          { id: 4, name: 'Zeynep Şahin', email: 'zeynep@example.com', role: 'editor', status: 'active', lastLogin: '2023-10-25 10:20' },
-          { id: 5, name: 'Ali Yıldız', email: 'ali@example.com', role: 'admin', status: 'active', lastLogin: '2023-10-25 16:05' },
-          { id: 6, name: 'Fatma Çelik', email: 'fatma@example.com', role: 'viewer', status: 'inactive', lastLogin: '2023-10-15 13:30' },
+          { id: 1, email: 'ahmet@example.com', role: 'admin', status: 'active', lastLogin: '2023-10-25 14:30' },
+          { id: 2, email: 'ayse@example.com', role: 'editor', status: 'active', lastLogin: '2023-10-24 09:15' },
+          { id: 3, email: 'mehmet@example.com', role: 'viewer', status: 'inactive', lastLogin: '2023-10-10 11:45' },
+          { id: 4, email: 'zeynep@example.com', role: 'editor', status: 'active', lastLogin: '2023-10-25 10:20' },
+          { id: 5, email: 'ali@example.com', role: 'admin', status: 'active', lastLogin: '2023-10-25 16:05' },
+          { id: 6, email: 'fatma@example.com', role: 'viewer', status: 'inactive', lastLogin: '2023-10-15 13:30' },
         ]);
       }
     } catch (err) {
@@ -85,9 +81,7 @@ export default function UsersPage() {
 
   // Filtre based on search term, role, and status
   const filteredUsers = users.filter((user) => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
@@ -132,10 +126,6 @@ export default function UsersPage() {
   const validateForm = () => {
     const errors: Record<string, string> = {};
     
-    if (!formData.name.trim()) {
-      errors.name = "İsim alanı zorunludur";
-    }
-    
     if (!formData.email.trim()) {
       errors.email = "E-posta alanı zorunludur";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -153,45 +143,41 @@ export default function UsersPage() {
   };
 
   const handleAddUser = async () => {
-    if (!validateForm()) return;
-    
-    try {
+    if (validateForm()) {
       setFormSubmitting(true);
-      
-      // Supabase ile kullanıcı kayıt işlemi
-      const authData = await registerUser(formData.email, formData.password, {
-        name: formData.name,
-        role: formData.role,
-        status: formData.status
-      });
-      
-      // Kullanıcı başarıyla eklendi
-      if (authData.user) {
-        const newUser: UserData = {
-          id: authData.user.id,
-          name: formData.name,
-          email: formData.email,
+      try {
+        // Supabase ile kullanıcı kayıt işlemi
+        const data = await registerUser(formData.email, formData.password, {
           role: formData.role,
-          status: formData.status,
-          lastLogin: 'Hiç giriş yapmadı'
-        };
+          status: formData.status
+        });
+
+        if (data.user) {
+          const newUser: UserData = {
+            id: data.user.id,
+            email: formData.email,
+            role: formData.role,
+            status: formData.status,
+            lastLogin: 'Henüz giriş yapılmadı'
+          };
+          
+          setUsers(prev => [...prev, newUser]);
+          resetForm();
+          setIsAddModalOpen(false);
+        }
+      } catch (error: unknown) {
+        console.error('Kullanıcı eklenirken hata oluştu:', error);
         
-        setUsers(prev => [...prev, newUser]);
-        resetForm();
-        setIsAddModalOpen(false);
+        if (error instanceof Error && error.message.includes('email already taken')) {
+          setFormErrors(prev => ({ ...prev, email: "Bu e-posta adresi zaten kullanılıyor" }));
+        } else if (error instanceof Error) {
+          alert(`Kullanıcı eklenirken bir hata oluştu: ${error.message}`);
+        } else {
+          alert('Kullanıcı eklenirken bir hata oluştu');
+        }
+      } finally {
+        setFormSubmitting(false);
       }
-    } catch (error: unknown) {
-      console.error('Kullanıcı eklenirken hata oluştu:', error);
-      
-      if (error instanceof Error && error.message.includes('email already taken')) {
-        setFormErrors(prev => ({ ...prev, email: "Bu e-posta adresi zaten kullanılıyor" }));
-      } else if (error instanceof Error) {
-        alert(`Kullanıcı eklenirken bir hata oluştu: ${error.message}`);
-      } else {
-        alert('Kullanıcı eklenirken bir hata oluştu');
-      }
-    } finally {
-      setFormSubmitting(false);
     }
   };
 
@@ -202,8 +188,7 @@ export default function UsersPage() {
       setFormSubmitting(true);
       
       // Supabase ile kullanıcı güncelleme işlemi
-      const { error } = await updateUser(currentUser.id.toString(), {
-        name: formData.name,
+      const { error } = await updateUserProfile(currentUser.id.toString(), {
         role: formData.role as 'admin' | 'editor' | 'viewer',
         status: formData.status
       });
@@ -215,7 +200,6 @@ export default function UsersPage() {
         if (user.id === currentUser.id) {
           return {
             ...user,
-            name: formData.name,
             role: formData.role,
             status: formData.status
           };
@@ -241,7 +225,6 @@ export default function UsersPage() {
   const openEditModal = (user: UserData) => {
     setCurrentUser(user);
     setFormData({
-      name: user.name,
       email: user.email,
       password: '', // Düzenleme ekranında şifre alanını boş bırakıyoruz
       role: user.role as 'admin' | 'editor' | 'viewer',
@@ -252,7 +235,6 @@ export default function UsersPage() {
 
   const resetForm = () => {
     setFormData({
-      name: '',
       email: '',
       password: '',
       role: 'viewer',
@@ -331,9 +313,6 @@ export default function UsersPage() {
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                İsim
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 E-posta
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -353,7 +332,7 @@ export default function UsersPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                   Arama kriterlerinize uygun kullanıcı bulunamadı
                 </td>
               </tr>
@@ -363,14 +342,13 @@ export default function UsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                        <span className="text-indigo-700">{user.name.charAt(0)}</span>
+                        <span className="text-indigo-700">{user.email.charAt(0).toUpperCase()}</span>
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{user.email}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {user.role === 'admin' ? 'Yönetici' : 
                      user.role === 'editor' ? 'Editör' : 'Görüntüleyici'}
@@ -421,19 +399,6 @@ export default function UsersPage() {
                 <div className="mt-3 text-center sm:mt-0 sm:text-left">
                   <h3 className="text-lg leading-6 font-medium text-gray-900">Yeni Kullanıcı Ekle</h3>
                   <div className="mt-4 space-y-4">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">İsim</label>
-                      <input
-                        type="text"
-                        name="name"
-                        id="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className={`mt-1 block w-full border ${formErrors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                      />
-                      {formErrors.name && <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>}
-                    </div>
-
                     <div>
                       <label htmlFor="email" className="block text-sm font-medium text-gray-700">E-posta</label>
                       <input
@@ -528,21 +493,8 @@ export default function UsersPage() {
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="mt-3 text-center sm:mt-0 sm:text-left">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">Kullanıcıyı Düzenle: {currentUser.name}</h3>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Kullanıcıyı Düzenle: {currentUser.email}</h3>
                   <div className="mt-4 space-y-4">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">İsim</label>
-                      <input
-                        type="text"
-                        name="name"
-                        id="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className={`mt-1 block w-full border ${formErrors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                      />
-                      {formErrors.name && <p className="mt-1 text-sm text-red-500">{formErrors.name}</p>}
-                    </div>
-
                     <div>
                       <label htmlFor="email" className="block text-sm font-medium text-gray-700">E-posta</label>
                       <input

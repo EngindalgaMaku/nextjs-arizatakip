@@ -92,8 +92,24 @@ export default function ViewIssueForm({ issue, onClose, onEdit }: ViewIssueFormP
               <span className="font-medium">Son Güncelleme:</span> {formatDate(issue.updated_at)}
             </p>
           )}
+          {issue.resolved_at && (
+            <p className="text-sm text-gray-500">
+              <span className="font-medium">Çözüm Tarihi:</span> {formatDate(issue.resolved_at)}
+            </p>
+          )}
         </div>
       </div>
+
+      {onEdit && (
+        <div className="mt-6">
+          <button
+            onClick={onEdit}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Düzenle
+          </button>
+        </div>
+      )}
     </div>
   );
 } 
