@@ -478,17 +478,78 @@ export default function TeacherIssuesPage() {
             console.log(`Arıza durumu değişti: ${oldIssue.status} -> ${updatedIssue.status}`);
             
             try {
-              // Doğrudan audio API kullanarak ses dosyasını çal
-              const audio = new Audio('/notification-alert.mp3');
-              audio.volume = 1.0;
+              // İki ses dosyasını sırayla çal
+              // İlk ses dosyası (notification-alert.mp3)
+              const firstAudio = new Audio('/notification-alert.mp3');
+              firstAudio.volume = 1.0;
               
-              // Ses dosyasını çal
-              const playPromise = audio.play();
+              // İkinci ses dosyası (notification-return.mp3)
+              const secondAudio = new Audio('/notification-return.mp3');
+              secondAudio.volume = 1.0;
+              
+              // İlk ses bittiğinde ikinci sesi çal
+              firstAudio.onended = () => {
+                console.log('İlk ses bitti, ikinci ses çalınıyor...');
+                secondAudio.play()
+                  .then(() => console.log('İkinci ses başarıyla çalındı'))
+                  .catch(err => console.error('İkinci ses çalma hatası:', err));
+              };
+              
+              // İlk sesi çal
+              const playPromise = firstAudio.play();
               
               if (playPromise !== undefined) {
                 playPromise
-                  .then(() => console.log('Ses dosyası başarıyla çalındı'))
-                  .catch(err => console.error('Ses dosyası çalınırken hata:', err));
+                  .then(() => console.log('İlk ses başarıyla çalınıyor'))
+                  .catch(err => {
+                    console.error('İlk ses çalma hatası:', err);
+                    // İlk ses çalınamazsa ikinci sesi denemeyi dene
+                    secondAudio.play()
+                      .then(() => console.log('İkinci ses çalınıyor (ilk ses başarısız olduğu için)'))
+                      .catch(err2 => console.error('İkinci ses de çalınamadı:', err2));
+                  });
+              }
+              
+              // DOM yöntemiyle de çalmayı dene (yedek)
+              try {
+                // Ses elementlerini oluştur
+                const audioElement1 = document.createElement('audio');
+                audioElement1.id = 'notification-sound-1';
+                audioElement1.src = '/notification-alert.mp3';
+                audioElement1.volume = 1.0;
+                
+                const audioElement2 = document.createElement('audio');
+                audioElement2.id = 'notification-sound-2';
+                audioElement2.src = '/notification-return.mp3';
+                audioElement2.volume = 1.0;
+                
+                // İlk ses bitince ikinci sesi çal
+                audioElement1.onended = () => {
+                  audioElement2.play()
+                    .then(() => console.log('DOM: İkinci ses başarıyla çalındı'))
+                    .catch(err => console.error('DOM: İkinci ses çalma hatası:', err));
+                };
+                
+                // Temizlik için
+                audioElement2.onended = () => {
+                  if (document.body.contains(audioElement1)) {
+                    document.body.removeChild(audioElement1);
+                  }
+                  if (document.body.contains(audioElement2)) {
+                    document.body.removeChild(audioElement2);
+                  }
+                };
+                
+                // DOM'a ekle
+                document.body.appendChild(audioElement1);
+                document.body.appendChild(audioElement2);
+                
+                // İlk sesi çal
+                audioElement1.play()
+                  .then(() => console.log('DOM: İlk ses başarıyla çalınıyor'))
+                  .catch(err => console.error('DOM: İlk ses çalma hatası:', err));
+              } catch (domError) {
+                console.error('DOM ses çalma hatası:', domError);
               }
             } catch (error) {
               console.error('Ses bildirimi çalınırken hata:', error);
