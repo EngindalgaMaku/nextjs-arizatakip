@@ -223,29 +223,41 @@ export async function deleteUser(id: string) {
 }
 
 // Arıza İşlemleri
-export const getIssues = async (limit?: number) => {
+export const getIssues = async (page = 1, pageSize = 10) => {
   try {
-    let query = supabase
+    // Sayfalama için offset hesapla
+    const offset = (page - 1) * pageSize;
+    
+    // Önce toplam kayıt sayısını al
+    const countResponse = await supabase
       .from('issues')
-      .select('*');
+      .select('id', { count: 'exact', head: true });
     
-    if (limit) {
-      query = query.limit(limit);
-    }
+    const totalCount = countResponse.count || 0;
     
-    const { data, error } = await query;
+    // Sayfalanmış veriyi al
+    const { data, error } = await supabase
+      .from('issues')
+      .select('*')
+      .range(offset, offset + pageSize - 1)
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching issues:', error);
-      return { error, data: null };
+      return { error, data: null, totalCount: 0, totalPages: 0 };
     }
     
-    return { data, error: null };
+    // Toplam sayfa sayısını hesapla
+    const totalPages = Math.ceil(totalCount / pageSize);
+    
+    return { data, error: null, totalCount, totalPages };
   } catch (error) {
     console.error('Exception fetching issues:', error);
     return { 
       error: error instanceof Error ? error : new Error('Unknown error fetching issues'), 
-      data: null 
+      data: null,
+      totalCount: 0,
+      totalPages: 0
     };
   }
 };
@@ -311,17 +323,48 @@ export async function addIssue(issueData: IssueData) {
 }
 
 // Öğretmen için arızaları getirme fonksiyonu
-export async function getIssuesForTeacher(teacherName: string) {
-  const { data, error } = await supabase
-    .from('issues')
-    .select('*')
-    .eq('reported_by', teacherName)
-    .order('created_at', { ascending: false });
-
-  return { data, error };
+export async function getIssuesForTeacher(teacherName: string, page = 1, pageSize = 10) {
+  try {
+    // Sayfalama için offset hesapla
+    const offset = (page - 1) * pageSize;
+    
+    // Önce toplam kayıt sayısını al
+    const countResponse = await supabase
+      .from('issues')
+      .select('id', { count: 'exact', head: true })
+      .eq('reported_by', teacherName);
+    
+    const totalCount = countResponse.count || 0;
+    
+    // Sayfalanmış veriyi al
+    const { data, error } = await supabase
+      .from('issues')
+      .select('*')
+      .eq('reported_by', teacherName)
+      .range(offset, offset + pageSize - 1)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching issues for teacher:', error);
+      return { error, data: null, totalCount: 0, totalPages: 0 };
+    }
+    
+    // Toplam sayfa sayısını hesapla
+    const totalPages = Math.ceil(totalCount / pageSize);
+    
+    return { data, error: null, totalCount, totalPages };
+  } catch (error) {
+    console.error('Exception fetching issues for teacher:', error);
+    return { 
+      error: error instanceof Error ? error : new Error('Unknown error fetching issues'), 
+      data: null,
+      totalCount: 0,
+      totalPages: 0
+    };
+  }
 }
 
-// Tüm arızaları getirme fonksiyonu
+// Tüm arızaları getirme fonksiyonu (pagination olmadan, rapor gibi özel amaçlar için)
 export async function getAllIssues() {
   const { data, error } = await supabase
     .from('issues')

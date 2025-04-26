@@ -109,6 +109,11 @@ export default function TeacherIssuesPage() {
   const [teacher, setTeacher] = useState<TeacherUser | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
+  // Sayfalama için state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const router = useRouter();
   
   // Arızaları yükle
@@ -118,13 +123,17 @@ export default function TeacherIssuesPage() {
     try {
       setIsLoading(true);
       
-      // Gerçek API çağrısı
-      const { data, error } = await getIssuesForTeacher(teacher.name);
+      // Gerçek API çağrısı - sayfalama ile
+      const { data, error, totalPages: pages, totalCount: count } = await getIssuesForTeacher(teacher.name, currentPage, pageSize);
       
       if (error) {
         console.error('Arızalar yüklenirken hata oluştu:', error);
         throw error;
       }
+      
+      // Toplam sayfa ve kayıt sayısını güncelle
+      setTotalPages(pages);
+      setTotalCount(count);
       
       if (!data || data.length === 0) {
         setIssues([]);
@@ -133,36 +142,38 @@ export default function TeacherIssuesPage() {
       }
       
       // API'den gelen veriyi formata
-      const formattedIssues = data
-        // En yeni arızalar önce sırala
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .map(issue => ({
-          id: issue.id,
-          device_type: issue.device_type,
-          device_name: issue.device_name,
-          device_location: issue.device_location,
-          room_number: issue.room_number,
-          reported_by: issue.reported_by,
-          assigned_to: issue.assigned_to,
-          description: issue.description,
-          status: issue.status,
-          priority: issue.priority,
-          notes: issue.notes,
-          created_at: issue.created_at, // Ham tarih verisi
-          updated_at: issue.updated_at,
-          resolved_at: issue.resolved_at
-        }));
+      const formattedIssues = data.map(issue => ({
+        id: issue.id,
+        device_type: issue.device_type,
+        device_name: issue.device_name,
+        device_location: issue.device_location,
+        room_number: issue.room_number,
+        reported_by: issue.reported_by,
+        assigned_to: issue.assigned_to,
+        description: issue.description,
+        status: issue.status,
+        priority: issue.priority,
+        notes: issue.notes,
+        created_at: issue.created_at, // Ham tarih verisi
+        updated_at: issue.updated_at,
+        resolved_at: issue.resolved_at
+      }));
       
       setIssues(formattedIssues);
     } catch (err) {
       console.error('Arızalar yüklenirken hata oluştu:', err);
-      alert('Arızalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+      Swal.fire({
+        title: 'Hata!',
+        text: 'Arızalar yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
+        icon: 'error',
+        confirmButtonText: 'Tamam'
+      });
       // Hata durumunda boş liste göster
       setIssues([]);
     } finally {
       setIsLoading(false);
     }
-  }, [teacher]);
+  }, [teacher, currentPage, pageSize]);
 
   // Öğretmen giriş kontrolü
   useEffect(() => {
@@ -201,13 +212,17 @@ export default function TeacherIssuesPage() {
     }
   }, [teacher, loadIssues, isAddFormSubmitted]);
 
-  // Filtre işlemi
+  // Sayfa değiştiğinde işlemler
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Filtre based on search term, status, and device type
   const filteredIssues = issues.filter((issue) => {
     const matchesSearch = 
       (issue.device_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) || 
       (issue.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (issue.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (issue.reported_by?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+      (issue.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     
     const matchesStatus = selectedStatus === 'all' || issue.status === selectedStatus;
     const matchesType = selectedType === 'all' || issue.device_type === selectedType;
@@ -410,7 +425,7 @@ export default function TeacherIssuesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       <div className="teacher-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
@@ -430,7 +445,7 @@ export default function TeacherIssuesPage() {
         </div>
       </div>
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Filtreler ve Arama */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
@@ -722,6 +737,117 @@ export default function TeacherIssuesPage() {
                   ))}
                 </div>
               </div>
+              
+              {/* Pagination */}
+              {(searchTerm === '' && selectedStatus === 'all' && selectedType === 'all' && selectedLocation === 'all') && totalPages > 1 && (
+                <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700">
+                        Toplam <span className="font-medium">{totalCount}</span> arıza kaydından{' '}
+                        <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span>-
+                        <span className="font-medium">
+                          {Math.min(currentPage * pageSize, totalCount)}
+                        </span>{' '}
+                        arası gösteriliyor
+                      </p>
+                    </div>
+                    <div>
+                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                            currentPage === 1 
+                              ? 'text-gray-300 cursor-not-allowed' 
+                              : 'text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className="sr-only">Önceki</span>
+                          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        
+                        {/* Sayfa numaraları */}
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          // Sayfa numaralarını akıllıca hesapla
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                currentPage === pageNum
+                                  ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                        
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                            currentPage === totalPages 
+                              ? 'text-gray-300 cursor-not-allowed' 
+                              : 'text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className="sr-only">Sonraki</span>
+                          <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                  
+                  {/* Mobil pagination */}
+                  <div className="flex sm:hidden justify-between items-center">
+                    <p className="text-sm text-gray-700">
+                      Sayfa <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span>
+                    </p>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className={`relative inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
+                          currentPage === 1 
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Önceki
+                      </button>
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className={`relative inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium ${
+                          currentPage === totalPages 
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Sonraki
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
