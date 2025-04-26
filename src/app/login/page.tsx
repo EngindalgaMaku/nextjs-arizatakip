@@ -6,7 +6,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, getSystemSetting } from '@/lib/supabase';
 import { setCookie } from 'cookies-next';
-import { ArrowRightOnRectangleIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { 
+  ArrowRightOnRectangleIcon, 
+  HomeIcon,
+  DevicePhoneMobileIcon 
+} from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -212,10 +216,17 @@ export default function LoginPage() {
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <Link 
             href="/" 
-            className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center"
+            className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center mr-4"
           >
             <HomeIcon className="w-4 h-4 mr-1" />
             Ana Sayfaya Dön
+          </Link>
+          <Link 
+            href="/pwa-guide" 
+            className="text-sm text-indigo-600 hover:text-indigo-800 inline-flex items-center"
+          >
+            <DevicePhoneMobileIcon className="w-4 h-4 mr-1" />
+            Uygulamayı Ana Ekrana Ekle
           </Link>
         </div>
       </div>

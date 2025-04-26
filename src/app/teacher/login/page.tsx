@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { setCookie } from 'cookies-next';
 import { getTeacherAccessCode, getSystemSetting } from '@/lib/supabase';
-import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline';
+import { ArrowRightOnRectangleIcon, UserIcon, PhoneIcon } from '@heroicons/react/24/outline';
 
 // Tarayıcı parmak izi oluşturan basit bir fonksiyon
 const generateDeviceFingerprint = (): string => {
@@ -380,6 +380,12 @@ export default function TeacherLoginPage() {
             <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
             Yönetici Girişi
           </Link>
+          <div className="mt-2">
+            <Link href="/pwa-guide" className="inline-flex items-center text-green-600 hover:text-green-800">
+              <PhoneIcon className="h-4 w-4 mr-1" />
+              Uygulamayı Telefona Ekle
+            </Link>
+          </div>
         </div>
       </div>
     </div>
