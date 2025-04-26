@@ -308,7 +308,7 @@ export default function TeacherLoginPage() {
         <form onSubmit={handleLogin}>
           <div className="mb-4">
             <label htmlFor="teacherName" className="block text-gray-700 font-medium mb-2">
-              Öğretmen Adı
+              Öğretmen Adı <span className="text-red-500">*</span>
             </label>
             <input
               id="teacherName"
@@ -319,6 +319,9 @@ export default function TeacherLoginPage() {
               placeholder="Adınız ve Soyadınız"
               required
             />
+            <p className="mt-1 text-xs text-red-600 font-medium">
+              Lütfen tam adınızı ve soyadınızı yazınız (Örn: Ahmet Yılmaz)
+            </p>
           </div>
           
           <div className="mb-6">

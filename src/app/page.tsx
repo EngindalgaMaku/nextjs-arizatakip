@@ -2,9 +2,59 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { getCookie } from 'cookies-next';
 import { UserIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 
 export default function HomePage() {
+  const router = useRouter();
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  // Sayfa yüklendiğinde cookie kontrolü yap ve otomatik giriş yap
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Admin cookie kontrolü
+        const adminSession = getCookie('admin-session');
+        if (adminSession) {
+          console.log('Yönetici oturumu bulundu, yönlendiriliyor...');
+          router.push('/dashboard');
+          return;
+        }
+
+        // Öğretmen cookie kontrolü
+        const teacherSession = getCookie('teacher-session');
+        if (teacherSession) {
+          console.log('Öğretmen oturumu bulundu, yönlendiriliyor...');
+          router.push('/teacher/issues');
+          return;
+        }
+
+        // Oturum bulunamadı, normal giriş ekranını göster
+        setIsAuthChecking(false);
+      } catch (error) {
+        console.error('Oturum kontrolü sırasında hata:', error);
+        setIsAuthChecking(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // Oturum kontrolü devam ediyorsa yükleniyor ekranını göster
+  if (isAuthChecking) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Oturum bilgileri kontrol ediliyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Oturum yoksa normal giriş ekranını göster
   return (
     <div className="h-screen flex items-center justify-center bg-gray-100 overflow-hidden">
       <div className="w-full max-w-md px-6 py-5 bg-white rounded-lg shadow-md mx-4">
