@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, BellAlertIcon, UsersIcon, DocumentTextIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, PrinterIcon, FilmIcon, DeviceTabletIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
-import { getSession, getIssues, getUsers } from '@/lib/supabase';
+import { getSession, getIssues, getUsers, getAllIssues } from '@/lib/supabase';
 import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/lib/helpers';
 import { useNotifications } from '@/contexts/NotificationContext';
 import Swal from 'sweetalert2';
@@ -60,7 +60,7 @@ export default function DashboardPage() {
         }
         
         // Supabase'den verileri getir
-        const { data: issues, error: issuesError } = await getIssues();
+        const { data: issues, error: issuesError } = await getAllIssues();
         const { data: users, error: usersError } = await getUsers();
         
         if (issuesError) {
