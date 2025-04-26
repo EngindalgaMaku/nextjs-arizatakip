@@ -477,12 +477,9 @@ export default function TeacherIssuesPage() {
           if (updatedIssue.status !== oldIssue.status) {
             console.log(`Arıza durumu değişti: ${oldIssue.status} -> ${updatedIssue.status}`);
             
-            // Sadece "beklemede" durumundan başka bir duruma geçişte ses çal
-            if (String(oldIssue.status).toLowerCase() === 'beklemede' && 
-                String(updatedIssue.status).toLowerCase() !== 'beklemede') {
-              console.log('Beklemedeki arıza işleme alındı, ses bildirimi gönderiliyor...');
-              playAlertSound();
-            }
+            // Her durum değişikliğinde ses çal
+            console.log('Arıza durumu değişti, ses bildirimi gönderiliyor...');
+            playAlertSound();
           }
           
           // Bildirim göster
