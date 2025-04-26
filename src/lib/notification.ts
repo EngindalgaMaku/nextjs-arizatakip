@@ -1,63 +1,23 @@
 import { Issue } from './supabase';
 
-// Ses dosyaları
-const NOTIFICATION_SOUND = '/notification.mp3';
+// Sesli bildirim için sabit
 const NOTIFICATION_ALERT_SOUND = '/notification-alert.mp3';
-const NOTIFICATION_RETURN_SOUND = '/notification-return.mp3';
 
 interface NotificationOptions {
   title: string;
   body: string;
-  sound?: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' | 'none';
 }
 
 /**
- * Bildirim sesini çalar
+ * Bildirim sesini çalar (sadece alert sesi)
  */
-export const playNotificationSound = (type: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' = 'notification') => {
+export const playAlertSound = () => {
   try {
     if (typeof window === 'undefined') return;
     
-    console.log(`Bildirim sesi çalınıyor: ${type}`);
+    console.log('Bildirim sesi çalınıyor: notification-alert.mp3');
     
-    if (type === 'notification-sequence') {
-      // Önce notification-alert.mp3, sonra notification-return.mp3 çal
-      console.log('Sıralı bildirim sesi başlatılıyor');
-      
-      const alertAudio = new Audio(NOTIFICATION_ALERT_SOUND);
-      alertAudio.play()
-        .then(() => {
-          console.log('İlk bildirim sesi başarıyla çalındı, ikinci ses bekleniyor');
-          
-          // İlk ses bittiğinde ikinci sesi çal
-          alertAudio.onended = () => {
-            console.log('İkinci bildirim sesi başlatılıyor');
-            const returnAudio = new Audio(NOTIFICATION_RETURN_SOUND);
-            returnAudio.play()
-              .then(() => console.log('İkinci bildirim sesi başarıyla çalındı'))
-              .catch(error => console.error('İkinci bildirim sesi çalınamadı:', error));
-          };
-        })
-        .catch(error => {
-          console.error('Sıralı bildirim sesi çalınamadı:', error);
-        });
-      
-      return;
-    }
-    
-    // Tek ses çalma
-    let soundPath;
-    if (type === 'notification') {
-      soundPath = NOTIFICATION_SOUND;
-    } else if (type === 'notification-alert') {
-      soundPath = NOTIFICATION_ALERT_SOUND;
-    } else {
-      soundPath = NOTIFICATION_RETURN_SOUND;
-    }
-    
-    console.log(`Ses dosya yolu: ${soundPath}`);
-    
-    const sound = new Audio(soundPath);
+    const sound = new Audio(NOTIFICATION_ALERT_SOUND);
     
     // Ses dosyası yükleme hatası
     sound.onerror = (error) => {
@@ -102,16 +62,6 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
         icon: '/okullogo.png'
       });
       
-      // Ses çal
-      if (options.sound && options.sound !== 'none') {
-        console.log(`Bildirim sesi çalınacak: ${options.sound}`);
-        setTimeout(() => {
-          if (options.sound && options.sound !== 'none') {
-            playNotificationSound(options.sound as 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence');
-          }
-        }, 100);
-      }
-      
       // Kullanıcı bildirime tıkladığında sayfaya odaklan
       notification.onclick = () => {
         console.log('Bildirime tıklandı, pencere odaklanıyor');
@@ -146,33 +96,21 @@ export const showIssueUpdateNotification = (issue: Issue, previousStatus?: strin
   if (previousStatus && previousStatus !== issue.status) {
     let title = 'Arıza kaydınız güncellendi';
     let body = `"${issue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(issue.status)}" olarak güncellendi.`;
-    let sound: 'notification' | 'notification-alert' | 'notification-return' | 'notification-sequence' = 'notification';
     
-    // Çözüldü durumu için farklı ses
+    // Çözüldü durumu için farklı başlık
     if (issue.status === 'cozuldu') {
       title = 'Arıza kaydınız çözüldü!';
-      sound = 'notification-alert';
-    }
-    
-    // Öğretmen tarafında durum "beklemede"den başka bir duruma değiştiyse 
-    // (sadece öğretmen panelinde çağrıldığında)
-    if (typeof window !== 'undefined' && 
-        window.location.pathname.includes('/teacher') && 
-        previousStatus === 'beklemede') {
-      sound = 'notification-sequence'; // Önce notification.mp3, sonra notification-return.mp3
     }
     
     showBrowserNotification({
       title,
-      body,
-      sound
+      body
     });
   } else {
     // Genel güncelleme
     showBrowserNotification({
       title: 'Arıza kaydınız güncellendi',
-      body: `"${issue.device_name}" cihazı için bildiriminiz güncellendi.`,
-      sound: 'notification'
+      body: `"${issue.device_name}" cihazı için bildiriminiz güncellendi.`
     });
   }
 };

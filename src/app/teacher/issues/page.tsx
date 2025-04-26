@@ -8,7 +8,7 @@ import TeacherEditForm from './edit-form';
 import { PlusIcon, ArrowRightOnRectangleIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, FilmIcon, PrinterIcon, DevicePhoneMobileIcon, MapPinIcon, ClockIcon, TrashIcon, PresentationChartBarIcon, DeviceTabletIcon } from '@heroicons/react/24/outline';
 import { deleteCookie } from 'cookies-next';
 import Swal from 'sweetalert2';
-import { showIssueUpdateNotification, showBrowserNotification } from '@/lib/notification';
+import { showBrowserNotification, playAlertSound } from '@/lib/notification';
 
 // Format date function
 const formatDate = (date: Date | string | null): string => {
@@ -416,42 +416,39 @@ export default function TeacherIssuesPage() {
     });
   };
 
-  // Bildirim izni iste
+  // Hoş Geldiniz bildirimi (sayfa ilk yüklendiğinde)
   useEffect(() => {
-    const requestNotificationPermission = async () => {
-      try {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-          console.log('Bildirim izni durumu:', Notification.permission);
-          
-          if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            const permission = await Notification.requestPermission();
-            console.log('Bildirim izni sonucu:', permission);
-            
-            // İzin alındıysa test bildirimi göster
-            if (permission === 'granted') {
-              new Notification('Bildirim sistemi aktif', {
-                body: 'Arıza takiplerinizde güncelleme olduğunda bildirim alacaksınız.',
-                icon: '/okullogo.png'
-              });
-            }
-          }
-        } else {
-          console.warn('Bu tarayıcı bildirim desteği sunmuyor');
-        }
-      } catch (error) {
-        console.error('Bildirim izni istenirken hata:', error);
-      }
-    };
-    
-    requestNotificationPermission();
-    
-    // Ses dosyalarını preload
-    const preloadNotificationSound = new Audio('/notification.mp3');
-    const preloadNotificationReturnSound = new Audio('/notification-return.mp3');
-    
-    // Tarayıcıya ses dosyalarını önbelleğe almasını söyle
-    preloadNotificationSound.preload = 'auto';
-    preloadNotificationReturnSound.preload = 'auto';
+    if (teacher?.name && !isLoading && issues.length >= 0) {
+      showBrowserNotification({
+        title: 'Öğretmen Paneline Hoş Geldiniz',
+        body: `${teacher.name}, açık arıza sayınız: ${issues.filter(i => i.status !== 'cozuldu' && i.status !== 'kapatildi').length}`
+      });
+    }
+  }, [teacher?.name, isLoading, issues.length]);
+  
+  // Ses dosyasını preload et
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('Ses dosyası önceden yükleniyor...');
+      const preloadAudio = new Audio('/notification-alert.mp3');
+      preloadAudio.preload = 'auto';
+      
+      // Tarayıcı kısıtlamalarını aşmak için sessiz bir event ile önbelleğe alma
+      const handleUserInteraction = () => {
+        preloadAudio.volume = 0.01; // Çok düşük ses
+        preloadAudio.play()
+          .then(() => {
+            setTimeout(() => preloadAudio.pause(), 10);
+            preloadAudio.volume = 1;
+            console.log('Ses dosyası başarıyla yüklendi');
+            document.removeEventListener('click', handleUserInteraction);
+          })
+          .catch(() => console.log('Ses dosyası yüklenemedi, kullanıcı etkileşimi gerekebilir'));
+      };
+      
+      // Kullanıcı etkileşimi bekle
+      document.addEventListener('click', handleUserInteraction, { once: true });
+    }
   }, []);
 
   // Supabase realtime aboneliği
@@ -479,10 +476,16 @@ export default function TeacherIssuesPage() {
           // Status değişikliğini kontrol et
           if (updatedIssue.status !== oldIssue.status) {
             console.log(`Arıza durumu değişti: ${oldIssue.status} -> ${updatedIssue.status}`);
+            
+            // Ses bildirimini çal
+            playAlertSound();
           }
           
           // Bildirim göster
-          showIssueUpdateNotification(updatedIssue, oldIssue.status);
+          showBrowserNotification({
+            title: 'Arıza kaydınız güncellendi',
+            body: `"${updatedIssue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(updatedIssue.status)}" olarak güncellendi.`
+          });
           
           // State'i güncelle
           setIssues(prev => prev.map(issue => 
@@ -507,17 +510,6 @@ export default function TeacherIssuesPage() {
       }
     };
   }, [teacher?.name]);
-
-  // Hoş Geldiniz bildirimi (sayfa ilk yüklendiğinde)
-  useEffect(() => {
-    if (teacher?.name && !isLoading && issues.length >= 0) {
-      showBrowserNotification({
-        title: 'Öğretmen Paneline Hoş Geldiniz',
-        body: `${teacher.name}, açık arıza sayınız: ${issues.filter(i => i.status !== 'cozuldu' && i.status !== 'kapatildi').length}`,
-        sound: 'none'
-      });
-    }
-  }, [teacher?.name, isLoading, issues.length]);
 
   if (isLoading) {
     return (

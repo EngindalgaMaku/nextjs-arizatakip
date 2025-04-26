@@ -4,6 +4,7 @@ import React, { createContext, useState, useContext, useEffect, useRef } from 'r
 import { useRouter } from 'next/navigation';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getDeviceTypeName } from '@/lib/helpers';
+import { playAlertSound } from '@/lib/notification';
 
 interface Notification {
   id: string;
@@ -30,53 +31,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     setupRealtimeSubscription();
-    
-    // Ses dosyalarını önceden yükle
-    if (typeof window !== 'undefined') {
-      console.log('Ses dosyaları önceden yükleniyor...');
-      const preloadNotificationSound = new Audio('/notification.mp3');
-      const preloadNotificationAlertSound = new Audio('/notification-alert.mp3');
-      
-      preloadNotificationSound.preload = 'auto';
-      preloadNotificationAlertSound.preload = 'auto';
-      
-      // Test amaçlı düşük sesle bir kez çal ve durdur (tarayıcı kısıtlamaları nedeniyle)
-      const preloadSounds = async () => {
-        try {
-          preloadNotificationSound.volume = 0.01; // Çok düşük ses
-          preloadNotificationAlertSound.volume = 0.01;
-          
-          // İlk sesi çal ve hemen durdur
-          await preloadNotificationSound.play();
-          setTimeout(() => preloadNotificationSound.pause(), 10);
-          
-          // İkinci sesi çal ve hemen durdur
-          await preloadNotificationAlertSound.play();
-          setTimeout(() => preloadNotificationAlertSound.pause(), 10);
-          
-          // Sesleri normal seviyeye getir
-          preloadNotificationSound.volume = 1;
-          preloadNotificationAlertSound.volume = 1;
-          
-          console.log('Ses dosyaları başarıyla yüklendi');
-        } catch (e) {
-          console.log('Ses dosyalarını otomatik yükleme başarısız (kullanıcı etkileşimi gerekebilir):', e);
-        }
-      };
-      
-      // Kullanıcı etkileşimi kontrolü - tarayıcı kısıtlamaları nedeniyle
-      if (document.hasFocus()) {
-        preloadSounds();
-      } else {
-        // Sayfa odağı kazandığında yükle
-        const handleFocus = () => {
-          preloadSounds();
-          window.removeEventListener('focus', handleFocus);
-        };
-        
-        window.addEventListener('focus', handleFocus);
-      }
-    }
 
     return () => {
       // Aboneliği temizle
@@ -139,8 +93,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             updateDashboardCountsRef.current(true);
           }
           
-          // Sesli bildirim
-          playNotificationSound();
+          // Sesli bildirim (sadece yeni arıza oluşturulduğunda)
+          playAlertSound();
         })
         .subscribe((status) => {
           console.log('Realtime notification subscription durumu:', status);
@@ -148,53 +102,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       
     } catch (error) {
       console.error('Gerçek zamanlı bildirim aboneliği kurulurken hata:', error);
-    }
-  };
-
-  // Bildirim sesi çal
-  const playNotificationSound = async () => {
-    try {
-      console.log('Bildirim sesleri çalınıyor...');
-      
-      // Ses dosyalarını önceden yükle
-      const notificationAudio = new Audio('/notification.mp3');
-      const alertAudio = new Audio('/notification-alert.mp3');
-      
-      // Promise temelli çalma işlemi
-      const playSequentially = async () => {
-        try {
-          // İlk sesi çal ve tamamlanmasını bekle (sıra değişti - önce alert)
-          console.log('Uyarı sesi başlatılıyor: notification-alert.mp3');
-          await alertAudio.play();
-          
-          // İlk ses bittiğinde çalışacak
-          return new Promise<void>((resolve) => {
-            alertAudio.onended = async () => {
-              console.log('Uyarı sesi tamamlandı, bildirim sesi başlatılıyor: notification.mp3');
-              
-              try {
-                // İkinci sesi çal
-                await notificationAudio.play();
-                notificationAudio.onended = () => {
-                  console.log('Bildirim sesi tamamlandı');
-                  resolve();
-                };
-              } catch (e) {
-                console.error('Bildirim sesi çalma hatası:', e);
-                resolve(); // Hata durumunda bile promise'i çöz
-              }
-            };
-          });
-        } catch (e) {
-          console.error('Uyarı sesi çalma hatası:', e);
-        }
-      };
-      
-      // Ses çalma işlemini başlat
-      playSequentially();
-      
-    } catch (error) {
-      console.error('Bildirim sesi çalınamadı:', error);
     }
   };
 
