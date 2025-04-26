@@ -2,24 +2,24 @@ import { Issue } from './supabase';
 
 // Ses dosyaları
 const NOTIFICATION_SOUND = '/notification.mp3';
-const NOTIFICATION_RETURN_SOUND = '/notification-return.mp3';
+const NOTIFICATION_ALERT_SOUND = '/notification-alert.mp3';
 
 interface NotificationOptions {
   title: string;
   body: string;
-  sound?: 'notification' | 'notification-return' | 'none';
+  sound?: 'notification' | 'notification-alert' | 'none';
 }
 
 /**
  * Bildirim sesini çalar
  */
-export const playNotificationSound = (type: 'notification' | 'notification-return' = 'notification') => {
+export const playNotificationSound = (type: 'notification' | 'notification-alert' = 'notification') => {
   try {
     if (typeof window === 'undefined') return;
     
     console.log(`Bildirim sesi çalınıyor: ${type}`);
     
-    const soundPath = type === 'notification' ? NOTIFICATION_SOUND : NOTIFICATION_RETURN_SOUND;
+    const soundPath = type === 'notification' ? NOTIFICATION_SOUND : NOTIFICATION_ALERT_SOUND;
     console.log(`Ses dosya yolu: ${soundPath}`);
     
     const sound = new Audio(soundPath);
@@ -71,7 +71,7 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
       if (options.sound && options.sound !== 'none') {
         console.log(`Bildirim sesi çalınacak: ${options.sound}`);
         setTimeout(() => {
-          if (options.sound === 'notification' || options.sound === 'notification-return') {
+          if (options.sound === 'notification' || options.sound === 'notification-alert') {
             playNotificationSound(options.sound);
           }
         }, 100);
@@ -111,12 +111,12 @@ export const showIssueUpdateNotification = (issue: Issue, previousStatus?: strin
   if (previousStatus && previousStatus !== issue.status) {
     let title = 'Arıza kaydınız güncellendi';
     let body = `"${issue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(issue.status)}" olarak güncellendi.`;
-    let sound: 'notification' | 'notification-return' = 'notification';
+    let sound: 'notification' | 'notification-alert' = 'notification';
     
     // Çözüldü durumu için farklı ses
     if (issue.status === 'cozuldu') {
       title = 'Arıza kaydınız çözüldü!';
-      sound = 'notification-return';
+      sound = 'notification-alert';
     }
     
     showBrowserNotification({

@@ -107,14 +107,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Bildirim sesi çal
   const playNotificationSound = async () => {
     try {
-      // Önce uyarı sesini çal
-      const alertAudio = new Audio('/notification-return.mp3');
-      await alertAudio.play().catch(e => console.log('Uyarı sesi çalma hatası:', e));
+      // Önce notification sesini çal
+      const notificationAudio = new Audio('/notification.mp3');
+      await notificationAudio.play().catch(e => console.log('Bildirim sesi çalma hatası:', e));
       
-      // Uyarı sesi bittikten sonra bildirim sesini çal
-      alertAudio.onended = () => {
-        const notificationAudio = new Audio('/notification.mp3');
-        notificationAudio.play().catch(e => console.log('Bildirim sesi çalma hatası:', e));
+      // Notification sesi bittikten sonra alert sesini çal
+      notificationAudio.onended = () => {
+        const alertAudio = new Audio('/notification-alert.mp3');
+        alertAudio.play().catch(e => console.log('Uyarı sesi çalma hatası:', e));
       };
     } catch (error) {
       console.error('Bildirim sesi çalınamadı:', error);
