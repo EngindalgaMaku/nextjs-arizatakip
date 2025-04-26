@@ -477,9 +477,22 @@ export default function TeacherIssuesPage() {
           if (updatedIssue.status !== oldIssue.status) {
             console.log(`Arıza durumu değişti: ${oldIssue.status} -> ${updatedIssue.status}`);
             
-            // Her durum değişikliğinde ses çal
-            console.log('Arıza durumu değişti, ses bildirimi gönderiliyor...');
-            playAlertSound();
+            try {
+              // Doğrudan audio API kullanarak ses dosyasını çal
+              const audio = new Audio('/notification-alert.mp3');
+              audio.volume = 1.0;
+              
+              // Ses dosyasını çal
+              const playPromise = audio.play();
+              
+              if (playPromise !== undefined) {
+                playPromise
+                  .then(() => console.log('Ses dosyası başarıyla çalındı'))
+                  .catch(err => console.error('Ses dosyası çalınırken hata:', err));
+              }
+            } catch (error) {
+              console.error('Ses bildirimi çalınırken hata:', error);
+            }
           }
           
           // Bildirim göster
