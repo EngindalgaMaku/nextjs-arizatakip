@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { setCookie } from 'cookies-next';
 import { getTeacherAccessCode, getSystemSetting } from '@/lib/supabase';
 
@@ -161,6 +162,15 @@ export default function TeacherLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
+        <div className="flex justify-center mb-4">
+          <Image 
+            src="/okullogo.png" 
+            alt="Okul Logosu" 
+            width={100} 
+            height={100}
+          />
+        </div>
+        
         <h1 className="text-2xl font-bold text-center mb-6">
           {siteName}
         </h1>

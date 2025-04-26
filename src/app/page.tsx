@@ -1,11 +1,22 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
+        <div className="flex justify-center mb-4">
+          <Image 
+            src="/okullogo.png" 
+            alt="Okul Logosu" 
+            width={120} 
+            height={120} 
+            className="mb-4"
+          />
+        </div>
+        
         <h1 className="text-2xl font-bold text-center mb-6">
           Hüsniye Özdilek Ticaret M.T.A.L.
         </h1>

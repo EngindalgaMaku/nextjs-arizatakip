@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronDownIcon, LogOutIcon } from "lucide-react";
 import { signOut, loadUserData } from "@/lib/supabase";
@@ -129,8 +130,19 @@ export default function DashboardLayout({
       >
         <div className="flex flex-col h-full">
           <div className="px-6 py-4 border-b border-blue-700">
-            <h1 className="text-2xl font-bold text-white">ATSİS</h1>
-            <p className="text-sm text-blue-200"></p>
+            <div className="flex items-center">
+              <Image 
+                src="/okullogo.png" 
+                alt="Okul Logosu" 
+                width={40} 
+                height={40}
+                className="mr-3" 
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-white">ATSİS</h1>
+                <p className="text-sm text-blue-200"></p>
+              </div>
+            </div>
           </div>
           
           <nav className="flex-1 px-4 py-4 space-y-1">
