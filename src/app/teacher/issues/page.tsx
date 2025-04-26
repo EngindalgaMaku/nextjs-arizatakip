@@ -263,17 +263,22 @@ export default function TeacherIssuesPage() {
     }).then((result) => {
       if (result.isConfirmed) {
         try {
-          // Local Storage'dan sil
+          // Merkezi logout rotasını kullan
+          router.push('/logout?redirectTo=/teacher/login');
+        } catch (error) {
+          console.error('Çıkış yaparken hata:', error);
+          
+          // Hata olursa manuel olarak temizleme yap
+          // Local Storage'dan kullanıcı bilgilerini sil
           localStorage.removeItem('teacherUser');
+          
+          // "Bu cihazda beni hatırla" bilgisini de sil
+          localStorage.removeItem('teacher_remembered_device');
           
           // Cookie'den sil  
           deleteCookie('teacher-session', { path: '/' });
           
           // Login sayfasına yönlendir
-          router.push('/teacher/login');
-        } catch (error) {
-          console.error('Çıkış yaparken hata:', error);
-          // Hata olsa bile login sayfasına yönlendir
           router.push('/teacher/login');
         }
       }

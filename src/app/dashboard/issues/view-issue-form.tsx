@@ -99,17 +99,6 @@ export default function ViewIssueForm({ issue, onClose, onEdit }: ViewIssueFormP
           )}
         </div>
       </div>
-
-      {onEdit && (
-        <div className="mt-6">
-          <button
-            onClick={onEdit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Düzenle
-          </button>
-        </div>
-      )}
     </div>
   );
 } 
