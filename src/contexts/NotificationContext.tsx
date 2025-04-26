@@ -105,10 +105,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   };
 
   // Bildirim sesi çal
-  const playNotificationSound = () => {
+  const playNotificationSound = async () => {
     try {
-      const audio = new Audio('/notification.mp3');
-      audio.play().catch(e => console.log('Ses çalma hatası:', e));
+      // Önce uyarı sesini çal
+      const alertAudio = new Audio('/notification-alert.mp3');
+      await alertAudio.play().catch(e => console.log('Uyarı sesi çalma hatası:', e));
+      
+      // Uyarı sesi bittikten sonra bildirim sesini çal
+      alertAudio.onended = () => {
+        const notificationAudio = new Audio('/notification.mp3');
+        notificationAudio.play().catch(e => console.log('Bildirim sesi çalma hatası:', e));
+      };
     } catch (error) {
       console.error('Bildirim sesi çalınamadı:', error);
     }
