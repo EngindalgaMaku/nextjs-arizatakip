@@ -125,12 +125,6 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
         .then(({ error, data }) => {
           if (error) throw error;
           
-          // Başarılı işlem sonrası bildirim göster
-          const successMessage = `Arıza bildirimi başarıyla oluşturuldu. Bildirimin durumu hakkında güncelleme almak için bu sayfayı kontrol edebilirsiniz.`;
-          
-          // Kullanıcıya hızlı bildirim göster
-          alert(successMessage);
-          
           // Başarı bildirimini çağır
           onSuccess();
         })
