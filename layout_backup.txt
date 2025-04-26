@@ -2,9 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// NotificationProvider'ı import et
-import { NotificationProvider } from "@/contexts/NotificationContext";
-
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -37,11 +34,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className={inter.className}>
-        <NotificationProvider>
-          {children}
-        </NotificationProvider>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

@@ -28,15 +28,52 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const supabaseSubscription = useRef<any>(null);
   const router = useRouter();
   const updateDashboardCountsRef = useRef<((increment: boolean) => void) | null>(null);
-
+  // URL değişikliğini takip etmek için pathname referansı
+  const currentPathRef = useRef<string>('');
+  
   useEffect(() => {
+    // İlk yükleme ve temizlik
     setupRealtimeSubscription();
+
+    // URL değişimini kontrol eden alt bileşen
+    const checkRouteChange = () => {
+      // Next.js client tarafında window nesnesine erişim kontrolü
+      if (typeof window !== 'undefined') {
+        const pathname = window.location.pathname;
+        
+        // Yol değiştiyse ve önceki bir yol kaydedilmişse
+        if (currentPathRef.current && pathname !== currentPathRef.current) {
+          console.log('URL değişikliği algılandı, bildirim aboneliği yenileniyor...');
+          
+          // Önce mevcut aboneliği temizle
+          if (supabaseSubscription.current) {
+            supabaseSubscription.current.unsubscribe();
+            supabaseSubscription.current = null;
+          }
+          
+          // Aboneliği yeniden oluştur
+          setupRealtimeSubscription();
+        }
+        
+        // Mevcut yolu güncelle
+        currentPathRef.current = pathname;
+      }
+    };
+    
+    // Router olaylarını dinle
+    window.addEventListener('popstate', checkRouteChange);
+    
+    // Periyodik kontrol (SPA geçişlerini yakalamak için)
+    const interval = setInterval(checkRouteChange, 1000);
 
     return () => {
       // Aboneliği temizle
       if (supabaseSubscription.current) {
         supabaseSubscription.current.unsubscribe();
       }
+      // Olay dinleyicilerini temizle
+      window.removeEventListener('popstate', checkRouteChange);
+      clearInterval(interval);
     };
   }, []);
 
@@ -58,13 +95,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Gerçek zamanlı abonelik kurulumu
   const setupRealtimeSubscription = async () => {
     try {
+      // Eğer zaten aktif bir abonelik varsa, önce onu temizleyelim
+      if (supabaseSubscription.current) {
+        console.log('Mevcut abonelik temizleniyor...');
+        await supabaseSubscription.current.unsubscribe();
+        supabaseSubscription.current = null;
+      }
+
+      // Client tarafı kontrolü
+      if (typeof window === 'undefined') {
+        console.log('Server-side rendering sırasında abonelik kurulmuyor');
+        return;
+      }
+      
       const { supabase } = await import('@/lib/supabase');
       
       console.log('Realtime notification subscription kurulumu başlatılıyor...');
       
+      // Benzersiz bir kanal ID'si oluştur (URL ve zaman damgası içeren)
+      const channelId = `issues-channel-${window.location.pathname}-${Date.now()}`;
+      console.log(`Yeni kanal ID'si: ${channelId}`);
+      
       // issues tablosundaki yeni kayıtları dinle
       supabaseSubscription.current = supabase
-        .channel('issues-channel')
+        .channel(channelId)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
