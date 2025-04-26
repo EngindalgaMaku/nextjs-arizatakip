@@ -17,19 +17,28 @@ export const playNotificationSound = (type: 'notification' | 'notification-retur
   try {
     if (typeof window === 'undefined') return;
     
-    const sound = new Audio(type === 'notification' ? NOTIFICATION_SOUND : NOTIFICATION_RETURN_SOUND);
+    console.log(`Bildirim sesi çalınıyor: ${type}`);
+    
+    const soundPath = type === 'notification' ? NOTIFICATION_SOUND : NOTIFICATION_RETURN_SOUND;
+    console.log(`Ses dosya yolu: ${soundPath}`);
+    
+    const sound = new Audio(soundPath);
     
     // Ses dosyası yükleme hatası
     sound.onerror = (error) => {
-      console.error('Bildirim sesi çalınamadı:', error);
+      console.error('Bildirim sesi çalınamadı (onError):', error);
     };
     
     // Sesi çal
-    sound.play().catch(error => {
-      console.error('Bildirim sesi çalınamadı:', error);
-    });
+    sound.play()
+      .then(() => {
+        console.log('Bildirim sesi başarıyla çalındı');
+      })
+      .catch(error => {
+        console.error('Bildirim sesi çalınamadı (promise):', error);
+      });
   } catch (error) {
-    console.error('Bildirim sesi çalınamadı:', error);
+    console.error('Bildirim sesi çalınamadı (genel hata):', error);
   }
 };
 
@@ -40,6 +49,8 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
   try {
     if (typeof window === 'undefined') return;
     
+    console.log('Bildirim gösteriliyor:', options);
+    
     // Tarayıcı bildirimi desteği kontrolü
     if (!('Notification' in window)) {
       console.warn('Bu tarayıcı bildirim özelliğini desteklemiyor');
@@ -48,6 +59,8 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
     
     // Bildirim izni kontrolü
     if (Notification.permission === 'granted') {
+      console.log('Bildirim izni mevcut, bildirim gösteriliyor');
+      
       // Bildirim göster
       const notification = new Notification(options.title, {
         body: options.body,
@@ -56,20 +69,34 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
       
       // Ses çal
       if (options.sound && options.sound !== 'none') {
-        playNotificationSound(options.sound);
+        console.log(`Bildirim sesi çalınacak: ${options.sound}`);
+        setTimeout(() => {
+          if (options.sound === 'notification' || options.sound === 'notification-return') {
+            playNotificationSound(options.sound);
+          }
+        }, 100);
       }
       
       // Kullanıcı bildirime tıkladığında sayfaya odaklan
       notification.onclick = () => {
+        console.log('Bildirime tıklandı, pencere odaklanıyor');
         window.focus();
       };
     } else if (Notification.permission !== 'denied') {
+      console.log('Bildirim izni yok, izin isteniyor...');
+      
       // İzin iste
       const permission = await Notification.requestPermission();
+      console.log('Bildirim izni sonucu:', permission);
       
       if (permission === 'granted') {
+        console.log('Bildirim izni alındı, bildirimi gösteriliyor');
         showBrowserNotification(options);
+      } else {
+        console.warn('Bildirim izni reddedildi');
       }
+    } else {
+      console.warn('Bildirim izni daha önce reddedilmiş');
     }
   } catch (error) {
     console.error('Bildirim gösterilemedi:', error);

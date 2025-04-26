@@ -421,10 +421,22 @@ export default function TeacherIssuesPage() {
     const requestNotificationPermission = async () => {
       try {
         if (typeof window !== 'undefined' && 'Notification' in window) {
+          console.log('Bildirim izni durumu:', Notification.permission);
+          
           if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
             const permission = await Notification.requestPermission();
-            console.log('Bildirim izni:', permission);
+            console.log('Bildirim izni sonucu:', permission);
+            
+            // İzin alındıysa test bildirimi göster
+            if (permission === 'granted') {
+              new Notification('Bildirim sistemi aktif', {
+                body: 'Arıza takiplerinizde güncelleme olduğunda bildirim alacaksınız.',
+                icon: '/okullogo.png'
+              });
+            }
           }
+        } else {
+          console.warn('Bu tarayıcı bildirim desteği sunmuyor');
         }
       } catch (error) {
         console.error('Bildirim izni istenirken hata:', error);
@@ -432,11 +444,25 @@ export default function TeacherIssuesPage() {
     };
     
     requestNotificationPermission();
+    
+    // Ses dosyasını önceden yükle
+    if (typeof window !== 'undefined') {
+      const preloadNotificationSound = new Audio('/notification.mp3');
+      const preloadNotificationReturnSound = new Audio('/notification-return.mp3');
+      
+      // Önceden yükle ama çalma
+      preloadNotificationSound.preload = 'auto';
+      preloadNotificationReturnSound.preload = 'auto';
+      
+      console.log('Ses dosyaları önceden yüklendi');
+    }
   }, []);
 
   // Supabase realtime aboneliği
   useEffect(() => {
     if (!teacher?.name) return;
+    
+    console.log('Realtime aboneliği oluşturuluyor...');
     
     // Öğretmenin bildirdiği arızaları dinlemek için abonelik oluştur
     const issueSubscription = supabase
@@ -450,9 +476,14 @@ export default function TeacherIssuesPage() {
           filter: `reported_by=eq.${teacher.name}`
         },
         (payload) => {
-          console.log('Arıza güncellendi:', payload);
+          console.log('Arıza güncelleme bildirimi alındı:', payload);
           const updatedIssue = payload.new as Issue;
           const oldIssue = payload.old as Issue;
+          
+          // Status değişikliğini kontrol et
+          if (updatedIssue.status !== oldIssue.status) {
+            console.log(`Arıza durumu değişti: ${oldIssue.status} -> ${updatedIssue.status}`);
+          }
           
           // Bildirim göster
           showIssueUpdateNotification(updatedIssue, oldIssue.status);
@@ -463,13 +494,16 @@ export default function TeacherIssuesPage() {
           ));
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Realtime subscription status: ${status}`);
+      });
     
     // Aboneliği kaydet
     setSubscription(issueSubscription);
     
     // Temizlik fonksiyonu
     return () => {
+      console.log('Realtime aboneliği sonlandırılıyor...');
       if (issueSubscription) {
         // Aboneliği sonlandır
         supabase.removeChannel(issueSubscription);
