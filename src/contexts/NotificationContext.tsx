@@ -30,6 +30,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const updateDashboardCountsRef = useRef<((increment: boolean) => void) | null>(null);
   // URL değişikliğini takip etmek için pathname referansı
   const currentPathRef = useRef<string>('');
+  // FCM token
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
   
   useEffect(() => {
     // İlk yükleme ve temizlik
@@ -75,6 +77,60 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       window.removeEventListener('popstate', checkRouteChange);
       clearInterval(interval);
     };
+  }, []);
+
+  // FCM izni isteme ve token alma
+  useEffect(() => {
+    const setupFCM = async () => {
+      try {
+        // Firebase ve FCM modüllerini dinamik olarak import et
+        const { requestFCMPermission, listenForFCMMessages } = await import('@/lib/firebase');
+        const { getCurrentUser, saveFCMToken } = await import('@/lib/supabase');
+        
+        // Kullanıcı ID'sini al
+        const user = await getCurrentUser();
+        
+        if (user) {
+          // FCM izinlerini iste
+          const token = await requestFCMPermission();
+          if (token) {
+            setFcmToken(token);
+            console.log('FCM token başarıyla alındı ve kaydedildi');
+            
+            // Token'ı veritabanına kaydet
+            await saveFCMToken(user.id, token);
+            
+            // FCM mesajlarını dinle
+            listenForFCMMessages((payload) => {
+              console.log('FCM bildirimi alındı:', payload);
+              
+              // Bildirimi göster (hem mesajlaşma için hem de görsel bildirim için)
+              const notification = {
+                id: payload.data?.issueId || `fcm-${Date.now()}`,
+                message: payload.notification?.body || 'Yeni bir bildirim',
+                isRead: false
+              };
+              
+              // Bildirimleri güncelle
+              setNotifications(prev => [notification, ...prev]);
+              setShowNotification(true);
+              
+              // Sesli bildirim
+              playAlertSound();
+            });
+          }
+        } else {
+          console.log('FCM token kaydı için kullanıcı bulunamadı');
+        }
+      } catch (error) {
+        console.error('FCM kurulumu sırasında hata:', error);
+      }
+    };
+    
+    // Client tarafında olduğunu kontrol et
+    if (typeof window !== 'undefined') {
+      setupFCM();
+    }
   }, []);
 
   // Dashboard sayılarını güncellemek için method

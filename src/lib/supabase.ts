@@ -612,4 +612,55 @@ export async function updatePassword(currentPassword: string, newPassword: strin
     console.error('Şifre güncellenirken hata:', error);
     throw error;
   }
+}
+
+/**
+ * Kullanıcının FCM token'ını veritabanına kaydeder
+ */
+export async function saveFCMToken(userId: string, token: string) {
+  try {
+    const { data, error } = await supabase
+      .from('user_fcm_tokens')
+      .upsert(
+        {
+          user_id: userId, 
+          token: token,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'user_id' }
+      );
+    
+    if (error) {
+      console.error('FCM token kaydedilemedi:', error);
+      return { success: false, error };
+    }
+    
+    return { success: true, data };
+  } catch (error) {
+    console.error('FCM token kaydedilirken hata:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Kullanıcının FCM token'ını siler
+ */
+export async function deleteFCMToken(userId: string) {
+  try {
+    const { error } = await supabase
+      .from('user_fcm_tokens')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('FCM token silinemedi:', error);
+      return { success: false, error };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('FCM token silinirken hata:', error);
+    return { success: false, error };
+  }
 } 
