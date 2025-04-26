@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build --force",
     "start": "next start",
     "lint": "next lint"
   },
@@ -16,7 +16,6 @@
     "@tamagui/config": "^1.126.1",
     "@tamagui/core": "^1.126.1",
     "@tanstack/react-query": "^5.74.4",
-    "@tremor/react": "^3.18.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cookies-next": "^5.1.0",
