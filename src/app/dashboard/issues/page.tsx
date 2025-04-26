@@ -47,8 +47,8 @@ export default function IssuesPage() {
       }
       
       // Toplam sayfa ve kayıt sayısını güncelle
-      setTotalPages(pages);
-      setTotalCount(count);
+      setTotalPages(pages || 1); // Eğer pages değeri 0 ise, en az 1 sayfa olmalı
+      setTotalCount(count || 0);
       
       if (!data || data.length === 0) {
         setIssues([]);

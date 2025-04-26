@@ -366,12 +366,37 @@ export async function getIssuesForTeacher(teacherName: string, page = 1, pageSiz
 
 // Tüm arızaları getirme fonksiyonu (pagination olmadan, rapor gibi özel amaçlar için)
 export async function getAllIssues() {
-  const { data, error } = await supabase
-    .from('issues')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    // Önce toplam kayıt sayısını al
+    const countResponse = await supabase
+      .from('issues')
+      .select('id', { count: 'exact', head: true });
+    
+    const totalCount = countResponse.count || 0;
+    
+    const { data, error } = await supabase
+      .from('issues')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  return { data, error };
+    if (error) {
+      console.error('Error fetching all issues:', error);
+      return { error, data: null, totalCount: 0, totalPages: 0 };
+    }
+    
+    // Tüm veriyi getirdiğimiz için, toplam sayfa sayısı her zaman 1 olacak
+    const totalPages = 1;
+    
+    return { data, error: null, totalCount, totalPages };
+  } catch (error) {
+    console.error('Exception fetching all issues:', error);
+    return { 
+      error: error instanceof Error ? error : new Error('Unknown error fetching all issues'), 
+      data: null,
+      totalCount: 0,
+      totalPages: 0
+    };
+  }
 }
 
 // Diğer işlevler (eski)
