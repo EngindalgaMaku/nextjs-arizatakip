@@ -185,9 +185,6 @@ export default function TeacherIssuesPage() {
     
     // Check for teacher authentication
     checkTeacherAuth();
-    
-    // Bildirim izni iste
-    requestNotificationPermission();
   }, [router]);
 
   // Öğretmen değiştiğinde arızaları yükle
@@ -280,27 +277,6 @@ export default function TeacherIssuesPage() {
       } catch (err) {
         console.error('Arıza silme hatası:', err);
         alert('Arıza silinirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-      }
-    }
-  };
-
-  // Bildirim izni isteme fonksiyonu
-  const requestNotificationPermission = () => {
-    // Bildirim API'si tarayıcıda destekleniyor mu kontrol et
-    if (typeof window !== 'undefined' && "Notification" in window) {
-      // İzin durumunu kontrol et
-      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-        // Kullanıcıya bildirim izinleri hakkında bilgi ver ve izin iste
-        const requestPermission = window.confirm(
-          "Arıza bildirimi durumları hakkında anlık bildirim almak ister misiniz? " +
-          "Bu özellik, arıza durumunuz değiştiğinde sizi haberdar edecektir."
-        );
-        
-        if (requestPermission) {
-          Notification.requestPermission().then(permission => {
-            console.log("Bildirim izni durumu:", permission);
-          });
-        }
       }
     }
   };

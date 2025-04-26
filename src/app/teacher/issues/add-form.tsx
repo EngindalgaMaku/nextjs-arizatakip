@@ -128,27 +128,6 @@ export default function AddIssueForm({ onSuccess, onCancel, teacherName }: AddIs
           // Başarılı işlem sonrası bildirim göster
           const successMessage = `Arıza bildirimi başarıyla oluşturuldu. Bildirimin durumu hakkında güncelleme almak için bu sayfayı kontrol edebilirsiniz.`;
           
-          // Eğer bildirim API'si destekleniyorsa bildirim göster
-          if ("Notification" in window) {
-            // İzin kontrolü
-            if (Notification.permission === "granted") {
-              new Notification("Arıza Bildirildi", {
-                body: `${formData.device_name} için arıza bildirimi başarıyla oluşturuldu.`,
-                icon: "/favicon.ico"
-              });
-            } else if (Notification.permission !== "denied") {
-              // Kullanıcıdan izin iste
-              Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                  new Notification("Arıza Bildirildi", {
-                    body: `${formData.device_name} için arıza bildirimi başarıyla oluşturuldu.`,
-                    icon: "/favicon.ico"
-                  });
-                }
-              });
-            }
-          }
-          
           // Kullanıcıya hızlı bildirim göster
           alert(successMessage);
           
