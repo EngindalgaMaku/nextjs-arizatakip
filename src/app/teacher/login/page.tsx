@@ -8,13 +8,94 @@ import { setCookie } from 'cookies-next';
 import { getTeacherAccessCode, getSystemSetting } from '@/lib/supabase';
 import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline';
 
+// Tarayıcı parmak izi oluşturan basit bir fonksiyon
+const generateDeviceFingerprint = (): string => {
+  if (typeof window === 'undefined') return '';
+  
+  // Navigatör, ekran ve tarayıcı bilgilerini kullanarak benzersiz bir parmak izi oluştur
+  const screenProps = `${window.screen.height}x${window.screen.width}x${window.screen.colorDepth}`;
+  const userAgent = navigator.userAgent;
+  const language = navigator.language;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const platform = navigator.platform;
+  
+  // Bu değerleri birleştirip karma (hash) oluştur
+  const rawFingerprint = `${userAgent}-${screenProps}-${language}-${timezone}-${platform}`;
+  
+  // Basit bir hash fonksiyonu
+  let hash = 0;
+  for (let i = 0; i < rawFingerprint.length; i++) {
+    const char = rawFingerprint.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 32-bit integer'a dönüştür
+  }
+  
+  return hash.toString(16); // Hex string'e dönüştür
+};
+
 export default function TeacherLoginPage() {
   const [teacherName, setTeacherName] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [siteName, setSiteName] = useState('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS');
+  const [rememberDevice, setRememberDevice] = useState(false);
+  const [isAutoLoginChecking, setIsAutoLoginChecking] = useState(true);
   const router = useRouter();
+  
+  // Sayfa yüklendiğinde otomatik giriş kontrolü yap
+  useEffect(() => {
+    const checkAutoLogin = async () => {
+      try {
+        if (typeof window === 'undefined') return;
+        
+        // Mevcut cihaz parmak izini oluştur
+        const currentFingerprint = generateDeviceFingerprint();
+        
+        // Kayıtlı oturum verisini kontrol et
+        const savedSession = localStorage.getItem('teacher_remembered_device');
+        
+        if (savedSession) {
+          const sessionData = JSON.parse(savedSession);
+          
+          // Parmak izi eşleşiyor mu kontrol et
+          if (sessionData.deviceFingerprint === currentFingerprint) {
+            // Kayıtlı bilgileri doldur
+            setTeacherName(sessionData.teacherName);
+            
+            // Geçerli giriş kodunu al
+            const validCode = await getTeacherAccessCode();
+            
+            if (validCode) {
+              // Otomatik giriş yap
+              const loginTime = new Date().toISOString();
+              const teacherData = {
+                name: sessionData.teacherName,
+                role: 'teacher',
+                loginTime
+              };
+              
+              localStorage.setItem('teacherUser', JSON.stringify(teacherData));
+              
+              setCookie('teacher-session', JSON.stringify(teacherData), {
+                maxAge: 60 * 60 * 24 * 365, // 1 yıl
+                path: '/',
+              });
+              
+              router.push('/teacher/issues');
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Otomatik giriş kontrol edilirken hata:', err);
+      } finally {
+        setIsAutoLoginChecking(false);
+      }
+    };
+    
+    checkAutoLogin();
+  }, [router]);
 
   // Site adını yükle
   useEffect(() => {
@@ -88,6 +169,16 @@ export default function TeacherLoginPage() {
           path: '/',
         });
         
+        // "Bu cihazda beni hatırla" seçeneği işaretliyse cihaz bilgilerini kaydet
+        if (rememberDevice) {
+          const deviceFingerprint = generateDeviceFingerprint();
+          const rememberedData = {
+            deviceFingerprint,
+            teacherName
+          };
+          localStorage.setItem('teacher_remembered_device', JSON.stringify(rememberedData));
+        }
+        
         // Yönlendirme
         router.push('/teacher/issues');
         return;
@@ -123,6 +214,16 @@ export default function TeacherLoginPage() {
         path: '/',
       });
       
+      // "Bu cihazda beni hatırla" seçeneği işaretliyse cihaz bilgilerini kaydet
+      if (rememberDevice) {
+        const deviceFingerprint = generateDeviceFingerprint();
+        const rememberedData = {
+          deviceFingerprint,
+          teacherName
+        };
+        localStorage.setItem('teacher_remembered_device', JSON.stringify(rememberedData));
+      }
+      
       // Yönlendirme
       router.push('/teacher/issues');
     } catch (err) {
@@ -149,6 +250,16 @@ export default function TeacherLoginPage() {
           path: '/',
         });
         
+        // "Bu cihazda beni hatırla" seçeneği işaretliyse cihaz bilgilerini kaydet
+        if (rememberDevice) {
+          const deviceFingerprint = generateDeviceFingerprint();
+          const rememberedData = {
+            deviceFingerprint,
+            teacherName
+          };
+          localStorage.setItem('teacher_remembered_device', JSON.stringify(rememberedData));
+        }
+        
         // Yönlendirme
         router.push('/teacher/issues');
         return;
@@ -159,6 +270,18 @@ export default function TeacherLoginPage() {
       setLoading(false);
     }
   };
+
+  // Otomatik giriş kontrol ediliyorsa yükleniyor ekranı göster
+  if (isAutoLoginChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="text-xl mb-2">Giriş kontrol ediliyor...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -213,28 +336,46 @@ export default function TeacherLoginPage() {
             />
           </div>
           
+          <div className="mb-6">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                checked={rememberDevice}
+                onChange={(e) => setRememberDevice(e.target.checked)}
+              />
+              <span className="ml-2 text-sm text-gray-700">Bu cihazda beni hatırla</span>
+            </label>
+            <p className="mt-1 text-xs text-gray-500">
+              Bu seçeneği işaretlerseniz, bu cihazdan bir sonraki girişinizde kodunuzu girmenize gerek kalmayacaktır.
+            </p>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2 px-4 bg-blue-600 text-white rounded-md flex items-center justify-center ${
-              loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'
+            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              loading ? 'opacity-70 cursor-not-allowed' : ''
             }`}
           >
             {loading ? (
-              'Giriş yapılıyor...'
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Giriş Yapılıyor...
+              </span>
             ) : (
-              <>
-                <ArrowRightOnRectangleIcon className="w-5 h-5 mr-2" />
-                Giriş Yap
-              </>
+              'Giriş Yap'
             )}
           </button>
         </form>
         
-        <div className="mt-4 text-center">
-          <Link href="/login" className="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center justify-center">
-            <UserIcon className="w-4 h-4 mr-1" />
-            Yönetici girişi için tıklayın
+        <div className="mt-6 text-center text-sm text-gray-600">
+          <Link href="/" className="inline-flex items-center text-blue-600 hover:text-blue-800">
+            <ArrowRightOnRectangleIcon className="h-4 w-4 mr-1" />
+            Yönetici Girişi
           </Link>
         </div>
       </div>
