@@ -7,11 +7,11 @@ export default function HomePage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-center mb-6">
-          Hüsniye Özdilek Mesleki ve Teknik Anadolu Lisesi
+          Hüsniye Özdilek Ticaret M.T.A.L.
         </h1>
         
         <h2 className="text-xl font-semibold text-center mb-6">
-          Arıza Bildirim Sistemi
+          ATSİS - Arıza Takip Sistemi
         </h2>
         
         <div className="space-y-4">
@@ -31,7 +31,7 @@ export default function HomePage() {
         </div>
         
         <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>Bilişim Alanı Teknik Destek</p>
+          <p>Bilişim Teknolojileri Alanı Teknik Destek</p>
           <p>© {new Date().getFullYear()} Tüm hakları saklıdır</p>
         </div>
       </div>
