@@ -387,6 +387,12 @@ export default function DashboardLayout({
                     Profil
                   </Link>
                   <Link
+                    href="/teacher/login"
+                    className="block px-4 py-2 text-sm text-indigo-600 hover:bg-gray-100 w-full text-left"
+                  >
+                    Öğretmen Moduna Geç
+                  </Link>
+                  <Link
                     href="/dashboard/settings"
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
                   >
