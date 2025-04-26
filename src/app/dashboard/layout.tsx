@@ -129,8 +129,8 @@ export default function DashboardLayout({
       >
         <div className="flex flex-col h-full">
           <div className="px-6 py-4 border-b border-blue-700">
-            <h1 className="text-2xl font-bold text-white">Arıza Takip Sistemi</h1>
-            <p className="text-sm text-blue-200">Yönetici Paneli</p>
+            <h1 className="text-2xl font-bold text-white">ATSİS</h1>
+            <p className="text-sm text-blue-200">Arıza Takip Sistemi</p>
           </div>
           
           <nav className="flex-1 px-4 py-4 space-y-1">

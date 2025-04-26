@@ -306,7 +306,7 @@ export default function TeacherIssuesPage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Hüsniye Özdilek Ticaret M.T.A.L.</h1>
-              <p className="mt-1 text-gray-500">Merhaba, {teacher.name}! Arıza bildirim sistemi</p>
+              <p className="mt-1 text-gray-500">Merhaba, {teacher.name}! ATSİS - Arıza Takip Sistemi</p>
             </div>
             {/* Masaüstünde göster, mobilde gizle */}
             <button

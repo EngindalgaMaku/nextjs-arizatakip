@@ -293,7 +293,7 @@ export default function IssuesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 mb-1">Arıza Takip Sistemi</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-1">Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS</h1>
         <p className="text-gray-500 text-sm sm:text-base">Okuldaki tüm cihazların arıza kayıtlarını yönetin</p>
       </div>
       

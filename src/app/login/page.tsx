@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [siteName, setSiteName] = useState('Yönetici Paneli');
+  const [siteName, setSiteName] = useState('ATSİS Yönetici Paneli');
   const router = useRouter();
   
   // Demo modunu kontrol edecek değişken (Supabase kurulumu yoksa true yapın)
@@ -28,12 +28,12 @@ export default function LoginPage() {
           setSiteName(data.value);
         } else {
           // Varsayılan değer
-          setSiteName('Hüsniye Özdilek Bilişim Alanı Şeflik Yönetici Paneli');
+          setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Yönetici Paneli');
         }
       } catch (err) {
         console.error('Site adı yüklenirken hata:', err);
         // Hata durumunda varsayılan değer
-        setSiteName('Hüsniye Özdilek Bilişim Alanı Şeflik Yönetici Paneli');
+        setSiteName('Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS Yönetici Paneli');
       }
     }
     

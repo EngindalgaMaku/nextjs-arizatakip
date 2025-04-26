@@ -38,8 +38,8 @@ export default function Sidebar() {
   return (
     <div className="fixed top-0 left-0 bottom-0 w-64 bg-blue-800 overflow-y-auto p-4">
       <div className="mb-8">
-        <h1 className="text-white font-bold text-xl">Arıza Takip Sistemi</h1>
-        <p className="text-blue-200 text-sm">Yönetici Paneli</p>
+        <h1 className="text-white font-bold text-xl">ATSİS</h1>
+        <p className="text-blue-200 text-sm">Arıza Takip Sistemi</p>
       </div>
       
       <nav className="space-y-2">
