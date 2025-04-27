@@ -207,6 +207,7 @@ export async function POST(request: NextRequest) {
         userRole: 'teacher',
         clickAction: 'https://atsis.husniyeozdilek.k12.tr/teacher/issues',
         url: `/teacher/issues?id=${issueRecord.id}`,
+        showToast: 'true'
       };
       
       // Tokenları birleştir

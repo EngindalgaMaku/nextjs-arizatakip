@@ -9,7 +9,6 @@ import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Swal from 'sweetalert2';
 import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
-import { NotificationTestButton } from '@/components/dashboard/NotificationTestButton';
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -589,9 +588,6 @@ export default function IssuesPage() {
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Arıza Bildirimleri</h1>
-        <div className="flex gap-2">
-          <NotificationTestButton />
-        </div>
       </div>
       <IssueList selectedId={issueId} onSelectIssue={setSelectedIssue} />
     </div>

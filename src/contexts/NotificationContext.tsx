@@ -413,31 +413,74 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               setNotificationCount((prev) => prev + 1);
               setLastNotification(notificationData);
               
-              // Toast bildirimi göster
-              toast.custom((t) => (
-                <div
-                  className={`${
-                    t.visible ? 'animate-enter' : 'animate-leave'
-                  } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-                >
-                  <div className="flex-1 w-0 p-4">
-                    <div className="flex items-start">
-                      <div className="ml-3 flex-1">
-                        <p className="text-sm font-medium text-gray-900">{payload.notification?.title || 'Yeni Bildirim'}</p>
-                        <p className="mt-1 text-sm text-gray-500">{payload.notification?.body || ''}</p>
+              // Check if this is a teacher notification or if showToast flag is set
+              if (payload.data?.userRole === 'teacher' || payload.data?.showToast === 'true') {
+                // Show a special toast notification for teachers
+                toast.custom((t) => (
+                  <div
+                    className={`${
+                      t.visible ? 'animate-enter' : 'animate-leave'
+                    } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                  >
+                    <div className="flex-1 w-0 p-4">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <p className="text-sm font-medium text-gray-900">{payload.notification?.title || 'Yeni Bildirim'}</p>
+                          <p className="mt-1 text-sm text-gray-500">{payload.notification?.body || ''}</p>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex border-l border-gray-200">
+                      <button
+                        onClick={() => {
+                          toast.dismiss(t.id);
+                          // Navigate to the issue page
+                          if (payload.data?.url) {
+                            router.push(payload.data.url);
+                          }
+                        }}
+                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Görüntüle
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex border-l border-gray-200">
-                    <button
-                      onClick={() => toast.dismiss(t.id)}
-                      className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Kapat
-                    </button>
+                ), {
+                  duration: 5000, // 5 seconds
+                  position: 'bottom-right',
+                });
+              } else {
+                // Default toast notification for non-teacher users
+                toast.custom((t) => (
+                  <div
+                    className={`${
+                      t.visible ? 'animate-enter' : 'animate-leave'
+                    } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                  >
+                    <div className="flex-1 w-0 p-4">
+                      <div className="flex items-start">
+                        <div className="ml-3 flex-1">
+                          <p className="text-sm font-medium text-gray-900">{payload.notification?.title || 'Yeni Bildirim'}</p>
+                          <p className="mt-1 text-sm text-gray-500">{payload.notification?.body || ''}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex border-l border-gray-200">
+                      <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Kapat
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ));
+                ));
+              }
             }
           });
           
