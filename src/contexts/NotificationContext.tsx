@@ -99,7 +99,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if ('serviceWorker' in navigator) {
         try {
           // Ön plandaki mesajları dinle
-          const messaging = getMessaging();
+          const app = firebaseApp();
+          const messaging = getMessaging(app);
           onMessage(messaging, (payload) => {
             console.log('Ön planda bildirim alındı:', payload);
             
@@ -390,37 +391,40 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         });
 
       // Mesaj dinleyicisi
-      const messaging = getMessaging(firebaseApp);
-      if (messaging) {
-        const unsubscribe = onMessage(messaging, (payload) => {
-          console.log("Foreground mesajı alındı:", payload);
-          if (payload.notification?.title) {
-            const notificationData: Notification = {
-              id: 'fcm-' + Date.now().toString(),
-              message: payload.notification.body || "",
-              isRead: false,
-              fcmData: {
-                title: payload.notification.title,
-                url: payload.data?.url || "",
-                userRole: user.role
-              }
-            };
-            
-            // Mesajı bildirim listesine ekle
-            setNotifications((prev) => [notificationData, ...prev]);
-            
-            // Bildirim sesini çal
-            playAlertSound();
-            
-            // Okunmamış bildirimleri güncelle
-            setNotificationCount((prev) => prev + 1);
-            setLastNotification(notificationData);
-          }
-        });
-        
-        return () => {
-          if (unsubscribe) unsubscribe();
-        };
+      const app = firebaseApp();
+      if (app) {
+        const messaging = getMessaging(app);
+        if (messaging) {
+          const unsubscribe = onMessage(messaging, (payload) => {
+            console.log("Foreground mesajı alındı:", payload);
+            if (payload.notification?.title) {
+              const notificationData: Notification = {
+                id: 'fcm-' + Date.now().toString(),
+                message: payload.notification.body || "",
+                isRead: false,
+                fcmData: {
+                  title: payload.notification.title,
+                  url: payload.data?.url || "",
+                  userRole: user.role
+                }
+              };
+              
+              // Mesajı bildirim listesine ekle
+              setNotifications((prev) => [notificationData, ...prev]);
+              
+              // Bildirim sesini çal
+              playAlertSound();
+              
+              // Okunmamış bildirimleri güncelle
+              setNotificationCount((prev) => prev + 1);
+              setLastNotification(notificationData);
+            }
+          });
+          
+          return () => {
+            if (unsubscribe) unsubscribe();
+          };
+        }
       }
     }
   }, [user]);

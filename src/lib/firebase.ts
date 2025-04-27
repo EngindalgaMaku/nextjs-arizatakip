@@ -1,6 +1,6 @@
 // Firebase yapılandırması
-import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
+import { initializeApp, FirebaseApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, isSupported, Messaging } from 'firebase/messaging';
 import { deleteFCMToken, saveFCMToken } from './supabase';
 
 // Firebase yapılandırması
@@ -13,8 +13,14 @@ const firebaseConfig = {
   appId: "1:943049988733:web:e8c073b8760198da65ef14"
 };
 
-// Firebase başlatma
-export const firebaseApp = initializeApp(firebaseConfig);
+// Firebase başlatma - singleton pattern
+let firebaseAppInstance: FirebaseApp | undefined = undefined;
+export const firebaseApp = (): FirebaseApp => {
+  if (!firebaseAppInstance && typeof window !== 'undefined') {
+    firebaseAppInstance = initializeApp(firebaseConfig);
+  }
+  return firebaseAppInstance as FirebaseApp;
+};
 
 // Tarayıcı kontrolü
 const isBrowser = typeof window !== 'undefined';
@@ -61,7 +67,7 @@ export async function initializeFirebaseMessaging(
     }
 
     // Messaging nesnesi oluştur
-    const messaging = getMessaging(firebaseApp);
+    const messaging = getMessaging(firebaseApp());
     
     // İzin iste ve token al
     try {
@@ -100,13 +106,9 @@ export async function initializeFirebaseMessaging(
   }
 }
 
-/**
- * Mesaj dinleyicisi kur
- * @param messaging Firebase Messaging nesnesi
- * @param callback Mesaj alındığında çalışacak fonksiyon
- */
+// Mesaj dinleyicisi kur
 export function setupMessageListener(
-  messaging: any,
+  messaging: Messaging,
   callback: (payload: any) => void
 ) {
   if (!isBrowser || !messaging) return;
@@ -203,51 +205,90 @@ export async function requestFCMPermission(userId: string, userRole: string): Pr
       return null;
     }
 
-    // Service worker kaydı
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/',
-        });
-        console.log('Service Worker kaydedildi:', registration);
-      } catch (err) {
-        console.error('Service Worker kaydı başarısız:', err);
-        return null;
-      }
-    } else {
-      console.warn('Service Worker bu tarayıcıda desteklenmiyor');
+    // Service worker işlemleri
+    if (!('serviceWorker' in navigator)) {
+      console.error('Service Worker bu tarayıcıda desteklenmiyor');
       return null;
     }
 
-    // Messaging nesnesi
-    const messaging = getMessaging(firebaseApp);
+    // Önce service worker'ı kontrol et
+    let registration;
+    try {
+      registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+      
+      // Service worker yoksa veya güncellenmesi gerekiyorsa kaydet
+      if (!registration) {
+        console.log('Service Worker kaydediliyor...');
+        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/'
+        });
+        console.log('Service Worker kaydedildi:', registration);
+      } else {
+        console.log('Mevcut Service Worker bulundu:', registration);
+      }
+
+      // Service worker hazır oluncaya kadar bekle
+      await navigator.serviceWorker.ready;
+      console.log('Service Worker hazır');
+      
+    } catch (err) {
+      console.error('Service Worker kaydı başarısız:', err);
+      return null;
+    }
 
     // İzin iste
-    const permission = await Notification.requestPermission();
+    let permission: NotificationPermission = Notification.permission;
+    if (permission !== 'granted') {
+      console.log('Bildirim izni isteniyor...');
+      try {
+        permission = await Notification.requestPermission();
+        console.log('Bildirim izni sonucu:', permission);
+      } catch (error) {
+        console.error('Bildirim izni istenirken hata:', error);
+        return null;
+      }
+    }
+    
+    // Sadece permission granted ise devam et
     if (permission !== 'granted') {
       console.warn('Bildirim izni verilmedi');
       return null;
     }
 
     // Token al
-    const token = await getToken(messaging, {
-      vapidKey: 'BBXCgNXccb-2nRV9Tm5NQXx0gXKgDFt1_exf3RhI6IgNn5FnMOrcKXKpY55D3l9YS-U_FtLm5fX_1xgfWPeYtWs',
-    });
+    console.log('FCM token alınıyor...');
+    try {
+      // Uygulama ve messaging kontrolü
+      const app = firebaseApp();
+      if (!app) {
+        console.error('Firebase uygulaması bulunamadı');
+        return null;
+      }
+      
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging, {
+        vapidKey: "BBXCgNXccb-2nRV9Tm5NQXx0gXKgDFt1_exf3RhI6IgNn5FnMOrcKXKpY55D3l9YS-U_FtLm5fX_1xgfWPeYtWs",
+        serviceWorkerRegistration: registration
+      });
 
-    if (!token) {
-      console.error('FCM token alınamadı');
+      if (!token) {
+        console.error('FCM token alınamadı');
+        return null;
+      }
+
+      console.log('FCM token alındı:', token);
+
+      // Token'ı kaydet
+      const result = await saveFCMToken(userId, token, userRole);
+      if (!result || result.error) {
+        console.error('Token kaydedilemedi:', result?.error);
+      }
+
+      return token;
+    } catch (tokenError) {
+      console.error('Token alınırken hata:', tokenError);
       return null;
     }
-
-    console.log('FCM token alındı:', token);
-
-    // Token'ı kaydet
-    const result = await saveFCMToken(userId, token, userRole);
-    if (!result || result.error) {
-      console.error('Token kaydedilemedi:', result?.error);
-    }
-
-    return token;
   } catch (error) {
     console.error('FCM izni alınırken hata:', error);
     return null;
