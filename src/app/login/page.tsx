@@ -126,7 +126,32 @@ export default function LoginPage() {
           console.log('Oturum cookie kaydedildi, dashboard sayfasına yönlendiriliyor');
           
           // Tarayıcı yönlendirme sorunlarını önlemek için doğrudan URL yönlendirmesi
-          window.location.href = window.location.origin + '/dashboard';
+          const resetNotifications = async () => {
+            try {
+              // Service Worker kaydını sil
+              if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for(let registration of registrations) {
+                  await registration.unregister();
+                  console.log('Service Worker kaydı silindi');
+                }
+              }
+              
+              // FCM bilgilerini localStorage'dan temizle
+              localStorage.removeItem('fcm_token');
+              localStorage.removeItem('fcm_user_role');
+              
+              console.log('Bildirim ayarları sıfırlandı, yönetici paneline yönlendiriliyor');
+            } catch (error) {
+              console.error('Bildirim sıfırlama hatası:', error);
+            }
+            
+            // Yönetici paneline yönlendir
+            window.location.href = window.location.origin + '/dashboard';
+          };
+          
+          // Bildirimleri sıfırla ve yönlendir
+          resetNotifications();
           return;
         } else {
           throw new Error('Kullanıcı bilgileri alınamadı');

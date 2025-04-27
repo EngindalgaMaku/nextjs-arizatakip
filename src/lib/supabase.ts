@@ -643,6 +643,10 @@ export async function saveFCMToken(userId: string, token: string) {
 
     console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId}, Rol: ${userData.role})`);
 
+    // Önce bu kullanıcı için tüm eski token'ları temizle
+    await clearUserTokens(userId);
+
+    // Sonra yeni token'ı kaydet
     const { data, error } = await supabase
       .from('user_fcm_tokens')
       .upsert(
@@ -673,9 +677,9 @@ export async function saveFCMToken(userId: string, token: string) {
 }
 
 /**
- * Kullanıcının FCM token'ını siler
+ * Kullanıcının tüm FCM token'larını temizler
  */
-export async function deleteFCMToken(userId: string) {
+export async function clearUserTokens(userId: string) {
   try {
     const { error } = await supabase
       .from('user_fcm_tokens')
@@ -683,13 +687,38 @@ export async function deleteFCMToken(userId: string) {
       .eq('user_id', userId);
     
     if (error) {
-      console.error('FCM token silinemedi:', error);
+      console.error('FCM token temizlenemedi:', error);
       return { success: false, error };
     }
     
+    console.log(`${userId} kullanıcısı için tüm FCM tokenlar temizlendi`);
     return { success: true };
   } catch (error) {
-    console.error('FCM token silinirken hata:', error);
+    console.error('FCM token temizlenirken hata:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Veritabanındaki tüm FCM token'ları temizler (sadece çok özel durumlarda kullanılmalı)
+ */
+export async function clearAllFCMTokens() {
+  try {
+    // Sadece admin yetkisine sahip kullanıcılar çağırabilir
+    const { error } = await supabase
+      .from('user_fcm_tokens')
+      .delete()
+      .neq('user_id', 'dummy');  // Tüm kayıtları silmek için geçerli bir where şartı
+    
+    if (error) {
+      console.error('FCM tokenlar temizlenemedi:', error);
+      return { success: false, error };
+    }
+    
+    console.log('Tüm FCM tokenlar temizlendi');
+    return { success: true };
+  } catch (error) {
+    console.error('FCM tokenlar temizlenirken hata:', error);
     return { success: false, error };
   }
 } 

@@ -88,7 +88,8 @@ export default function TeacherLoginPage() {
                 path: '/',
               });
               
-              router.push('/teacher/issues');
+              // Öğretmen sayfasına yönlendirme yapmadan önce bildirimleri sıfırla
+              resetNotifications();
               return;
             }
           }
@@ -127,6 +128,31 @@ export default function TeacherLoginPage() {
     
     loadSiteName();
   }, []);
+
+  // Bildirimleri sıfırlama fonksiyonu
+  const resetNotifications = async () => {
+    try {
+      // Service Worker kaydını sil
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for(let registration of registrations) {
+          await registration.unregister();
+          console.log('Service Worker kaydı silindi');
+        }
+      }
+      
+      // FCM bilgilerini localStorage'dan temizle
+      localStorage.removeItem('fcm_token');
+      localStorage.removeItem('fcm_user_role');
+      
+      console.log('Bildirim ayarları sıfırlandı, öğretmen paneline yönlendiriliyor');
+    } catch (error) {
+      console.error('Bildirim sıfırlama hatası:', error);
+    }
+    
+    // Öğretmen paneline yönlendir
+    router.push('/teacher/issues');
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,8 +211,8 @@ export default function TeacherLoginPage() {
           localStorage.setItem('teacher_remembered_device', JSON.stringify(rememberedData));
         }
         
-        // Yönlendirme
-        router.push('/teacher/issues');
+        // Bildirimleri sıfırla ve yönlendir
+        resetNotifications();
         return;
       }
       
@@ -230,8 +256,8 @@ export default function TeacherLoginPage() {
         localStorage.setItem('teacher_remembered_device', JSON.stringify(rememberedData));
       }
       
-      // Yönlendirme
-      router.push('/teacher/issues');
+      // Bildirimleri sıfırla ve yönlendir
+      resetNotifications();
     } catch (err) {
       console.error('Giriş sırasında hata:', err);
       
@@ -266,8 +292,8 @@ export default function TeacherLoginPage() {
           localStorage.setItem('teacher_remembered_device', JSON.stringify(rememberedData));
         }
         
-        // Yönlendirme
-        router.push('/teacher/issues');
+        // Bildirimleri sıfırla ve yönlendir
+        resetNotifications();
         return;
       }
       
