@@ -67,12 +67,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [user]);
 
-  // Firebase Cloud Messaging (FCM) kurulumu
+  // FCM kurulumu
   const setupFCM = async (userId: string, userRole: string): Promise<boolean> => {
     if (!userId || fcmInitialized.current) return false;
     
     try {
       console.log('FCM kurulumu başlatılıyor...');
+      
+      // FCM token almadan önce bildirim görünürlüğünü test et
+      toast.success('Bildirim testi - Eğer bu mesajı görüyorsanız, bildirimler çalışıyor');
       
       // FCM izni ve token alma
       const fcmToken = await requestFCMPermission(userId, userRole);
@@ -106,14 +109,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           onMessage(messaging, (payload) => {
             console.log('Ön planda bildirim alındı:', payload);
             
-            // Rol kontrolü
-            const userRole = localStorage.getItem('fcm_user_role');
-            const notificationRole = payload.data?.role;
-            
-            if (notificationRole && notificationRole !== userRole) {
-              console.log(`Bu bildirim ${notificationRole} rolü için, mevcut kullanıcı ${userRole} rolünde olduğu için gösterilmeyecek`);
-              return;
-            }
+            // Bildirim sesi çal
+            playAlertSound();
             
             // Bildirim göster
             const title = payload.notification?.title || 'Yeni Bildirim';

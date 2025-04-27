@@ -73,12 +73,19 @@ export const requestFCMPermission = async (userId: string, userRole: string): Pr
     }
 
     try {
+      // Service worker'ı kaydet - önemli: root dizinde olmalı
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
+      console.log('Service worker başarıyla kaydedildi:', registration.scope);
+      
       // Token iste
       const messaging = getMessaging(firebaseApp);
       
       // VAPID key ile token al (Web Push API için)
       const token = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration
       });
       
       if (!token) {
@@ -92,10 +99,7 @@ export const requestFCMPermission = async (userId: string, userRole: string): Pr
       localStorage.setItem('fcm_token', token);
       localStorage.setItem('fcm_user_id', userId);
       localStorage.setItem('fcm_user_role', userRole);
-      
-      // Service worker'a rol bilgisini gönder
-      await sendRoleToServiceWorker(userRole);
-      
+            
       return token;
     } catch (error) {
       console.error('FCM token alınırken hata:', error);
@@ -198,10 +202,7 @@ export const clearFCMToken = async (): Promise<boolean> => {
     localStorage.removeItem('fcm_token');
     localStorage.removeItem('fcm_user_id');
     localStorage.removeItem('fcm_user_role');
-    
-    // Service worker'a anonim rol bilgisini gönder
-    await sendRoleToServiceWorker('anonymous');
-    
+        
     console.log('FCM token temizlendi');
     return true;
   } catch (error) {

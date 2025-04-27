@@ -1,26 +1,24 @@
 // Firebase Messaging Service Worker
 
-// Firebase versiyonları - güncellemeden sonra bunları doğru versiyon numaralarına güncellemeniz gerekebilir
+// Firebase versiyonları - sabit versiyonlar kullanıyoruz
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-/* 
- * ÖNEMLİ: Bu dosyadaki Firebase yapılandırma değerlerini Firebase Console'dan aldığınız gerçek değerlerle değiştirmeniz gerekiyor.
- * Bu değerleri doğrudan Firebase Console -> Proje Ayarları -> Genel -> "Web uygulamanız için Firebase SDK snippet'i yapılandırın" kısmından alabilirsiniz.
- * 
- * NOT: Bu bir service worker dosyası olduğu için, environment değişkenleri burada çalışmaz. Değerleri doğrudan bu dosyaya yazmanız gerekiyor.
- */
+// Firebase yapılandırma değerleri
 firebase.initializeApp({
-  apiKey: "FIREBASE_API_KEY_BURAYA",
-  authDomain: "FIREBASE_AUTH_DOMAIN_BURAYA",
-  projectId: "FIREBASE_PROJECT_ID_BURAYA",
-  storageBucket: "FIREBASE_STORAGE_BUCKET_BURAYA",
-  messagingSenderId: "FIREBASE_MESSAGING_SENDER_ID_BURAYA",
-  appId: "FIREBASE_APP_ID_BURAYA"
+  apiKey: "AIzaSyDCpkjyNxxrzTn3rXM1kuH5zn0pgIORi0g",
+  authDomain: "atsis-38f7e.firebaseapp.com",
+  projectId: "atsis-38f7e",
+  storageBucket: "atsis-38f7e.firebasestorage.app",
+  messagingSenderId: "943049988733",
+  appId: "1:943049988733:web:e8c073b8760198da65ef14"
 });
 
 // Firebase Messaging nesnesini al
 const messaging = firebase.messaging();
+
+// Console'a hata ayıklama mesajı
+console.log('[firebase-messaging-sw.js] Service Worker başlatıldı');
 
 // Kullanıcı rolü için IndexedDB depolama
 const dbName = 'FirebaseMessagingServiceWorkerDB';
@@ -162,20 +160,6 @@ const requestRoleFromClient = () => {
 messaging.onBackgroundMessage(async (payload) => {
   console.log('[firebase-messaging-sw.js] Arkaplanda mesaj alındı:', payload);
   
-  // Rol kontrolü
-  const userRole = await getUserRole();
-  const messageRole = payload.data?.userRole || 'unknown';
-  
-  console.log(`[SW] Bildirim kontrolü - Kullanıcı rolü: "${userRole}", Mesaj rolü: "${messageRole}"`);
-  
-  // Bildirim bu kullanıcının rolü için değilse gösterme
-  if (userRole !== 'unknown' && messageRole !== 'unknown' && userRole !== messageRole) {
-    console.log(`[SW] ROL UYUŞMAZLIĞI: Bildirim "${messageRole}" rolü için, kullanıcı "${userRole}" rolünde. Bildirim GÖSTERİLMEYECEK.`);
-    return;
-  }
-  
-  console.log(`[SW] Bildirim gösteriliyor (${messageRole} rolü için)`);
-  
   // Bildirim başlığı ve içeriği
   const notificationTitle = payload.notification?.title || 'Yeni Bildirim';
   const notificationOptions = {
@@ -184,10 +168,9 @@ messaging.onBackgroundMessage(async (payload) => {
     badge: '/icons/badge-128x128.png',
     data: {
       ...payload.data,
-      timestamp: Date.now(),
-      receivedByRole: userRole
+      timestamp: Date.now()
     },
-    tag: `atsis-notification-${messageRole}-${Date.now()}`,
+    tag: `atsis-notification-${Date.now()}`,
   };
 
   // Bildirim gösterme
@@ -203,17 +186,6 @@ self.addEventListener('notificationclick', (event) => {
   
   // URL varsa tarayıcıyı aç ve o sayfaya yönlendir
   const urlToOpen = event.notification.data?.url || '/dashboard';
-  const userRole = event.notification.data?.userRole || 'unknown';
-  
-  // Rolüne göre yönlendirme kontrolü
-  let targetUrl;
-  if (userRole === 'admin') {
-    targetUrl = urlToOpen.startsWith('/') ? urlToOpen : '/dashboard';
-  } else if (userRole === 'teacher') {
-    targetUrl = urlToOpen.startsWith('/teacher') ? urlToOpen : '/teacher/issues';
-  } else {
-    targetUrl = urlToOpen; // varsayılan
-  }
   
   // Tüm istemcileri kontrol et
   event.waitUntil(
@@ -225,14 +197,14 @@ self.addEventListener('notificationclick', (event) => {
           // Açık bir sekme varsa onu öne getir ve URL'e yönlendir
           if (client.url && 'focus' in client) {
             client.focus();
-            client.navigate(targetUrl);
+            client.navigate(urlToOpen);
             return;
           }
         }
         
         // Açık bir pencere yoksa yeni bir tane aç
         if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
+          return clients.openWindow(urlToOpen);
         }
       })
   );
