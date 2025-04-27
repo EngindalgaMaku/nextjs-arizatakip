@@ -8,13 +8,14 @@ import { getMessaging, onMessage, getToken } from 'firebase/messaging';
 import { requestFCMPermission, clearFCMToken, setupMessageListener } from '@/lib/firebase';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getDeviceTypeName } from '@/lib/helpers';
-import { playAlertSound } from '@/lib/notification';
+import { playAlertSound, showBrowserNotification } from '@/lib/notification';
 import { 
   supabase, 
   saveFCMToken, 
   deleteFCMToken
 } from "@/lib/supabase";
 import { firebaseApp } from "@/lib/firebase";
+import { User } from '@supabase/auth-js';
 
 interface Notification {
   id: string;
@@ -52,6 +53,28 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [lastNotification, setLastNotification] = useState<any | null>(null);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const messageUnsubscribeRef = useRef<(() => void) | null>(null);
+  const hasUserInteractedRef = useRef(false);
+
+  // Kullanıcı etkileşimini takip et
+  useEffect(() => {
+    const trackUserInteraction = () => {
+      console.log("Kullanıcı sayfayla etkileşime girdi");
+      hasUserInteractedRef.current = true;
+    };
+    
+    // Çeşitli kullanıcı etkileşimi olaylarını dinle
+    window.addEventListener('click', trackUserInteraction);
+    window.addEventListener('touchstart', trackUserInteraction);
+    window.addEventListener('keydown', trackUserInteraction);
+    window.addEventListener('mousedown', trackUserInteraction);
+    
+    return () => {
+      window.removeEventListener('click', trackUserInteraction);
+      window.removeEventListener('touchstart', trackUserInteraction);
+      window.removeEventListener('keydown', trackUserInteraction);
+      window.removeEventListener('mousedown', trackUserInteraction);
+    };
+  }, []);
 
   // Sayfadan ayrılırken uyarı göster
   useEffect(() => {
@@ -312,33 +335,43 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setShowNotification(false);
   };
 
-  // Firebase token alma işlemi ve mesaj dinleyicisi kurulumu
-  const setupFirebaseListeners = useCallback(() => {
-    if (!user || !user.id) return;
-  
-    console.log("Firebase dinleyicileri kuruluyor - sayfa:", pathname);
+  // Real-time FCM mesajlarını dinleme
+  useEffect(() => {
+    console.log(`Sayfa değişikliği: ${pathname}, Kullanıcı: ${user ? 'var' : 'yok'}, Dinleyici: ${messageUnsubscribeRef.current ? 'aktif' : 'pasif'}`);
     
-    // Önceki dinleyiciyi temizle
-    if (messageUnsubscribeRef.current) {
-      console.log("Önceki Firebase mesaj dinleyicisi temizleniyor");
-      messageUnsubscribeRef.current();
-      messageUnsubscribeRef.current = null;
+    // User varsa ve dinleyici yoksa veya sayfa geçişi olduysa
+    if (user && (!messageUnsubscribeRef.current || pathname)) {
+      setupFirebaseListeners();
     }
+    
+    // Cleanup
+    return () => {
+      if (messageUnsubscribeRef.current) {
+        console.log('FCM dinleyicileri temizleniyor...');
+        messageUnsubscribeRef.current();
+        messageUnsubscribeRef.current = null;
+      }
+    };
+  }, [user, pathname]);
 
-    // Messaging'i başlat ve token al
-    requestFCMPermission(user.id, user.role || 'anonymous')
-      .then((token) => {
-        if (token) {
-          console.log("FCM token alındı:", token);
-          setFcmToken(token);
-        }
-      })
-      .catch((error) => {
-        console.error("FCM token alınamadı:", error);
-      });
-
-    // Mesaj dinleyicisi
+  const setupFirebaseListeners = async () => {
+    if (!user) return;
+    
     try {
+      // Önceki dinleyiciler varsa temizle
+      if (messageUnsubscribeRef.current) {
+        messageUnsubscribeRef.current();
+        messageUnsubscribeRef.current = null;
+      }
+
+      // Messaging'i başlat ve token al
+      const token = await requestFCMPermission(user.id, user.role || 'anonymous');
+      if (token) {
+        console.log("FCM token alındı:", token);
+        setFcmToken(token);
+      }
+
+      // Messaging'i başlat ve mesaj dinleyicisi kur
       const app = firebaseApp();
       if (app) {
         const messaging = getMessaging(app);
@@ -346,7 +379,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           console.log("Firebase mesaj dinleyicisi kuruluyor - sayfa:", pathname);
           
           // onMessage dinleyicisi kur ve referansını sakla
-          messageUnsubscribeRef.current = onMessage(messaging, (payload) => {
+          const unsubscribe = onMessage(messaging, (payload) => {
             console.log("Foreground mesajı alındı:", payload, "sayfa:", pathname);
             if (payload.notification?.title) {
               const notificationData: Notification = {
@@ -367,19 +400,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               console.log("Bildirim sesi çalınıyor - sayfa:", pathname);
               playAlertSound();
               
-              // Tarayıcıya bildirim göster (browser notification API)
-              if ('Notification' in window && Notification.permission === 'granted') {
-                try {
-                  new Notification(payload.notification.title, {
-                    body: payload.notification.body,
-                    icon: '/okullogo.png'
-                  });
-                } catch (e) {
-                  console.error("Browser notification failed:", e);
-                }
+              // Browser bildirimi göster (showBrowserNotification fonksiyonunu kullan)
+              if (payload.notification?.title) {
+                showBrowserNotification({
+                  title: payload.notification.title,
+                  body: payload.notification.body || '',
+                  url: payload.data?.url || '/'
+                });
               }
               
-              // Okunmamış bildirimleri güncelle
+              // Bildirim sayısını artır
               setNotificationCount((prev) => prev + 1);
               setLastNotification(notificationData);
               
@@ -411,47 +441,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             }
           });
           
-          console.log("Firebase mesaj dinleyicisi kuruldu - sayfa:", pathname);
+          messageUnsubscribeRef.current = unsubscribe;
+          console.log('FCM mesaj dinleyicileri kuruldu');
         }
       }
     } catch (error) {
-      console.error("Firebase mesaj dinleyicisi kurulurken hata:", error);
+      console.error('FCM ayarlanırken hata oluştu:', error);
     }
-  }, [user, pathname]);
-
-  // Kullanıcı, URL değişiminde ve bileşen monte edildiğinde Firebase dinleyicilerini kur
-  useEffect(() => {
-    // Sayfa değişikliklerinde konsola bilgi yazdır
-    console.log("NotificationContext: Sayfa değişimi algılandı", {
-      sayfa: pathname,
-      kullaniciVarMi: !!user,
-      dinleyiciVarMi: !!messageUnsubscribeRef.current
-    });
-
-    // Eğer kullanıcı varsa ve dinleyici yoksa veya sayfa değiştiyse dinleyicileri kur
-    if (user && (!messageUnsubscribeRef.current || lastPathRef.current !== pathname)) {
-      console.log("NotificationContext: Firebase dinleyicileri yeniden kuruluyor");
-      setupFirebaseListeners();
-    }
-    
-    return () => {
-      // Component unmount olduğunda dinleyiciyi temizle
-      if (messageUnsubscribeRef.current) {
-        messageUnsubscribeRef.current();
-        messageUnsubscribeRef.current = null;
-      }
-    };
-  }, [user, pathname, setupFirebaseListeners]);
-
-  // Supabase realtime aboneliği
-  useEffect(() => {
-    // URL değişikliğinde yeniden abonelik
-    if (pathname && supabaseSubscription.current && supabase) {
-      console.log("URL değişti, Supabase aboneliği yenileniyor:", pathname);
-      supabaseSubscription.current.unsubscribe();
-      setupRealtimeSubscription();
-    }
-  }, [user, pathname, setupRealtimeSubscription]);
+  };
 
   // Manuel olarak bildirimleri test etme fonksiyonu
   const testNotifications = () => {

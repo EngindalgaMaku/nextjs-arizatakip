@@ -1,6 +1,7 @@
 'use client';
 
 import { Issue } from './supabase';
+import { toast } from 'react-hot-toast';
 
 // Sesli bildirim için sabit
 const NOTIFICATION_ALERT_SOUND = '/notification-alert.mp3';
@@ -14,18 +15,33 @@ interface NotificationOptions {
 
 /**
  * Play notification sound
+ * @param {boolean} showVisualFallback - If true, shows a visual fallback notification when sound can't play
  */
-export function playAlertSound() {
+export function playAlertSound(showVisualFallback = true) {
   try {
     console.log("Bildirim sesi çalmaya başlıyor...");
+    
+    // Kullanıcının etkileşim durumunu kontrol et
+    const hasInteracted = document.querySelectorAll('*:active').length > 0 || 
+                         document.hasFocus() || 
+                         document.visibilityState === 'visible';
+    
+    console.log("Kullanıcı etkileşim durumu:", hasInteracted);
     
     // First play the alert sound
     const alertAudio = new Audio(NOTIFICATION_ALERT_SOUND);
     alertAudio.volume = 0.5;
+    alertAudio.muted = true; // Önce sessiz başlat
     
     // Debug için daha fazla çıktı
     alertAudio.addEventListener('canplay', () => {
       console.log("Alert ses dosyası yüklendi ve çalınmaya hazır");
+      // Yüklendiğinde ses açma
+      try {
+        alertAudio.muted = false;
+      } catch (e) {
+        console.log("Ses açma hatası:", e);
+      }
     });
     
     alertAudio.addEventListener('playing', () => {
@@ -41,9 +57,16 @@ export function playAlertSound() {
       console.log("Alert ses dosyası bitti, ana bildirim sesi başlıyor");
       const notificationAudio = new Audio('/notification.mp3');
       notificationAudio.volume = 0.5;
+      notificationAudio.muted = true; // Önce sessiz başlat
       
       notificationAudio.addEventListener('canplay', () => {
         console.log("Ana bildirim ses dosyası yüklendi ve çalınmaya hazır");
+        // Yüklendiğinde ses açma
+        try {
+          notificationAudio.muted = false;
+        } catch (e) {
+          console.log("Ses açma hatası:", e);
+        }
       });
       
       notificationAudio.addEventListener('playing', () => {
@@ -56,19 +79,111 @@ export function playAlertSound() {
       
       notificationAudio.play().catch(e => {
         console.log('Ana bildirim ses dosyası çalma hatası:', e);
+        // Sessiz oynatma deneyin
+        if (e.name === 'NotAllowedError') {
+          console.log("Sessiz oynatma deneniyor...");
+          notificationAudio.muted = true;
+          notificationAudio.play().catch(e2 => {
+            console.log("Sessiz çalma da başarısız oldu:", e2);
+            
+            // Görsel bildirim göster
+            if (showVisualFallback) {
+              showVisualNotificationFallback();
+            }
+          });
+        }
       });
     };
     
     // Start playing the alert sound
     alertAudio.play().catch(e => {
       console.log('Alert ses dosyası çalma hatası:', e);
-      // If alert sound fails, try to play at least the notification sound
-      const fallbackAudio = new Audio('/notification.mp3');
-      fallbackAudio.volume = 0.5;
-      fallbackAudio.play().catch(e => console.log('Yedek ses dosyası çalma hatası:', e));
+      
+      // Kullanıcı etkileşimi olmadan çalma hatası alındığında
+      if (e.name === 'NotAllowedError') {
+        console.log("Sessiz oynatma deneniyor...");
+        alertAudio.muted = true;
+        alertAudio.play().catch(e2 => {
+          console.log("Sessiz çalma da başarısız oldu:", e2);
+          
+          // Fallback olarak sadece vibration kullanmayı dene
+          if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]);
+            console.log("Vibration kullanıldı");
+          }
+          
+          // If alert sound fails, try to play at least the notification sound
+          const fallbackAudio = new Audio('/notification.mp3');
+          fallbackAudio.volume = 0.5;
+          fallbackAudio.muted = true;
+          fallbackAudio.play().catch(e => {
+            console.log('Yedek ses dosyası çalma hatası:', e);
+            
+            // Görsel bildirim göster
+            if (showVisualFallback) {
+              showVisualNotificationFallback();
+            }
+          });
+        });
+      }
     });
   } catch (error) {
     console.error('Bildirim sesi çalma hatası:', error);
+    
+    // Ses çalınamadığında görsel bildirim göster
+    if (showVisualFallback) {
+      showVisualNotificationFallback();
+    }
+  }
+}
+
+/**
+ * Ses çalınamadığında gösterilen görsel bildirim
+ */
+function showVisualNotificationFallback() {
+  // JSX kullanmadan standart toast bildirim göster
+  toast.success('🔔 Yeni bildirim geldi! Lütfen kontrol edin.', {
+    duration: 4000,
+    position: 'bottom-center',
+    style: {
+      background: '#3b82f6', // blue-500
+      color: '#ffffff',
+      fontWeight: 'bold',
+      padding: '16px',
+      borderRadius: '8px',
+    },
+    icon: '🔔',
+  });
+  
+  // Sayfada görsel yanıp sönme efekti (title değiştirme)
+  const originalTitle = document.title;
+  let interval: number | null = null;
+  
+  if (document.hidden) {
+    // Sayfa arka plandaysa başlığı yanıp söndür
+    let messageShown = false;
+    interval = window.setInterval(() => {
+      document.title = messageShown ? originalTitle : '🔔 Yeni Bildirim!';
+      messageShown = !messageShown;
+    }, 1000);
+    
+    // Kullanıcı sayfaya geri döndüğünde normal başlığa dön
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        if (interval) window.clearInterval(interval);
+        document.title = originalTitle;
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 10 saniye sonra otomatik olarak temizle
+    setTimeout(() => {
+      if (interval) window.clearInterval(interval);
+      document.title = originalTitle;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, 10000);
   }
 }
 
