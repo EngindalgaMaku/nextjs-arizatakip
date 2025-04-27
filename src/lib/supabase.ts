@@ -12,10 +12,10 @@ export const DEMO_MODE = false;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type User = {
-  id: string;
+  id: string;  // UUID formatında
   email: string;
   name: string | null;
-  role: 'admin' | 'editor' | 'viewer';
+  role: 'admin' | 'editor' | 'viewer' | 'teacher'; // teacher rolünü ekliyoruz
   created_at: string;
   last_login: string | null;
   status: 'active' | 'inactive';
@@ -541,25 +541,18 @@ export async function loadUserData() {
       throw sessionError || new Error('Kullanıcı oturumu bulunamadı');
     }
     
-    // Kullanıcı detaylarını veritabanından al
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    // Auth kullanıcı bilgilerini direkt kullan - veritabanı sorgusu yapmadan
+    const userData: User = {
+      id: user.id,
+      email: user.email || '',
+      name: user.email?.split('@')[0] || 'Kullanıcı',
+      role: 'admin' as const,
+      created_at: user.created_at || new Date().toISOString(),
+      last_login: null,
+      status: 'active' as const
+    };
     
-    if (error) {
-      console.error('Kullanıcı verisi alınamadı:', error);
-      // Temel bilgilerle devam et
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.email?.split('@')[0] || 'Kullanıcı',
-        role: 'admin' as const
-      };
-    }
-    
-    return data as User;
+    return userData;
   } catch (error) {
     console.error('Kullanıcı bilgileri yüklenirken hata:', error);
     // Demo ortamında temel kullanıcı verisi döndür
