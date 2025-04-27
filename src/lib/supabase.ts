@@ -619,7 +619,7 @@ export async function saveFCMToken(userId: string, token: string, userRole?: str
 
     // Check if the token already exists for this user
     const { data: existingTokens, error: checkError } = await supabase
-      .from('fcm_tokens')
+      .from('user_fcm_tokens')
       .select('*')
       .eq('user_id', userId)
       .eq('token', token);
@@ -637,11 +637,11 @@ export async function saveFCMToken(userId: string, token: string, userRole?: str
 
     // Insert the new token
     const { error: insertError } = await supabase
-      .from('fcm_tokens')
+      .from('user_fcm_tokens')
       .insert({
         user_id: userId,
         token: token,
-        role: userRole || null,
+        user_role: userRole || null,
         created_at: new Date().toISOString()
       });
 
@@ -718,7 +718,7 @@ export async function deleteFCMToken(userId: string, token?: string) {
     }
 
     let query = supabase
-      .from('fcm_tokens')
+      .from('user_fcm_tokens')
       .delete()
       .eq('user_id', userId);
 
