@@ -1,179 +1,42 @@
 // Firebase Messaging Service Worker
 
-// Firebase versiyonları - sabit versiyonlar kullanıyoruz
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+// Firebase versiyonları
+importScripts('https://www.gstatic.com/firebasejs/9.2.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.2.0/firebase-messaging-compat.js');
 
-// Firebase yapılandırma değerleri
-firebase.initializeApp({
-  apiKey: "AIzaSyDCpkjyNxxrzTn3rXM1kuH5zn0pgIORi0g",
-  authDomain: "atsis-38f7e.firebaseapp.com",
-  projectId: "atsis-38f7e",
-  storageBucket: "atsis-38f7e.firebasestorage.app",
-  messagingSenderId: "943049988733",
-  appId: "1:943049988733:web:e8c073b8760198da65ef14"
-});
+// Firebase yapılandırmasını yerleştirin
+// NOT: Bu değerleri .env dosyasından alamayız, çünkü service worker'lar doğrudan bunlara erişemez
+// Bu nedenle, build zamanında veya manuel olarak güncellenmelidir
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
 
-// Firebase Messaging nesnesini al
+firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // Console'a hata ayıklama mesajı
-console.log('[firebase-messaging-sw.js] Service Worker başlatıldı');
+console.log('[Service Worker] Firebase Service Worker başlatıldı');
 
-// Kullanıcı rolü için IndexedDB depolama
-const dbName = 'FirebaseMessagingServiceWorkerDB';
-const storeName = 'userSettings';
-const userRoleKey = 'currentUserRole';
-
-// Kullanıcı rolünü IndexedDB'ye kaydet
-const saveUserRole = (role) => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, 1);
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(storeName)) {
-        db.createObjectStore(storeName);
-      }
-    };
-    
-    request.onsuccess = (event) => {
-      const db = event.target.result;
-      const transaction = db.transaction([storeName], 'readwrite');
-      const store = transaction.objectStore(storeName);
-      
-      store.put(role, userRoleKey);
-      
-      transaction.oncomplete = () => {
-        console.log(`[SW] Rol kaydedildi: ${role}`);
-        resolve();
-      };
-      
-      transaction.onerror = (error) => {
-        console.error('[SW] Rol kaydetme hatası:', error);
-        reject(error);
-      };
-    };
-    
-    request.onerror = (error) => {
-      console.error('[SW] IndexedDB açma hatası:', error);
-      reject(error);
-    };
-  });
-};
-
-// Mevcut kullanıcı rolünü alır
-const getUserRole = () => {
-  // IndexedDB'den rol bilgisini alma
-  return new Promise((resolve) => {
-    try {
-      const request = indexedDB.open(dbName, 1);
-      
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName);
-        }
-      };
-      
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-        try {
-          const transaction = db.transaction([storeName], 'readonly');
-          const store = transaction.objectStore(storeName);
-          const getRequest = store.get(userRoleKey);
-          
-          getRequest.onsuccess = () => {
-            const role = getRequest.result;
-            console.log(`[SW] Kaydedilmiş rol: ${role || 'bulunamadı'}`);
-            
-            if (role) {
-              resolve(role);
-            } else {
-              // Role bulunamadıysa client'dan iste
-              requestRoleFromClient().then(resolve);
-            }
-          };
-          
-          getRequest.onerror = (error) => {
-            console.error('[SW] Rol okuma hatası:', error);
-            requestRoleFromClient().then(resolve);
-          };
-        } catch (txError) {
-          console.error('[SW] Transaction hatası:', txError);
-          requestRoleFromClient().then(resolve);
-        }
-      };
-      
-      request.onerror = (error) => {
-        console.error('[SW] IndexedDB açma hatası:', error);
-        requestRoleFromClient().then(resolve);
-      };
-    } catch (error) {
-      console.error('[SW] IndexedDB genel hata:', error);
-      requestRoleFromClient().then(resolve);
-    }
-  });
-};
-
-// Client'tan rol iste
-const requestRoleFromClient = () => {
-  return new Promise((resolve) => {
-    const messageChannel = new MessageChannel();
-    let responseReceived = false;
-    
-    // Mesaj kanalının cevabını dinle
-    messageChannel.port1.onmessage = (event) => {
-      responseReceived = true;
-      const role = event.data?.role || 'unknown';
-      console.log(`[SW] Client'dan rol alındı: ${role}`);
-      saveUserRole(role).catch(console.error);
-      resolve(role);
-    };
-    
-    // Tüm client'lara rol talebi gönder
-    self.clients.matchAll().then(clients => {
-      if (clients.length > 0) {
-        clients.forEach(client => {
-          client.postMessage(
-            { type: 'GET_USER_ROLE' },
-            [messageChannel.port2]
-          );
-        });
-      }
-      
-      // Cevap bekleme süresi (500ms)
-      setTimeout(() => {
-        if (!responseReceived) {
-          console.log('[SW] Client cevabı alınamadı, varsayılan rol kullanılıyor');
-          resolve('unknown');
-        }
-      }, 500);
-    }).catch(() => {
-      console.error('[SW] Client'lara erişim hatası');
-      resolve('unknown');
-    });
-  });
-};
-
-// Arkaplanda bildirim alındığında
-messaging.onBackgroundMessage(async (payload) => {
-  console.log('[firebase-messaging-sw.js] Arkaplanda mesaj alındı:', payload);
+// Arka planda mesaj alındığında
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Arka plan mesajı alındı:', payload);
   
-  // Bildirim başlığı ve içeriği
-  const notificationTitle = payload.notification?.title || 'Yeni Bildirim';
+  const notificationTitle = payload.notification?.title || 'ATSİS Bildirim';
   const notificationOptions = {
-    body: payload.notification?.body || 'Yeni bir bildiriminiz var.',
-    icon: '/okullogo.png',
-    badge: '/icons/badge-128x128.png',
-    data: {
-      ...payload.data,
-      timestamp: Date.now()
-    },
-    tag: `atsis-notification-${Date.now()}`,
+    body: payload.notification?.body || 'Yeni bir bildiriminiz var',
+    icon: '/logo.png',
+    badge: '/badge.png',
+    data: payload.data || {},
+    tag: payload.data?.issueId || 'general',
+    requireInteraction: true
   };
 
-  // Bildirim gösterme
+  // Bildirim göster
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
@@ -181,60 +44,58 @@ messaging.onBackgroundMessage(async (payload) => {
 self.addEventListener('notificationclick', (event) => {
   console.log('[firebase-messaging-sw.js] Bildirime tıklandı:', event);
   
-  // Bildirimi kapat
-  event.notification.close();
+  const notification = event.notification;
+  notification.close();
   
-  // URL varsa tarayıcıyı aç ve o sayfaya yönlendir
-  const urlToOpen = event.notification.data?.url || '/dashboard';
+  // URL'i ayarla (varsayılan olarak /dashboard'a git)
+  let url = '/dashboard';
   
-  // Tüm istemcileri kontrol et
+  if (notification.data && notification.data.url) {
+    url = notification.data.url;
+  } else if (notification.data && notification.data.issueId) {
+    // Belirli bir arıza kaydına yönlendir
+    url = `/issues/${notification.data.issueId}`;
+  }
+  
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // Açık bir pencere varsa onu kullan
-        for (let i = 0; i < clientList.length; i++) {
-          const client = clientList[i];
-          // Açık bir sekme varsa onu öne getir ve URL'e yönlendir
-          if (client.url && 'focus' in client) {
-            client.focus();
-            client.navigate(urlToOpen);
-            return;
+    clients.matchAll({ type: "window" }).then((clientsArr) => {
+      // Eğer zaten açık bir pencere varsa, odaklan ve url'yi değiştir
+      const hadWindowToFocus = clientsArr.some((windowClient) => {
+        if (windowClient.url === url) {
+          return windowClient.focus().then(() => true);
+        }
+        return false;
+      });
+      
+      // Açık bir pencere yoksa, yeni bir pencere aç
+      if (!hadWindowToFocus) {
+        clients.openWindow(url).then((windowClient) => {
+          if (windowClient) {
+            windowClient.focus();
           }
-        }
-        
-        // Açık bir pencere yoksa yeni bir tane aç
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
+        });
+      }
+    })
   );
 });
 
-// Service worker kurulum aşaması
-self.addEventListener('install', (event) => {
-  console.log('[firebase-messaging-sw.js] Service Worker kuruldu');
-  self.skipWaiting(); // Yeni service worker'ın hemen aktif olmasını sağlar
+// Service Worker kurulum aşaması
+self.addEventListener("install", (event) => {
+  console.log("[firebase-messaging-sw.js] Service Worker kuruldu");
+  self.skipWaiting();
 });
 
-// Service worker aktifleşme aşaması
-self.addEventListener('activate', (event) => {
-  console.log('[firebase-messaging-sw.js] Service Worker aktifleşti');
-  // Tüm istemciler üzerinde kontrol sahibi ol
-  event.waitUntil(clients.claim());
+// Service Worker aktifleşme aşaması
+self.addEventListener("activate", (event) => {
+  console.log("[firebase-messaging-sw.js] Service Worker aktifleştirildi");
+  return self.clients.claim();
 });
 
-// Client'lardan gelen mesajları dinle
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SET_USER_ROLE') {
-    const role = event.data.role || 'unknown';
-    console.log('[firebase-messaging-sw.js] Kullanıcı rolü güncellendi:', role);
-    
-    // Rolü IndexedDB'ye kaydet
-    saveUserRole(role).catch(console.error);
-    
-    // Yanıt gönder
-    if (event.ports && event.ports.length > 0) {
-      event.ports[0].postMessage({ success: true, message: 'Rol güncellendi', role });
-    }
+// Mesaj alındığında (Clientlara özel mesajlar için)
+self.addEventListener("message", (event) => {
+  console.log("[firebase-messaging-sw.js] Mesaj alındı:", event.data);
+  
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
   }
 }); 

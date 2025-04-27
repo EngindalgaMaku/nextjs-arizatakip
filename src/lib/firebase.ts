@@ -1,115 +1,123 @@
 // Firebase yapılandırması
-import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
-import { 
-  getMessaging, 
-  getToken, 
-  onMessage, 
-  isSupported,
-  deleteToken,
-  Messaging
-} from 'firebase/messaging';
+import { initializeApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { deleteFCMToken, saveFCMToken } from './supabase';
 
-// FCM yapılandırması
+// Firebase yapılandırması
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDCpkjyNxxrzTn3rXM1kuH5zn0pgIORi0g",
+  authDomain: "atsis-38f7e.firebaseapp.com",
+  projectId: "atsis-38f7e",
+  storageBucket: "atsis-38f7e.firebasestorage.app",
+  messagingSenderId: "943049988733",
+  appId: "1:943049988733:web:e8c073b8760198da65ef14"
 };
 
-// Firebase ve messaging örneklerini oluştur
-let firebaseApp: FirebaseApp | undefined;
-if (typeof window !== 'undefined' && !getApps().length) {
-  firebaseApp = initializeApp(firebaseConfig);
-}
+// Firebase başlatma
+export const firebaseApp = initializeApp(firebaseConfig);
 
-// VAPID key
-const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+// Tarayıcı kontrolü
+const isBrowser = typeof window !== 'undefined';
 
 /**
- * FCM için token alır ve kaydeder
+ * Firebase Cloud Messaging'i başlat ve token al
+ * @param saveFCMToken Token kaydetme fonksiyonu
+ * @param userId Kullanıcı ID
+ * @param userRole Kullanıcı rolü
+ * @returns 
  */
-export const requestFCMPermission = async (userId: string, userRole: string): Promise<string | null> => {
+export async function initializeFirebaseMessaging(
+  saveFCMToken: (userId: string, token: string, userRole: string) => Promise<void>,
+  userId: string,
+  userRole: string
+) {
+  if (!isBrowser) return null;
+
   try {
-    if (typeof window === 'undefined') {
-      console.warn('FCM izinleri istenirken hata: Window nesnesi bulunamadı (server-side)');
-      return null;
-    }
-
-    // FCM ve bildirim desteğini kontrol et
-    const isMessagingSupported = await isSupported();
-    if (!isMessagingSupported) {
-      console.warn('Firebase Cloud Messaging bu tarayıcıda desteklenmiyor.');
-      return null;
-    }
-
-    if (!('Notification' in window)) {
-      console.warn('Bu tarayıcı bildirim desteği sağlamıyor.');
-      return null;
-    }
-
-    // Bildirim izni kontrolü
-    let permission = Notification.permission;
-    
-    if (permission === 'default') {
-      console.log('Bildirim izni isteniyor...');
-      permission = await Notification.requestPermission();
-    }
-    
-    if (permission !== 'granted') {
-      console.warn('Bildirim izni reddedildi veya istenirken hata oluştu.');
-      return null;
-    }
-
-    console.log('Bildirim izni alındı, FCM token isteniyor...');
-
-    // Servis çalışanlarını kaydet
-    if (!('serviceWorker' in navigator)) {
-      console.warn('Service Worker bu tarayıcıda desteklenmiyor.');
-      return null;
-    }
-
-    try {
-      // Service worker'ı kaydet - önemli: root dizinde olmalı
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-        scope: '/'
-      });
-      console.log('Service worker başarıyla kaydedildi:', registration.scope);
-      
-      // Token iste
-      const messaging = getMessaging(firebaseApp);
-      
-      // VAPID key ile token al (Web Push API için)
-      const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: registration
-      });
-      
-      if (!token) {
-        console.warn('FCM token alınamadı. VAPID key veya izinler kontrol edilmeli.');
+    // Service worker kaydı
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/',
+          updateViaCache: 'none'
+        });
+        
+        console.log('Service Worker başarıyla kaydedildi:', registration.scope);
+        
+        // Service worker hazır olduğunda
+        await navigator.serviceWorker.ready;
+        console.log('Service Worker artık hazır');
+      } catch (error) {
+        console.error('Service Worker kaydı başarısız:', error);
         return null;
       }
+    }
 
-      console.log('FCM token başarıyla alındı:', token);
+    // FCM desteği kontrolü
+    const isMessagingSupported = await isSupported();
+    if (!isMessagingSupported) {
+      console.log('Firebase Cloud Messaging bu tarayıcıda desteklenmiyor');
+      return null;
+    }
+
+    // Messaging nesnesi oluştur
+    const messaging = getMessaging(firebaseApp);
+    
+    // İzin iste ve token al
+    try {
+      console.log('FCM izinleri isteniyor...');
       
-      // Kullanıcı bilgisini ve rolünü localStorage'a kaydet
-      localStorage.setItem('fcm_token', token);
-      localStorage.setItem('fcm_user_id', userId);
-      localStorage.setItem('fcm_user_role', userRole);
-            
-      return token;
+      const permission = await Notification.requestPermission();
+      console.log('Bildirim izin durumu:', permission);
+      
+      if (permission !== 'granted') {
+        console.log('Bildirim izni reddedildi');
+        return null;
+      }
+      
+      // Token al
+      console.log('FCM token alınıyor...');
+      const token = await getToken(messaging, {
+        vapidKey: 'BBXCgNXccb-2nRV9Tm5NQXx0gXKgDFt1_exf3RhI6IgNn5FnMOrcKXKpY55D3l9YS-U_FtLm5fX_1xgfWPeYtWs',
+        serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
+      });
+      
+      console.log('FCM token alındı:', token);
+
+      // Token kaydet
+      if (token) {
+        await saveFCMToken(userId, token, userRole);
+      }
+
+      return { messaging, token };
     } catch (error) {
       console.error('FCM token alınırken hata:', error);
       return null;
     }
   } catch (error) {
-    console.error('FCM izinleri istenirken hata:', error);
+    console.error('Firebase başlatılırken hata:', error);
     return null;
   }
-};
+}
+
+/**
+ * Mesaj dinleyicisi kur
+ * @param messaging Firebase Messaging nesnesi
+ * @param callback Mesaj alındığında çalışacak fonksiyon
+ */
+export function setupMessageListener(
+  messaging: any,
+  callback: (payload: any) => void
+) {
+  if (!isBrowser || !messaging) return;
+  
+  console.log('Mesaj dinleyicisi kuruldu');
+  
+  return onMessage(messaging, (payload) => {
+    console.log('Ön planda mesaj alındı:', payload);
+    callback(payload);
+  });
+}
 
 // Service Worker'a rol bilgisini gönder
 export const sendRoleToServiceWorker = async (role: string): Promise<boolean> => {
@@ -143,46 +151,6 @@ export const sendRoleToServiceWorker = async (role: string): Promise<boolean> =>
   } catch (error) {
     console.error('Service worker\'a rol gönderirken hata:', error);
     return false;
-  }
-};
-
-/**
- * FCM bildirimlerini dinler
- */
-export const listenForFCMMessages = (callback: (payload: any) => void) => {
-  // Messaging desteklenmiyor ise erken dön
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-    console.log('Service worker veya FCM bu ortamda desteklenmiyor');
-    return;
-  }
-  
-  // Mesajlaşma servisini al
-  const messaging = getMessaging(firebaseApp);
-  
-  try {
-    // Foreground mesajları dinle
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log('Foreground mesajı alındı:', payload);
-      
-      // Rol kontrolü
-      const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
-      const messageRole = payload.data?.userRole;
-      
-      // Rol kontrolü yap - eğer mesaj bu kullanıcının rolü için değilse işleme
-      if (messageRole && messageRole !== userRole && userRole !== 'admin') {
-        console.log(`Bu bildirim ${messageRole} rolü için, kullanıcı ${userRole} rolünde. Bildirim gösterilmeyecek.`);
-        return;
-      }
-      
-      // Geri çağırma ile mesajı işle
-      callback(payload);
-    });
-    
-    // Temizlik fonksiyonunu döndür (komponent unmount olduğunda çağrılabilir)
-    return unsubscribe;
-  } catch (error) {
-    console.error('FCM mesaj dinleme hatası:', error);
-    return () => {}; // Boş temizlik fonksiyonu
   }
 };
 

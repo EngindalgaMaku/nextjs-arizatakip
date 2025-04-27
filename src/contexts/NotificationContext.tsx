@@ -5,12 +5,20 @@ import { toast } from 'react-hot-toast';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
-import { getMessaging, onMessage } from 'firebase/messaging';
-import { saveFCMToken, deleteFCMToken } from '@/lib/supabase';
+import { getMessaging, onMessage, getToken } from 'firebase/messaging';
 import { requestFCMPermission, clearFCMToken } from '@/lib/firebase';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getDeviceTypeName } from '@/lib/helpers';
 import { playAlertSound } from '@/lib/notification';
+import { 
+  supabase, 
+  subscribeToRealtimeUpdates, 
+  getEnrolledClasses, 
+  saveFCMToken, 
+  deleteFCMToken
+} from "@/lib/supabase";
+import { useUser } from "@/contexts/UserContext";
+import { firebaseApp, initializeFirebaseMessaging, setupMessageListener } from "@/lib/firebase";
 
 interface Notification {
   id: string;
@@ -46,6 +54,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const fcmInitialized = useRef(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [lastNotification, setLastNotification] = useState<any | null>(null);
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
 
   // Supabase bağlantısını oluştur
   const supabase = createClient(
@@ -380,6 +389,81 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     
     setShowNotification(false);
   };
+
+  // Firebase token alma işlemi
+  useEffect(() => {
+    if (user && user.id) {
+      initializeFirebaseMessaging()
+        .then((token) => {
+          if (token) {
+            console.log("FCM token alındı:", token);
+            setFcmToken(token);
+            saveFCMToken(user.id, token, user.role);
+          }
+        })
+        .catch((error) => {
+          console.error("FCM token alınamadı:", error);
+        });
+
+      // Mesaj dinleyicisi
+      setupMessageListener((payload) => {
+        console.log("Foreground mesajı alındı:", payload);
+        if (payload.notification?.title) {
+          const notificationData = {
+            id: Date.now().toString(),
+            title: payload.notification.title,
+            message: payload.notification.body || "",
+            url: payload.data?.url || "",
+            status: "unread",
+            read: false,
+            timestamp: new Date().toISOString(),
+          };
+          
+          // Mesajı bildirim listesine ekle
+          setNotifications((prev) => {
+            // Aynı ID ile bildirim varsa güncelle, yoksa ekle
+            const existingNotificationIndex = prev.findIndex(n => n.id === notificationData.id);
+            if (existingNotificationIndex !== -1) {
+              const updatedNotifications = [...prev];
+              updatedNotifications[existingNotificationIndex] = notificationData;
+              return updatedNotifications;
+            }
+            // Yeni bildirim ekle
+            return [notificationData, ...prev];
+          });
+          
+          // Bildirim sesini çal
+          playAlertSound();
+          
+          // Okunmamış bildirimleri güncelle
+          setNotificationCount((prev) => prev + 1);
+          setLastNotification(notificationData);
+        }
+      });
+
+      // Temizleme işlemi
+      return () => {
+        if (fcmToken) {
+          console.log("FCM token temizleniyor...");
+          deleteFCMToken(user.id, fcmToken).catch(console.error);
+        }
+      };
+    }
+  }, [user]);
+
+  // Supabase realtime aboneliği
+  useEffect(() => {
+    // ... existing code ...
+    
+    // URL değişikliğinde yeniden abonelik
+    if (pathname && supabaseSubscription.current && supabase) {
+      console.log("URL değişti, Supabase aboneliği yenileniyor:", pathname);
+      supabaseSubscription.current.unsubscribe();
+      setupRealtimeSubscription();
+    }
+    
+    // ... existing code ...
+  }, [user, pathname, setupRealtimeSubscription]);
 
   return (
     <NotificationContext.Provider
