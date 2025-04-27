@@ -7,8 +7,7 @@ import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, Bell
 import { getSession, getIssues, getUsers, getAllIssues, supabase } from '@/lib/supabase';
 import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/lib/helpers';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { playAlertSound } from '@/lib/notification';
-import { showBrowserNotification } from '@/lib/notification';
+import { playAlertSound, showBrowserNotification } from '@/lib/notification';
 import Swal from 'sweetalert2';
 
 // Demo modu sabit değişkeni
@@ -32,32 +31,6 @@ export default function DashboardPage() {
   const [recentIssues, setRecentIssues] = useState<any[]>([]);
   const router = useRouter();
   const { updateDashboardCounts } = useNotifications();
-
-  // Test bildirim fonksiyonu
-  const triggerTestNotification = useCallback(() => {
-    console.log('Test bildirimi tetikleniyor...');
-    
-    // Bildirim sesi çal
-    playAlertSound();
-    
-    // Tarayıcı bildirimi göster
-    showBrowserNotification({
-      title: 'Test Bildirimi',
-      body: 'Bu bir test bildirimidir. Bildirim sisteminin çalıştığını doğrulamak için gönderilmiştir.'
-    });
-    
-    // Toast bildirimi göster
-    Swal.fire({
-      title: 'Test Bildirimi',
-      text: 'Bildirim sistemi başarıyla test edildi. Ses ve tarayıcı bildirimi gönderildi.',
-      icon: 'success',
-      toast: true,
-      position: 'top-end',
-      showConfirmButton: false,
-      timer: 5000,
-      timerProgressBar: true
-    });
-  }, []);
 
   // Yeni bildirim geldiğinde dashboard sayılarını güncelle
   const handleCountUpdate = useCallback((increment: boolean) => {
@@ -184,14 +157,9 @@ export default function DashboardPage() {
     checkAuth().then(isAuthenticated => {
       if (isAuthenticated) {
         loadDashboardData();
-        
-        // Sayfa yüklendiğinde test bildirimini tetikle (3 saniye gecikmeyle)
-        setTimeout(() => {
-          triggerTestNotification();
-        }, 3000);
       }
     });
-  }, [router, triggerTestNotification]);
+  }, [router]);
 
   // Supabase realtime aboneliği
   useEffect(() => {

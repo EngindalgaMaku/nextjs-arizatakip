@@ -6,6 +6,8 @@ const NOTIFICATION_ALERT_SOUND = '/notification-alert.mp3';
 interface NotificationOptions {
   title: string;
   body: string;
+  url?: string;
+  onClick?: () => void;
 }
 
 /**
@@ -113,6 +115,17 @@ export const showBrowserNotification = async (options: NotificationOptions) => {
       notification.onclick = () => {
         console.log('Bildirime tıklandı, pencere odaklanıyor');
         window.focus();
+        
+        // Özel onClick fonksiyonu varsa çağır
+        if (options.onClick) {
+          options.onClick();
+        }
+        
+        // URL varsa o sayfaya yönlendir
+        if (options.url) {
+          console.log(`Bildirim URL'sine yönlendiriliyor: ${options.url}`);
+          window.location.href = options.url;
+        }
       };
     } else if (Notification.permission !== 'denied') {
       console.log('Bildirim izni yok, izin isteniyor...');

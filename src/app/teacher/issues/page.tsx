@@ -506,50 +506,57 @@ export default function TeacherIssuesPage() {
                     // İlk ses çalınamazsa ikinci sesi denemeyi dene
                     secondAudio.play()
                       .then(() => console.log('İkinci ses çalınıyor (ilk ses başarısız olduğu için)'))
-                      .catch(err2 => console.error('İkinci ses de çalınamadı:', err2));
+                      .catch(err2 => {
+                        console.error('İkinci ses de çalınamadı:', err2);
+                        // Sadece iki ses de çalınamazsa DOM yöntemini kullan
+                        tryDOMPlayback();
+                      });
                   });
               }
               
-              // DOM yöntemiyle de çalmayı dene (yedek)
-              try {
-                // Ses elementlerini oluştur
-                const audioElement1 = document.createElement('audio');
-                audioElement1.id = 'notification-sound-1';
-                audioElement1.src = '/notification-alert.mp3';
-                audioElement1.volume = 1.0;
-                
-                const audioElement2 = document.createElement('audio');
-                audioElement2.id = 'notification-sound-2';
-                audioElement2.src = '/notification-return.mp3';
-                audioElement2.volume = 1.0;
-                
-                // İlk ses bitince ikinci sesi çal
-                audioElement1.onended = () => {
-                  audioElement2.play()
-                    .then(() => console.log('DOM: İkinci ses başarıyla çalındı'))
-                    .catch(err => console.error('DOM: İkinci ses çalma hatası:', err));
-                };
-                
-                // Temizlik için
-                audioElement2.onended = () => {
-                  if (document.body.contains(audioElement1)) {
-                    document.body.removeChild(audioElement1);
-                  }
-                  if (document.body.contains(audioElement2)) {
-                    document.body.removeChild(audioElement2);
-                  }
-                };
-                
-                // DOM'a ekle
-                document.body.appendChild(audioElement1);
-                document.body.appendChild(audioElement2);
-                
-                // İlk sesi çal
-                audioElement1.play()
-                  .then(() => console.log('DOM: İlk ses başarıyla çalınıyor'))
-                  .catch(err => console.error('DOM: İlk ses çalma hatası:', err));
-              } catch (domError) {
-                console.error('DOM ses çalma hatası:', domError);
+              // DOM yöntemiyle çalma fonksiyonu - sadece Audio API başarısız olduğunda kullanılır
+              function tryDOMPlayback() {
+                try {
+                  console.log('DOM yöntemiyle ses çalmayı deniyorum...');
+                  // Ses elementlerini oluştur
+                  const audioElement1 = document.createElement('audio');
+                  audioElement1.id = 'notification-sound-1';
+                  audioElement1.src = '/notification-alert.mp3';
+                  audioElement1.volume = 1.0;
+                  
+                  const audioElement2 = document.createElement('audio');
+                  audioElement2.id = 'notification-sound-2';
+                  audioElement2.src = '/notification-return.mp3';
+                  audioElement2.volume = 1.0;
+                  
+                  // İlk ses bitince ikinci sesi çal
+                  audioElement1.onended = () => {
+                    audioElement2.play()
+                      .then(() => console.log('DOM: İkinci ses başarıyla çalındı'))
+                      .catch(err => console.error('DOM: İkinci ses çalma hatası:', err));
+                  };
+                  
+                  // Temizlik için
+                  audioElement2.onended = () => {
+                    if (document.body.contains(audioElement1)) {
+                      document.body.removeChild(audioElement1);
+                    }
+                    if (document.body.contains(audioElement2)) {
+                      document.body.removeChild(audioElement2);
+                    }
+                  };
+                  
+                  // DOM'a ekle
+                  document.body.appendChild(audioElement1);
+                  document.body.appendChild(audioElement2);
+                  
+                  // İlk sesi çal
+                  audioElement1.play()
+                    .then(() => console.log('DOM: İlk ses başarıyla çalınıyor'))
+                    .catch(err => console.error('DOM: İlk ses çalma hatası:', err));
+                } catch (domError) {
+                  console.error('DOM ses çalma hatası:', domError);
+                }
               }
             } catch (error) {
               console.error('Ses bildirimi çalınırken hata:', error);
@@ -558,8 +565,9 @@ export default function TeacherIssuesPage() {
           
           // Bildirim göster
           showBrowserNotification({
-            title: 'Arıza kaydınız güncellendi',
-            body: `"${updatedIssue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(updatedIssue.status)}" olarak güncellendi.`
+            title: 'Arıza bildirimine dönüş yapılmıştır',
+            body: `"${updatedIssue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(updatedIssue.status)}" olarak güncellendi.`,
+            url: `/teacher/issues?id=${updatedIssue.id}`
           });
           
           // State'i güncelle
