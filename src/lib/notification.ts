@@ -141,19 +141,46 @@ export function playAlertSound(showVisualFallback = true) {
  * Ses çalınamadığında gösterilen görsel bildirim
  */
 function showVisualNotificationFallback() {
-  // JSX kullanmadan standart toast bildirim göster
-  toast.success('🔔 Yeni bildirim geldi! Lütfen kontrol edin.', {
-    duration: 4000,
+  // Daha çekici bir başarı bildirimi göster
+  toast.success('Yeni bildirim geldi! Lütfen kontrol edin.', {
+    duration: 5000,
     position: 'bottom-center',
+    id: 'notification-toast',
     style: {
-      background: '#3b82f6', // blue-500
+      background: 'linear-gradient(to right, #3b82f6, #2563eb)',
       color: '#ffffff',
       fontWeight: 'bold',
-      padding: '16px',
-      borderRadius: '8px',
+      padding: '1rem',
+      borderRadius: '0.5rem',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      maxWidth: '350px',
+      width: '100%',
     },
-    icon: '🔔',
+    className: 'notification-toast-success',
+    iconTheme: {
+      primary: '#ffffff',
+      secondary: '#3b82f6',
+    },
+    icon: '🔔'
   });
+  
+  // Dikkat çekmek için ekstra bir bildirim de ekle
+  setTimeout(() => {
+    toast('Arıza bildirimlerini kontrol etmek için tıklayınız', {
+      duration: 4000,
+      position: 'bottom-center',
+      style: {
+        background: '#1e40af',
+        color: '#ffffff',
+        padding: '0.75rem',
+        borderRadius: '0.5rem',
+        marginTop: '0.5rem',
+        fontSize: '0.875rem',
+      },
+      icon: '👆',
+    });
+  }, 1000);
   
   // Sayfada görsel yanıp sönme efekti (title değiştirme)
   const originalTitle = document.title;
