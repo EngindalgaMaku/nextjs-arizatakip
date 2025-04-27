@@ -4,14 +4,15 @@
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-// FCM yapılandırması - bu değerler frontend ile aynı olmalı
+// FCM yapılandırması - buradaki değerler servis worker'da hardcoded olmalı
+// Bu değerleri önce Firebase konsolundan aldığınız değerlerle değiştirin
 firebase.initializeApp({
-  apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY_BURADA',
-  authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN_BURADA',
-  projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID_BURADA',
-  storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET_BURADA',
-  messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID_BURADA',
-  appId: 'NEXT_PUBLIC_FIREBASE_APP_ID_BURADA',
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
+  projectId: "YOUR_FIREBASE_PROJECT_ID",
+  storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
+  appId: "YOUR_FIREBASE_APP_ID"
 });
 
 // Firebase Messaging nesnesini al

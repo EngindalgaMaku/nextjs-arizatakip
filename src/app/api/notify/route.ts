@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
 import { ServiceAccount } from 'firebase-admin';
+import { getMessaging } from 'firebase-admin/messaging';
 
 // Firebase Admin SDK başlatma
 if (!admin.apps.length) {
@@ -102,35 +103,55 @@ export async function POST(request: NextRequest) {
       // Tokenları birleştir
       const tokens = adminTokens.map((item: FCMToken) => item.token);
       
-      // FCM bildirimi gönder
-      const response = await admin.messaging().sendMulticast({
-        tokens,
-        notification,
-        data,
-        webpush: {
-          notification: {
-            ...notification,
-            icon: '/okullogo.png',
-            badge: '/icons/badge-128x128.png',
-            actions: [
-              {
-                action: 'view',
-                title: 'Görüntüle',
-              },
-            ],
+      // Her bir token için ayrı mesaj gönderme
+      let successCount = 0;
+      let failureCount = 0;
+      
+      // Her bir token için ayrı ayrı gönder
+      const sendPromises = tokens.map(async (token) => {
+        const message = {
+          token,
+          notification,
+          data,
+          webpush: {
+            notification: {
+              ...notification,
+              icon: '/okullogo.png',
+              badge: '/icons/badge-128x128.png',
+              actions: [
+                {
+                  action: 'view',
+                  title: 'Görüntüle',
+                },
+              ],
+            },
+            fcmOptions: {
+              link: data.url,
+            },
           },
-          fcmOptions: {
-            link: data.url,
-          },
-        },
+        };
+        
+        try {
+          // Tek bir cihaza gönder
+          await getMessaging().send(message);
+          successCount++;
+          return true;
+        } catch (error) {
+          console.error('Bildirim gönderme hatası:', error);
+          failureCount++;
+          return false;
+        }
       });
       
-      console.log(`${response.successCount} bildirim başarıyla gönderildi`);
+      // Tüm gönderim işlemlerinin tamamlanmasını bekle
+      await Promise.all(sendPromises);
+      
+      console.log(`${successCount} bildirim başarıyla gönderildi, ${failureCount} başarısız`);
       
       return NextResponse.json({
         success: true,
-        sent: response.successCount,
-        failed: response.failureCount,
+        sent: successCount,
+        failed: failureCount,
       });
     }
     
@@ -185,35 +206,55 @@ export async function POST(request: NextRequest) {
       // Tokenları birleştir
       const tokens = teacherTokens.map((item: FCMToken) => item.token);
       
-      // FCM bildirimi gönder
-      const response = await admin.messaging().sendMulticast({
-        tokens,
-        notification,
-        data,
-        webpush: {
-          notification: {
-            ...notification,
-            icon: '/okullogo.png',
-            badge: '/icons/badge-128x128.png',
-            actions: [
-              {
-                action: 'view',
-                title: 'Görüntüle',
-              },
-            ],
+      // Her bir token için ayrı mesaj gönderme
+      let successCount = 0;
+      let failureCount = 0;
+      
+      // Her bir token için ayrı ayrı gönder
+      const sendPromises = tokens.map(async (token) => {
+        const message = {
+          token,
+          notification,
+          data,
+          webpush: {
+            notification: {
+              ...notification,
+              icon: '/okullogo.png',
+              badge: '/icons/badge-128x128.png',
+              actions: [
+                {
+                  action: 'view',
+                  title: 'Görüntüle',
+                },
+              ],
+            },
+            fcmOptions: {
+              link: data.url,
+            },
           },
-          fcmOptions: {
-            link: data.url,
-          },
-        },
+        };
+        
+        try {
+          // Tek bir cihaza gönder
+          await getMessaging().send(message);
+          successCount++;
+          return true;
+        } catch (error) {
+          console.error('Bildirim gönderme hatası:', error);
+          failureCount++;
+          return false;
+        }
       });
       
-      console.log(`${response.successCount} durum güncelleme bildirimi gönderildi`);
+      // Tüm gönderim işlemlerinin tamamlanmasını bekle
+      await Promise.all(sendPromises);
+      
+      console.log(`${successCount} durum güncelleme bildirimi gönderildi, ${failureCount} başarısız`);
       
       return NextResponse.json({
         success: true,
-        sent: response.successCount,
-        failed: response.failureCount,
+        sent: successCount,
+        failed: failureCount,
       });
     }
     
