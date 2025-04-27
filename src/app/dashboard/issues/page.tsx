@@ -575,8 +575,15 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
 
 export default function IssuesPage() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
-  const searchParams = useSearchParams();
-  const selectedId = searchParams.get('id');
+  const [issueId, setIssueId] = useState<string | null>(null);
+  
+  // useSearchParams'ı useEffect içinde kullan
+  useEffect(() => {
+    // Client-side kodu olduğunu belirt
+    const searchParams = new URLSearchParams(window.location.search);
+    const id = searchParams.get('id');
+    setIssueId(id);
+  }, []);
 
   return (
     <div className="container mx-auto">
@@ -586,7 +593,7 @@ export default function IssuesPage() {
           <NotificationTestButton />
         </div>
       </div>
-      <IssueList selectedId={selectedId} onSelectIssue={setSelectedIssue} />
+      <IssueList selectedId={issueId} onSelectIssue={setSelectedIssue} />
     </div>
   );
 } 
