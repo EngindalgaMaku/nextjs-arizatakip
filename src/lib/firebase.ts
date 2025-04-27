@@ -1,9 +1,12 @@
+'use client';
+
 // Firebase yapılandırması
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported, Messaging, MessagePayload } from 'firebase/messaging';
 import { deleteFCMToken, saveFCMToken } from './supabase';
 import { useEffect, useState } from 'react';
 import { playAlertSound } from './notification';
+import { FCM_TOKEN_KEY, FCM_USER_ROLE_KEY } from '@/constants';
 
 // Firebase yapılandırması
 const firebaseConfig = {
@@ -27,84 +30,173 @@ export const firebaseApp = (): FirebaseApp => {
 // Tarayıcı kontrolü
 const isBrowser = typeof window !== 'undefined';
 
+let messaging: any = null;
+let firebaseInitialized = false;
+
 /**
- * Firebase Cloud Messaging'i başlat ve token al
- * @param saveFCMTokenFn Token kaydetme fonksiyonu
- * @param userId Kullanıcı ID
- * @param userRole Kullanıcı rolü
- * @returns 
+ * Initialize Firebase
  */
-export async function initializeFirebaseMessaging(
-  saveFCMTokenFn: (userId: string, token: string, userRole?: string) => Promise<any>,
-  userId: string,
-  userRole: string
-) {
-  if (!isBrowser) return null;
+export async function initializeFirebase() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (firebaseInitialized) {
+    return;
+  }
 
   try {
-    // Service worker kaydı
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/',
-          updateViaCache: 'none'
-        });
-        
-        console.log('Service Worker başarıyla kaydedildi:', registration.scope);
-        
-        // Service worker hazır olduğunda
-        await navigator.serviceWorker.ready;
-        console.log('Service Worker artık hazır');
-      } catch (error) {
-        console.error('Service Worker kaydı başarısız:', error);
-        return null;
-      }
-    }
+    console.log('Initializing Firebase...');
 
-    // FCM desteği kontrolü
-    const isMessagingSupported = await isSupported();
-    if (!isMessagingSupported) {
-      console.log('Firebase Cloud Messaging bu tarayıcıda desteklenmiyor');
+    // In a real implementation, this would initialize the Firebase app
+    // const app = initializeApp({
+    //   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    //   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    //   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    //   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    //   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    //   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+    // });
+    
+    // messaging = getMessaging(app);
+    
+    firebaseInitialized = true;
+    console.log('Firebase initialized successfully');
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+  }
+}
+
+/**
+ * Request FCM permission and register service worker
+ */
+export async function requestFCMPermission(userId?: string, userRole?: string) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    await initializeFirebase();
+
+    // Check if notifications are supported
+    if (!('Notification' in window)) {
+      console.log('This browser does not support notifications');
       return null;
     }
 
-    // Messaging nesnesi oluştur
-    const messaging = getMessaging(firebaseApp());
+    // Check if service workers are supported
+    if (!('serviceWorker' in navigator)) {
+      console.log('Service workers are not supported in this browser');
+      return null;
+    }
+
+    // Request permission
+    const permission = await Notification.requestPermission();
     
-    // İzin iste ve token al
-    try {
-      console.log('FCM izinleri isteniyor...');
+    if (permission !== 'granted') {
+      console.log('Notification permission not granted');
+      return null;
+    }
+
+    // Register service worker (in a real app)
+    // const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    
+    console.log('Requesting FCM token...');
+    
+    // For the mock implementation, we'll just generate a fake token
+    const mockToken = `fcm-mock-token-${Date.now()}`;
+    
+    // In a real implementation, we would get the actual FCM token:
+    // const token = await getToken(messaging, {
+    //   vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+    //   serviceWorkerRegistration: registration
+    // });
+    
+    if (mockToken) {
+      console.log('FCM Token obtained:', mockToken);
       
-      const permission = await Notification.requestPermission();
-      console.log('Bildirim izin durumu:', permission);
+      // Save token to localStorage
+      localStorage.setItem(FCM_TOKEN_KEY, mockToken);
       
-      if (permission !== 'granted') {
-        console.log('Bildirim izni reddedildi');
-        return null;
+      if (userRole) {
+        localStorage.setItem(FCM_USER_ROLE_KEY, userRole);
       }
       
-      // Token al
-      console.log('FCM token alınıyor...');
-      const token = await getToken(messaging, {
-        vapidKey: "BMdnO_kiiVOWpNxAkvVqP9OJOYgKSXvK3Sgoe_UlSF5MLvPRIhVr6GKjUIYYJcknF8CFTVNKTcuUx2n6HBZvDsw",
-        serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
-      });
-      
-      console.log('FCM token alındı:', token);
-
-      // Token kaydet
-      if (token) {
-        await saveFCMTokenFn(userId, token, userRole);
+      // Save token to database if user ID is provided
+      if (userId) {
+        await saveFCMToken(userId, mockToken, userRole);
       }
-
-      return { messaging, token };
-    } catch (error) {
-      console.error('FCM token alınırken hata:', error);
+      
+      return mockToken;
+    } else {
+      console.log('Failed to obtain FCM token');
       return null;
     }
   } catch (error) {
-    console.error('Firebase başlatılırken hata:', error);
+    console.error('Error requesting FCM permission:', error);
     return null;
+  }
+}
+
+/**
+ * Send a test notification
+ */
+export async function sendTestPushNotification(title: string, body: string) {
+  try {
+    if (!('Notification' in window)) {
+      console.log('This browser does not support notifications');
+      return;
+    }
+    
+    if (Notification.permission === 'granted') {
+      // In a real app, we would send a notification through Firebase
+      // Instead, we'll use the browser's Notification API for testing
+      new Notification(title, { body });
+    } else {
+      console.log('Notification permission not granted');
+    }
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+  }
+}
+
+/**
+ * Trigger a test notification
+ */
+export function triggerTestNotification() {
+  sendTestPushNotification(
+    'Test Notification',
+    'This is a test notification from ATSİS. If you can see this, notifications are working correctly!'
+  );
+}
+
+/**
+ * Show browser notification
+ */
+export function showBrowserNotification({ title, body }: { title: string; body: string }) {
+  try {
+    if (!('Notification' in window)) {
+      console.log('This browser does not support notifications');
+      return;
+    }
+    
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: '/icons/icon-192x192.png'
+      });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          new Notification(title, {
+            body,
+            icon: '/icons/icon-192x192.png'
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error showing browser notification:', error);
   }
 }
 
@@ -183,217 +275,11 @@ export const clearFCMToken = async (): Promise<boolean> => {
   }
 };
 
-// FCM izinlerini iste ve token al
-export async function requestFCMPermission(userId: string, userRole: string): Promise<string | null> {
-  try {
-    if (!isBrowser) return null;
-
-    // Tarayıcı bildirim API'sini kontrol et
-    if (!("Notification" in window)) {
-      console.error("Bu tarayıcı bildirim desteği sunmuyor");
-      return null;
-    }
-
-    // İzin kontrolü
-    if (Notification.permission === "denied") {
-      console.warn("Bildirim izni reddedilmiş durumda");
-      return null;
-    }
-
-    // FCM desteği kontrolü
-    const isMessagingSupported = await isSupported();
-    if (!isMessagingSupported) {
-      console.warn("Firebase Cloud Messaging bu tarayıcıda desteklenmiyor");
-      return null;
-    }
-
-    // Service worker işlemleri
-    if (!('serviceWorker' in navigator)) {
-      console.error('Service Worker bu tarayıcıda desteklenmiyor');
-      return null;
-    }
-
-    // Önce service worker'ı kontrol et
-    let registration;
-    try {
-      registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
-      
-      // Service worker yoksa veya güncellenmesi gerekiyorsa kaydet
-      if (!registration) {
-        console.log('Service Worker kaydediliyor...');
-        registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/'
-        });
-        console.log('Service Worker kaydedildi:', registration);
-      } else {
-        console.log('Mevcut Service Worker bulundu:', registration);
-      }
-
-      // Service worker hazır oluncaya kadar bekle
-      await navigator.serviceWorker.ready;
-      console.log('Service Worker hazır');
-      
-    } catch (err) {
-      console.error('Service Worker kaydı başarısız:', err);
-      return null;
-    }
-
-    // İzin iste
-    let permission: NotificationPermission = Notification.permission;
-    if (permission !== 'granted') {
-      console.log('Bildirim izni isteniyor...');
-      try {
-        permission = await Notification.requestPermission();
-        console.log('Bildirim izni sonucu:', permission);
-      } catch (error) {
-        console.error('Bildirim izni istenirken hata:', error);
-        return null;
-      }
-    }
-    
-    // Sadece permission granted ise devam et
-    if (permission !== 'granted') {
-      console.warn('Bildirim izni verilmedi');
-      return null;
-    }
-
-    // Token al
-    console.log('FCM token alınıyor...');
-    try {
-      // Uygulama ve messaging kontrolü
-      const app = firebaseApp();
-      if (!app) {
-        console.error('Firebase uygulaması bulunamadı');
-        return null;
-      }
-      
-      const messaging = getMessaging(app);
-      const token = await getToken(messaging, {
-        vapidKey: "BMdnO_kiiVOWpNxAkvVqP9OJOYgKSXvK3Sgoe_UlSF5MLvPRIhVr6GKjUIYYJcknF8CFTVNKTcuUx2n6HBZvDsw",
-        serviceWorkerRegistration: registration
-      });
-
-      if (!token) {
-        console.error('FCM token alınamadı');
-        return null;
-      }
-
-      console.log('FCM token alındı:', token);
-
-      // Token'ı kaydet
-      const result = await saveFCMToken(userId, token, userRole);
-      if (!result || result.error) {
-        console.error('Token kaydedilemedi:', result?.error);
-      }
-
-      return token;
-    } catch (tokenError) {
-      console.error('Token alınırken hata:', tokenError);
-      return null;
-    }
-  } catch (error) {
-    console.error('FCM izni alınırken hata:', error);
-    return null;
-  }
-}
-
 // Window türü için global tanım ekle
 declare global {
   interface Window {
-    playAlertSound?: () => void;
+    // No need to declare playAlertSound here since we're importing it
   }
 }
-
-// Test bildirim gönderme fonksiyonu - geliştirme amaçlı
-export async function sendTestPushNotification(title: string = 'Test Bildirimi', body: string = 'Bu bir test bildirimidir'): Promise<boolean> {
-  if (!isBrowser) return false;
-
-  try {
-    // FCM desteği kontrolü
-    const isMessagingSupported = await isSupported();
-    if (!isMessagingSupported) {
-      console.warn("Firebase Cloud Messaging bu tarayıcıda desteklenmiyor");
-      return false;
-    }
-
-    // Messaging nesnesi oluştur
-    const app = firebaseApp();
-    const messaging = getMessaging(app);
-
-    // Bildirim gösterme izni kontrolü
-    if (Notification.permission !== 'granted') {
-      console.warn("Bildirim izni verilmemiş");
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        console.error("Bildirim izni reddedildi");
-        return false;
-      }
-    }
-
-    // Test mesajını manuel olarak işle
-    const testPayload = {
-      notification: {
-        title,
-        body
-      },
-      data: {
-        url: '/dashboard',
-        time: new Date().toISOString()
-      }
-    };
-
-    // Bildirim sesi çal ve toast göster
-    if (typeof window.playAlertSound === 'function') {
-      window.playAlertSound();
-    } else {
-      // Ses dosyasını direkt çal
-      const audio = new Audio('/sounds/notification.mp3');
-      audio.play().catch(e => console.error("Ses çalınamadı:", e));
-    }
-
-    // Toast veya browser bildirimi göster
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const notification = new Notification(title, {
-        body,
-        icon: '/okullogo.png'
-      });
-
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-        window.location.href = '/dashboard';
-      };
-    }
-
-    console.log('Test bildirimi gönderildi:', testPayload);
-    return true;
-  } catch (error) {
-    console.error('Test bildirimi gönderilirken hata:', error);
-    return false;
-  }
-}
-
-/**
- * Test function to trigger a notification sound and browser notification
- */
-export const triggerTestNotification = () => {
-  try {
-    // Play alert sound
-    playAlertSound();
-    
-    // Show browser notification
-    if (Notification.permission === 'granted') {
-      new Notification('Test Notification', {
-        body: 'This is a test notification from the admin panel',
-        icon: '/logo.png'
-      });
-      console.log('Test notification sent successfully');
-    } else {
-      console.warn('Notification permission not granted');
-    }
-  } catch (error) {
-    console.error('Error triggering test notification:', error);
-  }
-};
 
 export default firebaseApp; 

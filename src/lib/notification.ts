@@ -1,3 +1,5 @@
+'use client';
+
 import { Issue } from './supabase';
 
 // Sesli bildirim için sabit
@@ -11,80 +13,62 @@ interface NotificationOptions {
 }
 
 /**
- * Bildirim sesini çalar (sadece alert sesi)
+ * Play notification sound
  */
-export const playAlertSound = () => {
+export function playAlertSound() {
   try {
-    if (typeof window === 'undefined') return;
-    
-    console.log('Bildirim sesi çalınıyor: notification-alert.mp3');
-    
-    // Yeni bir ses nesnesi oluştur
-    const sound = new Audio(NOTIFICATION_ALERT_SOUND);
-    
-    // Ses seviyesini maksimuma ayarla
-    sound.volume = 1.0;
-    
-    // Önce ses dosyasını yükle
-    sound.load();
-    
-    // Ses dosyası yükleme hatası
-    sound.onerror = (error) => {
-      console.error('Bildirim sesi çalınamadı (onError):', error);
-    };
-    
-    // Alternatif yöntem 1: Doğrudan play metodu
-    const playPromise = sound.play();
-    
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          console.log('Bildirim sesi başarıyla çalındı');
-        })
-        .catch(error => {
-          console.error('Bildirim sesi çalınamadı (promise):', error);
-          
-          // Alternatif yöntem 2: Yeni bir Audio nesnesi ile tekrar dene
-          try {
-            const alternativeSound = new Audio('/notification-alert.mp3');
-            alternativeSound.volume = 1.0;
-            alternativeSound.play()
-              .then(() => console.log('Alternatif yöntemle ses çalındı'))
-              .catch(err => console.error('Alternatif yöntem de başarısız oldu:', err));
-          } catch (fallbackError) {
-            console.error('Tüm ses çalma yöntemleri başarısız oldu:', fallbackError);
-          }
-        });
-    }
+    const audio = new Audio('/notification.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Audio play failed:', e));
   } catch (error) {
-    console.error('Bildirim sesi çalınamadı (genel hata):', error);
-    
-    // Son çare olarak direkt bir ses nesnesi oluşturup çal
-    try {
-      const emergencySound = document.createElement('audio');
-      emergencySound.src = '/notification-alert.mp3';
-      emergencySound.volume = 1.0;
-      document.body.appendChild(emergencySound);
-      
-      // Hemen oynat
-      emergencySound.play()
-        .then(() => {
-          // Oynatma başarılı olduğunda elementi temizle
-          setTimeout(() => {
-            document.body.removeChild(emergencySound);
-          }, 2000); // 2 saniye sonra temizle
-          console.log('Acil yöntemle ses çalındı');
-        })
-        .catch(() => {
-          // Temizleme
-          document.body.removeChild(emergencySound);
-          console.error('Acil yöntem de başarısız oldu');
-        });
-    } catch (emergencyError) {
-      console.error('Hiçbir ses çalma yöntemi çalışmıyor:', emergencyError);
-    }
+    console.error('Error playing notification sound:', error);
   }
-};
+}
+
+/**
+ * Format notification time
+ */
+export function formatNotificationTime(timestamp: string | number | Date): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) {
+    return 'Az önce';
+  } else if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} dakika önce`;
+  } else if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} saat önce`;
+  } else if (diffInSeconds < 604800) {
+    const days = Math.floor(diffInSeconds / 86400);
+    return `${days} gün önce`;
+  } else {
+    return date.toLocaleDateString('tr-TR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+}
+
+/**
+ * Get notification color based on type
+ */
+export function getNotificationColor(type: string): string {
+  switch (type.toLowerCase()) {
+    case 'success':
+      return 'green';
+    case 'error':
+      return 'red';
+    case 'warning':
+      return 'orange';
+    case 'info':
+    default:
+      return 'blue';
+  }
+}
 
 /**
  * Tarayıcı bildirimi gösterir
