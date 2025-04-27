@@ -36,9 +36,7 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const searchParams = useSearchParams();
-  const selectedId = searchParams.get('id');
-
+  
   // Arızaları yükle
   const loadIssues = useCallback(async () => {
     try {
@@ -384,7 +382,193 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
 
   return (
     <div className="space-y-6">
-      {/* ... existing UI code ... */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        {filteredIssues.length === 0 ? (
+          <div className="py-10 px-4 text-center">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">Arıza kaydı bulunamadı</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {searchTerm || selectedStatus !== 'all' || selectedType !== 'all' || selectedLocation !== 'all' || selectedReporter !== 'all' 
+                ? 'Arama kriterlerinize uygun arıza kaydı bulunamadı' 
+                : 'Henüz arıza kaydı bulunmamaktadır'}
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {filteredIssues.map((issue) => (
+              <li key={issue.id} className="px-4 py-4">
+                <div 
+                  className="bg-white overflow-hidden border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                  onClick={() => viewIssueDetails(issue)}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                          <span className="text-indigo-700 font-medium">{getDeviceTypeName(issue.device_type as any).charAt(0)}</span>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
+                          <div className="text-xs text-gray-500">{getDeviceTypeName(issue.device_type as any)}</div>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${getStatusColor(issue.status as any)}`}>
+                        {getStatusName(issue.status as any)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-wrap text-sm text-gray-500 mt-2">
+                      <div className="w-1/2 mb-1">
+                        <span className="font-medium">Konum:</span> {getLocationName(issue.device_location as any)} ({issue.room_number})
+                      </div>
+                      <div className="w-1/2 mb-1">
+                        <span className="font-medium">Öncelik:</span> <span className={`px-1.5 py-0.5 rounded-full text-xs ${getPriorityColor(issue.priority as any)}`}>
+                          {(issue.priority as any) === 'dusuk' ? 'Düşük' :
+                            (issue.priority as any) === 'normal' ? 'Normal' :
+                            (issue.priority as any) === 'yuksek' ? 'Yüksek' :
+                            (issue.priority as any) === 'kritik' ? 'Kritik' : issue.priority}
+                        </span>
+                      </div>
+                      <div className="w-full mb-1">
+                        <span className="font-medium">Oluşturan:</span> {issue.reported_by}
+                      </div>
+                      <div className="w-full">
+                        <span className="font-medium">Tarih:</span> {issue.created_at}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end space-x-2">
+                      <button
+                        className="p-2 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          viewIssueDetails(issue);
+                        }}
+                        title="Detay Görüntüle"
+                      >
+                        <EyeIcon className="w-5 h-5" />
+                      </button>
+                      <button
+                        className="p-2 rounded-md text-red-600 hover:bg-red-50 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteIssue(issue.id);
+                        }}
+                        title="Sil"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      
+      {/* View Modal */}
+      {isViewModalOpen && currentIssue && (
+        <div className="modal-overlay" onClick={closeViewModal}>
+          <div
+            className="modal-content max-w-2xl mx-auto mt-4 sm:mt-20 p-4 sm:p-5 rounded-lg shadow-lg bg-white overflow-y-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+              <h2 className="text-xl font-bold">Arıza Detayları</h2>
+              <button
+                onClick={closeViewModal}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <ViewIssueForm 
+              issue={currentIssue} 
+              onEdit={() => {
+                setIsViewModalOpen(false);
+                setIsEditModalOpen(true);
+              }}
+            />
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={closeViewModal}
+                className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 mr-2"
+              >
+                Kapat
+              </button>
+              <button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setIsEditModalOpen(true);
+                }}
+                className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              >
+                Düzenle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && currentIssue && (
+        <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
+          <div
+            className="modal-content max-w-2xl mx-auto mt-4 sm:mt-20 p-4 sm:p-5 rounded-lg shadow-lg bg-white overflow-y-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-200">
+              <h2 className="text-xl font-bold">Arıza Düzenle</h2>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <EditIssueForm
+              issue={currentIssue}
+              onSuccess={() => {
+                setIsEditModalOpen(false);
+                loadIssues();
+              }}
+              onClose={() => setIsEditModalOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Add Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50" onClick={closeAddModal}>
+          <div className="bg-white rounded-lg shadow-xl overflow-hidden max-w-2xl w-full overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Yeni Arıza Ekle</h2>
+              <button
+                onClick={closeAddModal}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <AddIssueForm 
+                onClose={closeAddModal} 
+                onSuccess={handleAddSuccess}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
