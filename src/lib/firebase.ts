@@ -84,7 +84,7 @@ export async function initializeFirebaseMessaging(
       // Token al
       console.log('FCM token alınıyor...');
       const token = await getToken(messaging, {
-        vapidKey: "BH5kBtbDmafRQnJzr3wrNGCcCmOygNwZaYtwOXzFOKRmhokPfiQ4ngP7pIaeoVjNbWYXb4CTUo4XGT2AaGAhWY7a",
+        vapidKey: "BBJViqQmN7wQKZwUId5F-e29P7cjVZSp28Jv_gQZ-qrLVvuEMudZKKeDgVcNELSCxhgj4JwkMJR7JF6WEHmGBIQ",
         serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
       });
       
@@ -267,7 +267,7 @@ export async function requestFCMPermission(userId: string, userRole: string): Pr
       
       const messaging = getMessaging(app);
       const token = await getToken(messaging, {
-        vapidKey: "BH5kBtbDmafRQnJzr3wrNGCcCmOygNwZaYtwOXzFOKRmhokPfiQ4ngP7pIaeoVjNbWYXb4CTUo4XGT2AaGAhWY7a",
+        vapidKey: "BBJViqQmN7wQKZwUId5F-e29P7cjVZSp28Jv_gQZ-qrLVvuEMudZKKeDgVcNELSCxhgj4JwkMJR7JF6WEHmGBIQ",
         serviceWorkerRegistration: registration
       });
 
