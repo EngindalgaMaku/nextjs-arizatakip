@@ -56,7 +56,6 @@ export const requestFCMPermission = async (userRole: string): Promise<string | n
 
       // Önce eski token varsa temizle
       try {
-        const { deleteFCMToken } = await import('@/lib/supabase');
         const oldToken = localStorage.getItem('fcm_token');
         const oldRole = localStorage.getItem('fcm_user_role');
         
@@ -66,6 +65,8 @@ export const requestFCMPermission = async (userRole: string): Promise<string | n
           await registration.pushManager.getSubscription().then(sub => {
             if (sub) sub.unsubscribe();
           });
+          
+          // Local storage temizle
           localStorage.removeItem('fcm_token');
           localStorage.removeItem('fcm_user_role');
         }

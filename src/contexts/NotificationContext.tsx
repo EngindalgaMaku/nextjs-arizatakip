@@ -121,7 +121,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       try {
         // Firebase ve FCM modüllerini dinamik olarak import et
         const { requestFCMPermission, listenForFCMMessages } = await import('@/lib/firebase');
-        const { getCurrentUser, saveFCMToken } = await import('@/lib/supabase');
+        const { getCurrentUser } = await import('@/lib/supabase');
         
         // Kullanıcı ID'sini al
         const user = await getCurrentUser();
@@ -133,13 +133,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setFcmToken(token);
             console.log('FCM token başarıyla alındı ve kaydedildi');
             
-            // Token'ı veritabanına kaydet
-            const saveResult = await saveFCMToken(user.id, token);
-            
-            if (saveResult.success) {
-              console.log('FCM token veritabanına kaydedildi');
-            } else {
-              console.error('FCM token kaydedilemedi:', saveResult.error);
+            // Token'ı veritabanına kaydet (API çağrısı üzerinden yapılacak)
+            try {
+              const response = await fetch('/api/save-fcm-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  userId: user.id,
+                  token,
+                  userRole: user.role || 'anonymous'
+                })
+              });
+              
+              const result = await response.json();
+              if (result.success) {
+                console.log('FCM token veritabanına kaydedildi');
+              } else {
+                console.error('FCM token kaydedilemedi:', result.error);
+              }
+            } catch (error) {
+              console.error('FCM token kaydetme API çağrısı başarısız:', error);
             }
             
             // FCM mesajlarını dinle
