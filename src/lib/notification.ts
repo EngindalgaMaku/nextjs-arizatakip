@@ -17,27 +17,58 @@ interface NotificationOptions {
  */
 export function playAlertSound() {
   try {
+    console.log("Bildirim sesi çalmaya başlıyor...");
+    
     // First play the alert sound
     const alertAudio = new Audio(NOTIFICATION_ALERT_SOUND);
     alertAudio.volume = 0.5;
     
+    // Debug için daha fazla çıktı
+    alertAudio.addEventListener('canplay', () => {
+      console.log("Alert ses dosyası yüklendi ve çalınmaya hazır");
+    });
+    
+    alertAudio.addEventListener('playing', () => {
+      console.log("Alert ses dosyası çalıyor");
+    });
+    
+    alertAudio.addEventListener('error', (e) => {
+      console.error("Alert ses dosyası çalma hatası:", e);
+    });
+    
     // Then play the main notification sound after the alert finishes
     alertAudio.onended = () => {
+      console.log("Alert ses dosyası bitti, ana bildirim sesi başlıyor");
       const notificationAudio = new Audio('/notification.mp3');
       notificationAudio.volume = 0.5;
-      notificationAudio.play().catch(e => console.log('Audio play failed:', e));
+      
+      notificationAudio.addEventListener('canplay', () => {
+        console.log("Ana bildirim ses dosyası yüklendi ve çalınmaya hazır");
+      });
+      
+      notificationAudio.addEventListener('playing', () => {
+        console.log("Ana bildirim ses dosyası çalıyor");
+      });
+      
+      notificationAudio.addEventListener('error', (e) => {
+        console.error("Ana bildirim ses dosyası çalma hatası:", e);
+      });
+      
+      notificationAudio.play().catch(e => {
+        console.log('Ana bildirim ses dosyası çalma hatası:', e);
+      });
     };
     
     // Start playing the alert sound
     alertAudio.play().catch(e => {
-      console.log('Alert audio play failed:', e);
+      console.log('Alert ses dosyası çalma hatası:', e);
       // If alert sound fails, try to play at least the notification sound
       const fallbackAudio = new Audio('/notification.mp3');
       fallbackAudio.volume = 0.5;
-      fallbackAudio.play().catch(e => console.log('Fallback audio play failed:', e));
+      fallbackAudio.play().catch(e => console.log('Yedek ses dosyası çalma hatası:', e));
     });
   } catch (error) {
-    console.error('Error playing notification sound:', error);
+    console.error('Bildirim sesi çalma hatası:', error);
   }
 }
 

@@ -5,6 +5,7 @@ import "./globals.css";
 // Provider'ları import et
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -42,6 +43,7 @@ export default function RootLayout({
         <AuthProvider>
           <NotificationProvider>
             {children}
+            <Toaster position="bottom-right" />
           </NotificationProvider>
         </AuthProvider>
       </body>

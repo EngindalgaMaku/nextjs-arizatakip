@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { playAlertSound, showBrowserNotification } from '@/lib/notification';
 
 interface NotificationTestButtonProps {
@@ -15,24 +15,27 @@ export const NotificationTestButton: React.FC<NotificationTestButtonProps> = ({
   const handleTestNotification = () => {
     setTesting(true);
     
-    // Play notification sound
-    playAlertSound();
-    
-    // Show browser notification
-    showBrowserNotification({
-      title: 'Test Bildirimi',
-      body: 'Bu bir test bildirimidir. Bildirimler düzgün çalışıyor!'
-    });
-    
-    // Call the optional callback
-    if (onTest) {
-      onTest();
-    }
-    
-    // Reset button state after a short delay
+    // Ses testi için useEffect kullan
     setTimeout(() => {
-      setTesting(false);
-    }, 2000);
+      // Play notification sound
+      playAlertSound();
+      
+      // Show browser notification
+      showBrowserNotification({
+        title: 'Test Bildirimi',
+        body: 'Bu bir test bildirimidir. Bildirimler düzgün çalışıyor!'
+      });
+      
+      // Call the optional callback
+      if (onTest) {
+        onTest();
+      }
+      
+      // Reset button state after a short delay
+      setTimeout(() => {
+        setTesting(false);
+      }, 2000);
+    }, 100);
   };
 
   return (
