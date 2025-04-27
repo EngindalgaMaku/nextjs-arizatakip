@@ -19,7 +19,6 @@ import { AuthOptions, getServerSession } from 'next-auth';
 import dashboardReducer from '@/reducers/dashboardReducer';
 import { UserRole } from '@/generated/client';
 import { cache } from 'react';
-import { NotificationTestButton } from '@/components/dashboard/NotificationTestButton';
 import DashboardCards from '@/components/dashboard/DashboardCards';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { DashboardLayout } from '@/layouts/DashboardLayout';

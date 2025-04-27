@@ -139,38 +139,6 @@ export async function requestFCMPermission(userId?: string, userRole?: string) {
 }
 
 /**
- * Send a test notification
- */
-export async function sendTestPushNotification(title: string, body: string) {
-  try {
-    if (!('Notification' in window)) {
-      console.log('This browser does not support notifications');
-      return;
-    }
-    
-    if (Notification.permission === 'granted') {
-      // In a real app, we would send a notification through Firebase
-      // Instead, we'll use the browser's Notification API for testing
-      new Notification(title, { body });
-    } else {
-      console.log('Notification permission not granted');
-    }
-  } catch (error) {
-    console.error('Error sending test notification:', error);
-  }
-}
-
-/**
- * Trigger a test notification
- */
-export function triggerTestNotification() {
-  sendTestPushNotification(
-    'Test Notification',
-    'This is a test notification from ATSİS. If you can see this, notifications are working correctly!'
-  );
-}
-
-/**
  * Show browser notification
  */
 export function showBrowserNotification({ title, body }: { title: string; body: string }) {

@@ -97,9 +97,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     try {
       console.log('FCM kurulumu başlatılıyor...');
       
-      // FCM token almadan önce bildirim görünürlüğünü test et
-      toast.success('Bildirim testi - Eğer bu mesajı görüyorsanız, bildirimler çalışıyor');
-      
       // FCM izni ve token alma
       const fcmToken = await requestFCMPermission(userId, userRole);
       
@@ -110,9 +107,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       
       // Token zaten kaydedildi, durumu güncelle
       fcmInitialized.current = true;
-      
-      // NOT: Artık onMessage dinleyicisini burada kurmaya gerek yok
-      // çünkü useEffect içinde zaten kuruyoruz
       
       console.log('FCM başarıyla kuruldu');
       return true;
@@ -493,48 +487,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  // Manuel olarak bildirimleri test etme fonksiyonu
-  const testNotifications = () => {
-    console.log("Manuel bildirim testi başlatılıyor...");
-    
-    // Bildirim sesini çal
-    playAlertSound();
-    
-    // Fake bir FCM mesajı oluştur ve işle
-    const fakePayload = {
-      notification: {
-        title: "Test Bildirimi",
-        body: "Bu bir test bildirimidir. Bildirim sistemi çalışıyor!"
-      },
-      data: {
-        url: "/dashboard"
-      }
-    };
-    
-    const notificationData: Notification = {
-      id: 'test-' + Date.now().toString(),
-      message: fakePayload.notification.body,
-      isRead: false,
-      fcmData: {
-        title: fakePayload.notification.title,
-        url: fakePayload.data.url,
-        userRole: user?.role
-      }
-    };
-    
-    // Bildirim listesine ekle
-    setNotifications((prev) => [notificationData, ...prev]);
-    
-    // Bildirim sayacını artır
-    setNotificationCount((prev) => prev + 1);
-    
-    // Toast bildirim göster
-    toast.success("Bildirim testi başarılı!");
-    
-    // Firebase dinleyicilerini yeniden kur
-    setupFirebaseListeners();
-  };
-
   return (
     <NotificationContext.Provider
       value={{
@@ -592,13 +544,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           </div>
         </div>
       )}
-
-      {/* Gizli Bildirim Test düğmesi - Double click ile aktifleşir */}
-      <div
-        className="fixed bottom-0 right-0 w-6 h-6 opacity-0"
-        onDoubleClick={testNotifications}
-        title="Bildirimleri test etmek için çift tıkla"
-      />
     </NotificationContext.Provider>
   );
 }

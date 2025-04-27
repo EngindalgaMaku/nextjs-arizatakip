@@ -147,15 +147,6 @@ export default function LoginPage() {
               localStorage.removeItem('fcm_user_role');
               
               console.log('Bildirim ayarları sıfırlandı, yönetici paneline yönlendiriliyor');
-              
-              // Test bildirimi gönder
-              const { sendTestPushNotification } = await import('@/lib/firebase');
-              await sendTestPushNotification(
-                'Hoş Geldiniz', 
-                `${userData.name || 'Yönetici'} olarak başarıyla giriş yaptınız.`
-              );
-              console.log('Test bildirimi gönderildi');
-              
             } catch (error) {
               console.error('Bildirim sıfırlama hatası:', error);
             }
