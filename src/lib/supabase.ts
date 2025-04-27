@@ -617,7 +617,7 @@ export async function updatePassword(currentPassword: string, newPassword: strin
 /**
  * Kullanıcının FCM token'ını veritabanına kaydeder
  */
-export async function saveFCMToken(userId: string, token: string) {
+export async function saveFCMToken(userId: string, token: string, userRole?: string) {
   try {
     if (!userId) {
       console.error('FCM token kaydedilemedi: Kullanıcı ID boş');
@@ -629,19 +629,25 @@ export async function saveFCMToken(userId: string, token: string) {
       return { success: false, error: 'Token boş' };
     }
 
-    // Kullanıcı rolünü al
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
+    let role = userRole;
     
-    if (userError) {
-      console.error('FCM token kaydedilemedi: Kullanıcı rolü alınamadı', userError);
-      return { success: false, error: userError };
+    // Eğer rol belirtilmemişse kullanıcı rolünü al
+    if (!role) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      if (userError) {
+        console.error('FCM token kaydedilemedi: Kullanıcı rolü alınamadı', userError);
+        return { success: false, error: userError };
+      }
+      
+      role = userData.role;
     }
 
-    console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId}, Rol: ${userData.role})`);
+    console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId}, Rol: ${role})`);
 
     // Önce bu kullanıcı için tüm eski token'ları temizle
     await clearUserTokens(userId);
@@ -653,7 +659,7 @@ export async function saveFCMToken(userId: string, token: string) {
         {
           user_id: userId, 
           token: token,
-          user_role: userData.role, // Kullanıcı rolünü ekle
+          user_role: role, // Kullanıcı rolünü ekle
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
@@ -719,6 +725,38 @@ export async function clearAllFCMTokens() {
     return { success: true };
   } catch (error) {
     console.error('FCM tokenlar temizlenirken hata:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * FCM tokenını Supabase'den siler
+ * @param userId Kullanıcı ID'si
+ * @param token Belirli bir token silinecekse (isteğe bağlı)
+ */
+export async function deleteFCMToken(userId: string, token?: string) {
+  try {
+    let query = supabase
+      .from('user_fcm_tokens')
+      .delete()
+      .eq('user_id', userId);
+    
+    // Eğer belirli bir token silinecekse
+    if (token) {
+      query = query.eq('token', token);
+    }
+    
+    const { error } = await query;
+
+    if (error) {
+      console.error('FCM token silinirken hata:', error);
+      return { success: false, error };
+    }
+
+    console.log(`${userId} kullanıcısı için FCM token${token ? '' : 'ları'} başarıyla silindi`);
+    return { success: true };
+  } catch (error) {
+    console.error('FCM token silinirken bir hata oluştu:', error);
     return { success: false, error };
   }
 } 

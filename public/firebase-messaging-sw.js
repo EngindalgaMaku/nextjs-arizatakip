@@ -22,56 +22,159 @@ firebase.initializeApp({
 // Firebase Messaging nesnesini al
 const messaging = firebase.messaging();
 
+// Kullanıcı rolü için IndexedDB depolama
+const dbName = 'FirebaseMessagingServiceWorkerDB';
+const storeName = 'userSettings';
+const userRoleKey = 'currentUserRole';
+
+// Kullanıcı rolünü IndexedDB'ye kaydet
+const saveUserRole = (role) => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, 1);
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(storeName)) {
+        db.createObjectStore(storeName);
+      }
+    };
+    
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      const transaction = db.transaction([storeName], 'readwrite');
+      const store = transaction.objectStore(storeName);
+      
+      store.put(role, userRoleKey);
+      
+      transaction.oncomplete = () => {
+        console.log(`[SW] Rol kaydedildi: ${role}`);
+        resolve();
+      };
+      
+      transaction.onerror = (error) => {
+        console.error('[SW] Rol kaydetme hatası:', error);
+        reject(error);
+      };
+    };
+    
+    request.onerror = (error) => {
+      console.error('[SW] IndexedDB açma hatası:', error);
+      reject(error);
+    };
+  });
+};
+
 // Mevcut kullanıcı rolünü alır
 const getUserRole = () => {
-  // IndexedDB'den veya localStorage'dan rol bilgisini alma girişimi
+  // IndexedDB'den rol bilgisini alma
   return new Promise((resolve) => {
-    // Bilinen rol anahtarları
-    const knownRoleKeys = ['fcm_user_role', 'userRole', 'role'];
+    try {
+      const request = indexedDB.open(dbName, 1);
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName);
+        }
+      };
+      
+      request.onsuccess = (event) => {
+        const db = event.target.result;
+        try {
+          const transaction = db.transaction([storeName], 'readonly');
+          const store = transaction.objectStore(storeName);
+          const getRequest = store.get(userRoleKey);
+          
+          getRequest.onsuccess = () => {
+            const role = getRequest.result;
+            console.log(`[SW] Kaydedilmiş rol: ${role || 'bulunamadı'}`);
+            
+            if (role) {
+              resolve(role);
+            } else {
+              // Role bulunamadıysa client'dan iste
+              requestRoleFromClient().then(resolve);
+            }
+          };
+          
+          getRequest.onerror = (error) => {
+            console.error('[SW] Rol okuma hatası:', error);
+            requestRoleFromClient().then(resolve);
+          };
+        } catch (txError) {
+          console.error('[SW] Transaction hatası:', txError);
+          requestRoleFromClient().then(resolve);
+        }
+      };
+      
+      request.onerror = (error) => {
+        console.error('[SW] IndexedDB açma hatası:', error);
+        requestRoleFromClient().then(resolve);
+      };
+    } catch (error) {
+      console.error('[SW] IndexedDB genel hata:', error);
+      requestRoleFromClient().then(resolve);
+    }
+  });
+};
+
+// Client'tan rol iste
+const requestRoleFromClient = () => {
+  return new Promise((resolve) => {
+    const messageChannel = new MessageChannel();
+    let responseReceived = false;
     
-    // IndexedDB yoklama (asenkron)
-    let roleFound = false;
+    // Mesaj kanalının cevabını dinle
+    messageChannel.port1.onmessage = (event) => {
+      responseReceived = true;
+      const role = event.data?.role || 'unknown';
+      console.log(`[SW] Client'dan rol alındı: ${role}`);
+      saveUserRole(role).catch(console.error);
+      resolve(role);
+    };
     
-    // Service worker'da localStorage doğrudan erişilemez, clients API kullanmamız gerekiyor
+    // Tüm client'lara rol talebi gönder
     self.clients.matchAll().then(clients => {
       if (clients.length > 0) {
-        // İlk client'a mesaj gönder, rol bilgisi iste
-        const client = clients[0];
-        client.postMessage({ type: 'GET_USER_ROLE' });
-        
-        // Cevabı beklemek yerine, varsayılan olarak genel rol (zamanı korumak için)
-        setTimeout(() => {
-          if (!roleFound) resolve('any');
-        }, 100);
-        
-        // Mesaj dinleyicisi
-        self.addEventListener('message', event => {
-          if (event.data && event.data.type === 'USER_ROLE_RESPONSE') {
-            roleFound = true;
-            resolve(event.data.role || 'any');
-          }
+        clients.forEach(client => {
+          client.postMessage(
+            { type: 'GET_USER_ROLE' },
+            [messageChannel.port2]
+          );
         });
-      } else {
-        // Client yoksa, varsayılan rol
-        resolve('any');
       }
-    }).catch(() => resolve('any'));
+      
+      // Cevap bekleme süresi (500ms)
+      setTimeout(() => {
+        if (!responseReceived) {
+          console.log('[SW] Client cevabı alınamadı, varsayılan rol kullanılıyor');
+          resolve('unknown');
+        }
+      }, 500);
+    }).catch(() => {
+      console.error('[SW] Client'lara erişim hatası');
+      resolve('unknown');
+    });
   });
 };
 
 // Arkaplanda bildirim alındığında
 messaging.onBackgroundMessage(async (payload) => {
-  console.log('[firebase-messaging-sw.js] Arkaplanda mesaj alındı ', payload);
+  console.log('[firebase-messaging-sw.js] Arkaplanda mesaj alındı:', payload);
   
   // Rol kontrolü
   const userRole = await getUserRole();
-  const messageRole = payload.data?.userRole || 'any';
+  const messageRole = payload.data?.userRole || 'unknown';
+  
+  console.log(`[SW] Bildirim kontrolü - Kullanıcı rolü: "${userRole}", Mesaj rolü: "${messageRole}"`);
   
   // Bildirim bu kullanıcının rolü için değilse gösterme
-  if (userRole !== 'any' && messageRole !== 'any' && userRole !== messageRole) {
-    console.log(`[firebase-messaging-sw.js] Bildirim rolü (${messageRole}) kullanıcı rolüyle (${userRole}) uyuşmuyor. Bildirim gösterilmeyecek.`);
+  if (userRole !== 'unknown' && messageRole !== 'unknown' && userRole !== messageRole) {
+    console.log(`[SW] ROL UYUŞMAZLIĞI: Bildirim "${messageRole}" rolü için, kullanıcı "${userRole}" rolünde. Bildirim GÖSTERİLMEYECEK.`);
     return;
   }
+  
+  console.log(`[SW] Bildirim gösteriliyor (${messageRole} rolü için)`);
   
   // Bildirim başlığı ve içeriği
   const notificationTitle = payload.notification?.title || 'Yeni Bildirim';
@@ -79,10 +182,12 @@ messaging.onBackgroundMessage(async (payload) => {
     body: payload.notification?.body || 'Yeni bir bildiriminiz var.',
     icon: '/okullogo.png',
     badge: '/icons/badge-128x128.png',
-    data: payload.data,
-    // Bildirim tıklandığında açılacak URL
-    // FCM ile birlikte click_action parametresi kullanılabilir
-    tag: 'atsis-notification',
+    data: {
+      ...payload.data,
+      timestamp: Date.now(),
+      receivedByRole: userRole
+    },
+    tag: `atsis-notification-${messageRole}-${Date.now()}`,
   };
 
   // Bildirim gösterme
@@ -91,14 +196,14 @@ messaging.onBackgroundMessage(async (payload) => {
 
 // Bildirime tıklandığında
 self.addEventListener('notificationclick', (event) => {
-  console.log('[firebase-messaging-sw.js] Bildirime tıklandı ', event);
+  console.log('[firebase-messaging-sw.js] Bildirime tıklandı:', event);
   
   // Bildirimi kapat
   event.notification.close();
   
   // URL varsa tarayıcıyı aç ve o sayfaya yönlendir
   const urlToOpen = event.notification.data?.url || '/dashboard';
-  const userRole = event.notification.data?.userRole || 'any';
+  const userRole = event.notification.data?.userRole || 'unknown';
   
   // Rolüne göre yönlendirme kontrolü
   let targetUrl;
@@ -149,6 +254,15 @@ self.addEventListener('activate', (event) => {
 // Client'lardan gelen mesajları dinle
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SET_USER_ROLE') {
-    console.log('[firebase-messaging-sw.js] Kullanıcı rolü güncellendi:', event.data.role);
+    const role = event.data.role || 'unknown';
+    console.log('[firebase-messaging-sw.js] Kullanıcı rolü güncellendi:', role);
+    
+    // Rolü IndexedDB'ye kaydet
+    saveUserRole(role).catch(console.error);
+    
+    // Yanıt gönder
+    if (event.ports && event.ports.length > 0) {
+      event.ports[0].postMessage({ success: true, message: 'Rol güncellendi', role });
+    }
   }
 }); 

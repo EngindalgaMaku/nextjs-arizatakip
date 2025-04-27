@@ -1,7 +1,14 @@
 'use client';
 
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { toast } from 'react-hot-toast';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+import { useAuth } from './AuthContext';
+import { BeforeUnloadEvent } from 'next/dist/compiled/@edge-runtime/primitives/events';
+import { getMessaging, onMessage } from 'firebase/messaging';
+import { saveFCMToken, deleteFCMToken } from '@/lib/supabase';
+import { requestFCMPermission, clearFCMToken } from '@/lib/firebase';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getDeviceTypeName } from '@/lib/helpers';
 import { playAlertSound } from '@/lib/notification';
@@ -19,185 +26,295 @@ interface NotificationContextType {
   closeNotification: () => void;
   handleNotificationClick: (id: string) => void;
   updateDashboardCounts?: (increment: boolean) => void;
+  notificationCount: number;
+  lastNotification: any | null;
+  setupFCM: (userId: string, userRole: string) => Promise<boolean>;
+  cleanupFCM: () => Promise<boolean>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotification, setShowNotification] = useState(false);
   const supabaseSubscription = useRef<any>(null);
+  const pathname = usePathname();
+  const lastPathRef = useRef<string | null>(null);
   const router = useRouter();
   const updateDashboardCountsRef = useRef<((increment: boolean) => void) | null>(null);
-  // URL değişikliğini takip etmek için pathname referansı
-  const currentPathRef = useRef<string>('');
-  // FCM token
-  const [fcmToken, setFcmToken] = useState<string | null>(null);
-  
-  useEffect(() => {
-    // İlk yükleme ve temizlik
-    setupRealtimeSubscription();
+  const isInitialized = useRef(false);
+  const fcmInitialized = useRef(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [lastNotification, setLastNotification] = useState<any | null>(null);
 
-    // URL değişimini kontrol eden alt bileşen
-    const checkRouteChange = () => {
-      // Next.js client tarafında window nesnesine erişim kontrolü
-      if (typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        
-        // Yol değiştiyse ve önceki bir yol kaydedilmişse
-        if (currentPathRef.current && pathname !== currentPathRef.current) {
-          console.log('URL değişikliği algılandı, bildirim aboneliği yenileniyor...');
-          
-          // Önce mevcut aboneliği temizle
-          if (supabaseSubscription.current) {
-            supabaseSubscription.current.unsubscribe();
-            supabaseSubscription.current = null;
-          }
-          
-          // Aboneliği yeniden oluştur
-          setupRealtimeSubscription();
-        }
-        
-        // Mevcut yolu güncelle
-        currentPathRef.current = pathname;
+  // Supabase bağlantısını oluştur
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  );
+
+  // Sayfadan ayrılırken uyarı göster
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (user) {
+        e.preventDefault();
+        e.returnValue = 'Sayfadan ayrılırsanız bildirimlerinizi alamazsınız!';
+        return e.returnValue;
       }
     };
-    
-    // Router olaylarını dinle
-    window.addEventListener('popstate', checkRouteChange);
-    
-    // Periyodik kontrol (SPA geçişlerini yakalamak için)
-    const interval = setInterval(checkRouteChange, 1000);
 
-    // Service worker mesaj dinleyicisi ekle
-    const setupServiceWorkerCommunication = () => {
-      // Service worker mesaj olayını dinle
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'GET_USER_ROLE') {
-          // Service worker rol bilgisi istediğinde, mevcut rolü gönder
-          const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
-          
-          // Tüm service worker'lara cevap gönder
-          navigator.serviceWorker.ready.then(registration => {
-            if (registration.active) {
-              registration.active.postMessage({
-                type: 'USER_ROLE_RESPONSE',
-                role: userRole
-              });
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [user]);
+
+  // Firebase Cloud Messaging (FCM) kurulumu
+  const setupFCM = async (userId: string, userRole: string): Promise<boolean> => {
+    if (!userId || fcmInitialized.current) return false;
+    
+    try {
+      console.log('FCM kurulumu başlatılıyor...');
+      
+      // FCM izni ve token alma
+      const fcmToken = await requestFCMPermission(userId, userRole);
+      
+      if (!fcmToken) {
+        console.warn('FCM token alınamadı, bildirimler çalışmayabilir');
+        return false;
+      }
+      
+      // Token'ı Supabase'e kaydet
+      const saveResult = await saveFCMToken({
+        userId,
+        token: fcmToken,
+        userRole,
+        deviceInfo: {
+          browser: navigator.userAgent,
+          platform: navigator.platform
+        }
+      });
+      
+      if (!saveResult) {
+        console.error('Token Supabase\'e kaydedilemedi');
+        return false;
+      }
+      
+      // FCM mesaj dinleyici
+      if ('serviceWorker' in navigator) {
+        try {
+          // Ön plandaki mesajları dinle
+          const messaging = getMessaging();
+          onMessage(messaging, (payload) => {
+            console.log('Ön planda bildirim alındı:', payload);
+            
+            // Rol kontrolü
+            const userRole = localStorage.getItem('fcm_user_role');
+            const notificationRole = payload.data?.role;
+            
+            if (notificationRole && notificationRole !== userRole) {
+              console.log(`Bu bildirim ${notificationRole} rolü için, mevcut kullanıcı ${userRole} rolünde olduğu için gösterilmeyecek`);
+              return;
+            }
+            
+            // Bildirim göster
+            const title = payload.notification?.title || 'Yeni Bildirim';
+            const body = payload.notification?.body || '';
+            
+            toast.custom((t) => (
+              <div
+                className={`${
+                  t.visible ? 'animate-enter' : 'animate-leave'
+                } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+              >
+                <div className="flex-1 w-0 p-4">
+                  <div className="flex items-start">
+                    <div className="ml-3 flex-1">
+                      <p className="text-sm font-medium text-gray-900">{title}</p>
+                      <p className="mt-1 text-sm text-gray-500">{body}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex border-l border-gray-200">
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </div>
+            ));
+            
+            // Bildirim sayısını ve son bildirimi güncelle
+            setNotificationCount((prev) => prev + 1);
+            setLastNotification(payload);
+            
+            // Bildirime tıklanınca yönlendirme
+            if (payload.data?.url) {
+              router.push(payload.data.url);
             }
           });
+          
+          fcmInitialized.current = true;
+          console.log('FCM başarıyla kuruldu');
+          return true;
+        } catch (error) {
+          console.error('FCM mesaj dinleyici hatası:', error);
+          return false;
         }
-      });
-    };
-    
-    // Service worker kurulumu yoklaması
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(() => {
-        setupServiceWorkerCommunication();
-        
-        // Service worker'a mevcut rol bilgisini gönder
-        const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
-        navigator.serviceWorker.controller?.postMessage({
-          type: 'SET_USER_ROLE',
-          role: userRole
-        });
-      });
+      } else {
+        console.warn('Service Worker desteği yok, FCM ön plan bildirimleri çalışmayacak');
+        return false;
+      }
+    } catch (error) {
+      console.error('FCM kurulum hatası:', error);
+      return false;
+    }
+  };
+  
+  // FCM temizleme
+  const cleanupFCM = async (): Promise<boolean> => {
+    try {
+      if (!fcmInitialized.current) return true;
+      
+      // FCM token'ı Supabase'den sil
+      const userId = localStorage.getItem('fcm_user_id');
+      if (userId) {
+        const deleteResult = await deleteFCMToken(userId);
+        if (!deleteResult) {
+          console.warn('Token Supabase\'den silinemedi');
+        }
+      }
+      
+      // FCM token'ı temizle
+      await clearFCMToken();
+      
+      fcmInitialized.current = false;
+      console.log('FCM başarıyla temizlendi');
+      return true;
+    } catch (error) {
+      console.error('FCM temizleme hatası:', error);
+      return false;
+    }
+  };
+
+  // Realtime aboneliği kur/kaldır
+  const setupRealtimeSubscription = useCallback(() => {
+    if (!user || !isInitialized.current) return;
+
+    // Önceki aboneliği temizle
+    if (supabaseSubscription.current) {
+      supabaseSubscription.current.unsubscribe();
+      supabaseSubscription.current = null;
     }
 
+    console.log('Realtime bildirim aboneliği kuruluyor...');
+
+    // Yeni abonelik oluştur
+    supabaseSubscription.current = supabase
+      .channel('bildirimler')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'bildirimler',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        console.log('Yeni bildirim alındı:', payload);
+        
+        // Bildirim göster
+        toast.custom((t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-gray-900">Yeni Bildirim</p>
+                  <p className="mt-1 text-sm text-gray-500">{payload.new.mesaj}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-gray-200">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        ));
+        
+        // Bildirim sayısını ve son bildirimi güncelle
+        setNotificationCount((prev) => prev + 1);
+        setLastNotification(payload.new);
+      })
+      .subscribe((status) => {
+        console.log('Realtime abonelik durumu:', status);
+      });
+
+    console.log('Realtime abonelik kuruldu');
+  }, [user, supabase]);
+
+  // URL değişikliklerini takip et
+  useEffect(() => {
+    // Son path ile mevcut path karşılaştır
+    if (lastPathRef.current !== null && lastPathRef.current !== pathname) {
+      console.log('URL değişikliği algılandı:', lastPathRef.current, '->', pathname);
+      
+      // Aboneliği yenile
+      setupRealtimeSubscription();
+    }
+    
+    // Mevcut path'i kaydet
+    lastPathRef.current = pathname;
+  }, [pathname, setupRealtimeSubscription]);
+
+  // Kullanıcı ve URL değişikliklerinde aboneliği güncelle
+  useEffect(() => {
+    // Kullanıcı yoksa aboneliği temizle
+    if (!user) {
+      if (supabaseSubscription.current) {
+        console.log('Kullanıcı çıkış yaptı, abonelik temizleniyor...');
+        supabaseSubscription.current.unsubscribe();
+        supabaseSubscription.current = null;
+      }
+      
+      // FCM temizle
+      cleanupFCM().then(() => {
+        console.log('FCM bilgileri temizlendi');
+      });
+      
+      return;
+    }
+    
+    // İlk kez ya da URL değişikliğinde aboneliği kur
+    if (!isInitialized.current || lastPathRef.current !== pathname) {
+      setupRealtimeSubscription();
+      isInitialized.current = true;
+      
+      // FCM kur (eğer hazır değilse)
+      if (!fcmInitialized.current) {
+        setupFCM(user.id, user.role || 'anonymous').then((success) => {
+          if (success) {
+            console.log('FCM kurulumu tamamlandı');
+          } else {
+            console.warn('FCM kurulumu başarısız oldu');
+          }
+        });
+      }
+    }
+    
     return () => {
-      // Aboneliği temizle
+      // Component unmount olduğunda aboneliği temizle
       if (supabaseSubscription.current) {
         supabaseSubscription.current.unsubscribe();
-      }
-      // Olay dinleyicilerini temizle
-      window.removeEventListener('popstate', checkRouteChange);
-      clearInterval(interval);
-    };
-  }, []);
-
-  // FCM izni isteme ve token alma
-  useEffect(() => {
-    const setupFCM = async () => {
-      try {
-        // Firebase ve FCM modüllerini dinamik olarak import et
-        const { requestFCMPermission, listenForFCMMessages } = await import('@/lib/firebase');
-        const { getCurrentUser } = await import('@/lib/supabase');
-        
-        // Kullanıcı ID'sini al
-        const user = await getCurrentUser();
-        
-        if (user) {
-          // FCM izinlerini iste
-          const token = await requestFCMPermission(user.role || 'anonymous');
-          if (token) {
-            setFcmToken(token);
-            console.log('FCM token başarıyla alındı ve kaydedildi');
-            
-            // Token'ı veritabanına kaydet (API çağrısı üzerinden yapılacak)
-            try {
-              const response = await fetch('/api/save-fcm-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  userId: user.id,
-                  token,
-                  userRole: user.role || 'anonymous'
-                })
-              });
-              
-              const result = await response.json();
-              if (result.success) {
-                console.log('FCM token veritabanına kaydedildi');
-              } else {
-                console.error('FCM token kaydedilemedi:', result.error);
-              }
-            } catch (error) {
-              console.error('FCM token kaydetme API çağrısı başarısız:', error);
-            }
-            
-            // FCM mesajlarını dinle
-            listenForFCMMessages((payload) => {
-              console.log('FCM bildirimi alındı:', payload);
-              
-              // Kullanıcı rolünü kontrol et ve rolüne uygun bildirimleri göster
-              const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
-              const notificationRole = payload.data?.userRole;
-              
-              // Rol kontrolü - rolüne uygun olmayan bildirimleri gösterme
-              if (notificationRole && notificationRole !== userRole) {
-                console.log(`Bu bildirim ${notificationRole} rolü için, mevcut kullanıcı ${userRole} rolünde olduğu için gösterilmeyecek`);
-                return; // Bildirimi işleme
-              }
-              
-              // Bildirimi göster (hem mesajlaşma için hem de görsel bildirim için)
-              const notification = {
-                id: payload.data?.issueId || `fcm-${Date.now()}`,
-                message: payload.notification?.body || 'Yeni bir bildirim',
-                isRead: false,
-                fcmData: payload.data // FCM verilerini sakla
-              };
-              
-              // Bildirimleri güncelle
-              setNotifications(prev => [notification, ...prev]);
-              setShowNotification(true);
-              
-              // Sesli bildirim
-              playAlertSound();
-            });
-          }
-        } else {
-          console.log('FCM token kaydı için kullanıcı bulunamadı');
-        }
-      } catch (error) {
-        console.error('FCM kurulumu sırasında hata:', error);
+        supabaseSubscription.current = null;
       }
     };
-    
-    // Client tarafında olduğunu kontrol et
-    if (typeof window !== 'undefined') {
-      setupFCM();
-    }
-  }, []);
+  }, [user, pathname, setupRealtimeSubscription]);
 
   // Dashboard sayılarını güncellemek için method
   const updateDashboardCounts = (increment: boolean) => {
@@ -212,133 +329,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Dashboard komponenti bu methodu çağırarak sayı güncelleme fonksiyonunu kaydeder
   const registerDashboardCountsUpdater = (updater: (increment: boolean) => void) => {
     updateDashboardCountsRef.current = updater;
-  };
-
-  // Gerçek zamanlı abonelik kurulumu
-  const setupRealtimeSubscription = async () => {
-    try {
-      // Eğer zaten aktif bir abonelik varsa, önce onu temizleyelim
-      if (supabaseSubscription.current) {
-        console.log('Mevcut abonelik temizleniyor...');
-        await supabaseSubscription.current.unsubscribe();
-        supabaseSubscription.current = null;
-      }
-
-      // Client tarafı kontrolü
-      if (typeof window === 'undefined') {
-        console.log('Server-side rendering sırasında abonelik kurulmuyor');
-        return;
-      }
-      
-      const { supabase } = await import('@/lib/supabase');
-      
-      console.log('Realtime notification subscription kurulumu başlatılıyor...');
-      
-      // Benzersiz bir kanal ID'si oluştur (URL ve zaman damgası içeren)
-      const channelId = `issues-channel-${window.location.pathname}-${Date.now()}`;
-      console.log(`Yeni kanal ID'si: ${channelId}`);
-      
-      // issues tablosundaki yeni kayıtları dinle
-      supabaseSubscription.current = supabase
-        .channel(channelId)
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'issues' 
-        }, (payload) => {
-          console.log('Yeni arıza bildirimi alındı:', payload);
-          
-          // Yeni bir arıza oluşturulduğunda
-          const newIssue = payload.new;
-          
-          // Bildirim oluştur
-          const notification = {
-            id: newIssue.id,
-            message: `Yeni arıza bildirimi: ${newIssue.device_name} (${getDeviceTypeName(newIssue.device_type)}) - ${newIssue.reported_by} tarafından`,
-            isRead: false
-          };
-          
-          // Bildirimleri güncelle
-          setNotifications(prev => [notification, ...prev]);
-          
-          // Bildirim göster
-          setShowNotification(true);
-          
-          // Dashboard sayılarını güncelle
-          if (updateDashboardCountsRef.current) {
-            updateDashboardCountsRef.current(true);
-          }
-          
-          // Sesli bildirim (sadece yeni arıza oluşturulduğunda)
-          playAlertSound();
-          
-          // DOM üzerinden doğrudan ses çal (ek güvenlik önlemi)
-          try {
-            // Varsa eski ses elementini temizle
-            const existingSound = document.getElementById('notification-sound');
-            if (existingSound) {
-              document.body.removeChild(existingSound);
-            }
-            
-            // Birinci ses (notification-alert.mp3) için element oluştur
-            const firstAudioElement = document.createElement('audio');
-            firstAudioElement.id = 'notification-sound-1';
-            firstAudioElement.src = '/notification-alert.mp3';
-            firstAudioElement.volume = 1.0;
-            
-            // İkinci ses (notification.mp3) için element oluştur
-            const secondAudioElement = document.createElement('audio');
-            secondAudioElement.id = 'notification-sound-2';
-            secondAudioElement.src = '/notification.mp3';
-            secondAudioElement.volume = 1.0;
-            
-            // İlk ses bittiğinde ikinci sesi çal
-            firstAudioElement.onended = () => {
-              console.log('İlk ses bitti, ikinci ses çalınıyor...');
-              secondAudioElement.play()
-                .then(() => console.log('İkinci ses başarıyla çalındı'))
-                .catch(err => console.error('İkinci ses çalma hatası:', err));
-            };
-            
-            // İkinci ses bittiğinde elementleri temizle
-            secondAudioElement.onended = () => {
-              if (document.body.contains(firstAudioElement)) {
-                document.body.removeChild(firstAudioElement);
-              }
-              if (document.body.contains(secondAudioElement)) {
-                document.body.removeChild(secondAudioElement);
-              }
-              console.log('Bildirim sesi sekansı tamamlandı, elementler temizlendi');
-            };
-            
-            // İlk elementi DOM'a ekleyip ilk sesi çal
-            document.body.appendChild(firstAudioElement);
-            document.body.appendChild(secondAudioElement);
-            
-            // İlk sesi çal
-            const playPromise = firstAudioElement.play();
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => console.log('İlk ses başarıyla çalıyor'))
-                .catch(error => {
-                  console.error('İlk ses çalma hatası:', error);
-                  // İlk ses çalınamazsa ikinci sesi denemeyi dene
-                  secondAudioElement.play()
-                    .then(() => console.log('İlk ses atlandı, ikinci ses çalıyor'))
-                    .catch(err => console.error('İkinci ses de çalınamadı:', err));
-                });
-            }
-          } catch (audioError) {
-            console.error('Doğrudan DOM ses çalma hatası:', audioError);
-          }
-        })
-        .subscribe((status) => {
-          console.log('Realtime notification subscription durumu:', status);
-        });
-      
-    } catch (error) {
-      console.error('Gerçek zamanlı bildirim aboneliği kurulurken hata:', error);
-    }
   };
 
   // Bildirimi kapat
@@ -407,7 +397,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         showNotification,
         closeNotification,
         handleNotificationClick,
-        updateDashboardCounts
+        updateDashboardCounts,
+        notificationCount,
+        lastNotification,
+        setupFCM,
+        cleanupFCM
       }}
     >
       {children}
