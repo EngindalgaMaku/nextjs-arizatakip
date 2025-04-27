@@ -4,15 +4,19 @@
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-// FCM yapılandırması - buradaki değerler servis worker'da hardcoded olmalı
-// Bu değerleri önce Firebase konsolundan aldığınız değerlerle değiştirin
+/* 
+ * ÖNEMLİ: Bu dosyadaki Firebase yapılandırma değerlerini Firebase Console'dan aldığınız gerçek değerlerle değiştirmeniz gerekiyor.
+ * Bu değerleri doğrudan Firebase Console -> Proje Ayarları -> Genel -> "Web uygulamanız için Firebase SDK snippet'i yapılandırın" kısmından alabilirsiniz.
+ * 
+ * NOT: Bu bir service worker dosyası olduğu için, environment değişkenleri burada çalışmaz. Değerleri doğrudan bu dosyaya yazmanız gerekiyor.
+ */
 firebase.initializeApp({
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-  projectId: "YOUR_FIREBASE_PROJECT_ID",
-  storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
-  appId: "YOUR_FIREBASE_APP_ID"
+  apiKey: "FIREBASE_API_KEY_BURAYA",
+  authDomain: "FIREBASE_AUTH_DOMAIN_BURAYA",
+  projectId: "FIREBASE_PROJECT_ID_BURAYA",
+  storageBucket: "FIREBASE_STORAGE_BUCKET_BURAYA",
+  messagingSenderId: "FIREBASE_MESSAGING_SENDER_ID_BURAYA",
+  appId: "FIREBASE_APP_ID_BURAYA"
 });
 
 // Firebase Messaging nesnesini al

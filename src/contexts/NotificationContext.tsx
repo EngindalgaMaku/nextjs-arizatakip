@@ -98,7 +98,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             console.log('FCM token başarıyla alındı ve kaydedildi');
             
             // Token'ı veritabanına kaydet
-            await saveFCMToken(user.id, token);
+            const saveResult = await saveFCMToken(user.id, token);
+            
+            if (saveResult.success) {
+              console.log('FCM token veritabanına kaydedildi');
+            } else {
+              console.error('FCM token kaydedilemedi:', saveResult.error);
+            }
             
             // FCM mesajlarını dinle
             listenForFCMMessages((payload) => {

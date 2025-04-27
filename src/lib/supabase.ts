@@ -619,6 +619,18 @@ export async function updatePassword(currentPassword: string, newPassword: strin
  */
 export async function saveFCMToken(userId: string, token: string) {
   try {
+    if (!userId) {
+      console.error('FCM token kaydedilemedi: Kullanıcı ID boş');
+      return { success: false, error: 'Kullanıcı ID boş' };
+    }
+
+    if (!token) {
+      console.error('FCM token kaydedilemedi: Token boş');
+      return { success: false, error: 'Token boş' };
+    }
+
+    console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId})`);
+
     const { data, error } = await supabase
       .from('user_fcm_tokens')
       .upsert(
@@ -628,7 +640,10 @@ export async function saveFCMToken(userId: string, token: string) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
-        { onConflict: 'user_id' }
+        { 
+          onConflict: 'user_id,token',
+          ignoreDuplicates: true
+        }
       );
     
     if (error) {
@@ -636,6 +651,7 @@ export async function saveFCMToken(userId: string, token: string) {
       return { success: false, error };
     }
     
+    console.log('FCM token başarıyla kaydedildi');
     return { success: true, data };
   } catch (error) {
     console.error('FCM token kaydedilirken hata:', error);
