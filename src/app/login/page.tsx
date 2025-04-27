@@ -8,7 +8,7 @@ import { signIn, getSystemSetting } from '@/lib/supabase';
 import { setCookie } from 'cookies-next';
 import { 
   ArrowRightOnRectangleIcon, 
-  HomeIcon,
+  UserIcon,
   DevicePhoneMobileIcon 
 } from '@heroicons/react/24/outline';
 
@@ -160,9 +160,13 @@ export default function LoginPage() {
           />
         </div>
         
-        <h1 className="text-2xl font-bold text-center mb-6">
+        <h1 className="text-2xl font-bold text-center mb-2">
           {siteName}
         </h1>
+        
+        <h2 className="text-xl text-center text-blue-600 font-semibold mb-6">
+          Yönetici Girişi
+        </h2>
         
         {error && (
           <div className="mb-4 p-4 text-red-700 bg-red-100 rounded-md">
@@ -221,11 +225,11 @@ export default function LoginPage() {
         
         <div className="mt-6 pt-4 border-t border-gray-200 text-center">
           <button 
-            onClick={() => navigateTo('/')}
-            className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center"
+            onClick={() => navigateTo('/teacher/login')}
+            className="text-sm text-gray-600 hover:text-blue-600 inline-flex items-center"
           >
-            <HomeIcon className="w-4 h-4 mr-1" />
-            Ana Sayfaya Dön
+            <UserIcon className="w-4 h-4 mr-1" />
+            Öğretmen Girişi
           </button>
         </div>
         
