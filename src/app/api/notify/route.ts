@@ -79,12 +79,13 @@ export async function POST(request: NextRequest) {
         .from('user_fcm_tokens')
         .select('token')
         .in('user_id', adminIds)
-        .eq('user_role', 'admin');
+        .eq('user_role', 'admin')
+        .is('token', 'not.null');
       
       // FCM tokenlar var mı kontrol et
       if (!adminTokens || adminTokens.length === 0) {
-        console.log('Bildirim gönderilecek FCM token bulunamadı');
-        return NextResponse.json({ success: false, message: 'Token bulunamadı' });
+        console.log('Bildirim gönderilecek admin FCM token bulunamadı');
+        return NextResponse.json({ success: false, message: 'Admin token bulunamadı' });
       }
       
       // Bildirim içeriği
@@ -176,7 +177,8 @@ export async function POST(request: NextRequest) {
         .from('user_fcm_tokens')
         .select('token')
         .eq('user_id', teacherInfo.id)
-        .eq('user_role', 'teacher');
+        .eq('user_role', 'teacher')
+        .is('token', 'not.null');
       
       if (!teacherTokens || teacherTokens.length === 0) {
         console.log('Öğretmen için FCM token bulunamadı');

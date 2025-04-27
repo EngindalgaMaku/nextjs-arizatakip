@@ -111,6 +111,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             listenForFCMMessages((payload) => {
               console.log('FCM bildirimi alındı:', payload);
               
+              // Kullanıcı rolünü kontrol et ve rolüne uygun bildirimleri göster
+              const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
+              const notificationRole = payload.data?.userRole;
+              
+              // Rol kontrolü - rolüne uygun olmayan bildirimleri gösterme
+              if (notificationRole && notificationRole !== userRole) {
+                console.log(`Bu bildirim ${notificationRole} rolü için, mevcut kullanıcı ${userRole} rolünde olduğu için gösterilmeyecek`);
+                return; // Bildirimi işleme
+              }
+              
               // Bildirimi göster (hem mesajlaşma için hem de görsel bildirim için)
               const notification = {
                 id: payload.data?.issueId || `fcm-${Date.now()}`,

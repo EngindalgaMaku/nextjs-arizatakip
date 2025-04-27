@@ -54,6 +54,25 @@ export const requestFCMPermission = async (userRole: string): Promise<string | n
       });
       console.log('FCM için service worker kaydedildi:', registration);
 
+      // Önce eski token varsa temizle
+      try {
+        const { deleteFCMToken } = await import('@/lib/supabase');
+        const oldToken = localStorage.getItem('fcm_token');
+        const oldRole = localStorage.getItem('fcm_user_role');
+        
+        // Rol değişikliği varsa eski token'ı temizle
+        if (oldToken && oldRole && oldRole !== userRole) {
+          console.log(`Eski token (${oldRole} rolü) temizleniyor ve ${userRole} rolü için yeni token alınıyor`);
+          await registration.pushManager.getSubscription().then(sub => {
+            if (sub) sub.unsubscribe();
+          });
+          localStorage.removeItem('fcm_token');
+          localStorage.removeItem('fcm_user_role');
+        }
+      } catch (cleanupError) {
+        console.warn('Eski token temizlenirken hata:', cleanupError);
+      }
+
       // FCM token'ını al
       const currentToken = await getToken(messaging, {
         vapidKey: VAPID_KEY,
