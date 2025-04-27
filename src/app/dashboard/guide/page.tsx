@@ -8,11 +8,9 @@ async function getGuideHtml(): Promise<string> {
   const filePath = path.join(process.cwd(), 'ATSiS_Kullanim_Kilavuzu.html');
   try {
     const htmlContent = fs.readFileSync(filePath, 'utf-8');
-    // Basic check to replace relative image paths if necessary, 
-    // although moving to /public/images should handle this automatically.
-    // You might need more robust replacement depending on original paths.
-    // return htmlContent.replace(/src="images\//g, 'src="/images/'); 
-    return htmlContent;
+    // Replace relative image paths (src="images/...) with absolute paths (src="/images/...)
+    const correctedHtml = htmlContent.replace(/src="images\//g, 'src="/images/');
+    return correctedHtml;
   } catch (error) {
     console.error("Error reading guide HTML file:", error);
     return '<p>Kullanım kılavuzu yüklenirken bir hata oluştu.</p>';

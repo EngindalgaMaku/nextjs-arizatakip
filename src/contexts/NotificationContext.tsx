@@ -82,20 +82,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  // Sayfadan ayrılırken uyarı göster
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (user) {
-        e.preventDefault();
-        e.returnValue = 'Sayfadan ayrılırsanız bildirimlerinizi alamazsınız!';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [user]);
-
   // FCM kurulumu
   const setupFCM = async (userId: string, userRole: string): Promise<boolean> => {
     if (!userId || fcmInitialized.current) return false;
