@@ -141,6 +141,39 @@ export default function EditIssueForm({ issue, onClose, onSuccess }: EditIssueFo
         throw result.error;
       }
       
+      // --- Explicitly trigger notification for teacher --- 
+      // Check if the status was actually changed, especially if it affects the teacher
+      const statusChanged = formData.status !== issue.status;
+      
+      if (statusChanged) { // Only notify if status changed
+         console.log('Issue status changed by admin, triggering notification for teacher...');
+         try {
+           const notifyResponse = await fetch('/api/notify', {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+             },
+             body: JSON.stringify({
+               target: 'teacher',
+               issueId: issue.id,
+               updaterRole: 'admin' // Indicate admin initiated this update
+             }),
+           });
+           
+           if (!notifyResponse.ok) {
+              const errorData = await notifyResponse.json();
+              console.error('Failed to send teacher notification:', notifyResponse.status, errorData);
+              // Don't block the success flow, but log the error
+           } else {
+              console.log('Teacher notification request sent successfully.');
+           }
+         } catch (notificationError) {
+             console.error('Error sending teacher notification:', notificationError);
+             // Log error but continue
+         }
+      }
+      // --- End notification trigger --- 
+      
       // Show success message
       Swal.fire({
         title: 'Başarılı!',

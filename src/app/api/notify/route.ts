@@ -9,6 +9,7 @@ import { z } from 'zod';
 const notifyRequestBodySchema = z.object({
   target: z.enum(['admin', 'teacher']),
   issueId: z.string().optional(), // Optional, depending on notification type
+  updaterRole: z.enum(['admin', 'teacher']).optional(), // Who initiated the update?
   // Add other expected fields if necessary
 });
 
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid request body', details: validationResult.error.errors }, { status: 400 });
     }
 
-    const { target, issueId } = validationResult.data;
+    // Destructure updaterRole along with other data
+    const { target, issueId, updaterRole } = validationResult.data;
 
     let issueRecord: any = null;
     if (issueId) {
@@ -170,6 +172,13 @@ export async function POST(request: NextRequest) {
       });
 
     } else if (target === 'teacher' && issueRecord) {
+       // --- Add check for updater role --- 
+       if (updaterRole !== 'admin') {
+           console.log(`Skipping teacher notification for issue ${issueId} because update was not initiated by an admin (updater: ${updaterRole || 'unknown'}).`);
+           return NextResponse.json({ success: true, message: 'Notification skipped: update not by admin.' });
+       }
+       // --- End check ---
+
        // Fetch teacher tokens (assuming user_id is stored with the token)
        if (!issueRecord.user_id) {
          return NextResponse.json({ success: false, error: 'Arıza kaydı için öğretmen ID bulunamadı' }, { status: 400 });
