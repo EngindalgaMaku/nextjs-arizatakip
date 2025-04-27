@@ -333,149 +333,165 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setShowNotification(false);
   };
 
-  // Real-time FCM mesajlarını dinleme
+  // Real-time FCM mesajlarını dinleme - Sadece user değiştiğinde kurulur
   useEffect(() => {
-    console.log(`Sayfa değişikliği: ${pathname}, Kullanıcı: ${user ? 'var' : 'yok'}, Dinleyici: ${messageUnsubscribeRef.current ? 'aktif' : 'pasif'}`);
-    
-    // User varsa ve dinleyici yoksa veya sayfa geçişi olduysa
-    if (user && (!messageUnsubscribeRef.current || pathname)) {
-      setupFirebaseListeners();
+    let unsubscribe: (() => void) | null = null;
+
+    if (user) {
+      console.log(`Kullanıcı girişi algılandı, FCM dinleyicisi kuruluyor...`);
+      // setupFirebaseListeners'ı çağır ve unsubscribe fonksiyonunu al
+      const setup = async () => {
+         unsubscribe = await setupFirebaseListeners();
+      };
+      setup();
+    } else {
+      console.log(`Kullanıcı çıkışı algılandı, FCM dinleyicisi temizleniyor...`);
     }
-    
-    // Cleanup
+
+    // Cleanup function: sadece component unmount olduğunda veya user değiştiğinde çalışır
     return () => {
-      if (messageUnsubscribeRef.current) {
-        console.log('FCM dinleyicileri temizleniyor...');
-        messageUnsubscribeRef.current();
-        messageUnsubscribeRef.current = null;
+      if (unsubscribe) {
+        console.log('FCM dinleyicisi useEffect cleanup içinde temizleniyor...');
+        unsubscribe();
       }
     };
-  }, [user, pathname]);
+  }, [user]); // Sadece user'a bağımlı
 
-  const setupFirebaseListeners = async () => {
-    if (!user) return;
-    
+  const setupFirebaseListeners = async (): Promise<(() => void) | null> => {
+    if (!user) return null;
+
     try {
-      // Önceki dinleyiciler varsa temizle
-      if (messageUnsubscribeRef.current) {
-        messageUnsubscribeRef.current();
-        messageUnsubscribeRef.current = null;
-      }
-
-      // Messaging'i başlat ve token al
+      // Messaging'i başlat ve token al (Bu zaten izin kontrolü yapıyor)
       const token = await requestFCMPermission(user.id, user.role || 'anonymous');
       if (token) {
-        console.log("FCM token alındı:", token);
+        console.log("FCM token alındı (setupFirebaseListeners içinde):", token);
         setFcmToken(token);
+      } else {
+        console.warn("FCM token alınamadı, mesaj dinleyicisi kurulamıyor.");
+        return null; // Token yoksa dinleyici kurma
       }
 
-      // Messaging'i başlat ve mesaj dinleyicisi kur
       const app = firebaseApp();
-      if (app) {
-        const messaging = getMessaging(app);
-        if (messaging) {
-          console.log("Firebase mesaj dinleyicisi kuruluyor - sayfa:", pathname);
-          
-          // onMessage dinleyicisi kur ve referansını sakla
-          const unsubscribe = onMessage(messaging, (payload) => {
-            console.log("Foreground mesajı alındı:", payload, "sayfa:", pathname);
-            if (payload.notification?.title) {
-              const notificationData: Notification = {
-                id: 'fcm-' + Date.now().toString(),
-                message: payload.notification.body || "",
-                isRead: false,
-                fcmData: {
-                  title: payload.notification.title,
-                  url: payload.data?.url || "",
-                  userRole: user.role
-                }
-              };
-              
-              // Mesajı bildirim listesine ekle
-              setNotifications((prev) => [notificationData, ...prev]);
-              
-              // Bildirim sesini çal (sadece kullanıcı etkileşimi olduysa)
-              console.log("Bildirim sesi çalınıyor mu kontrol ediliyor...");
-              if (hasUserInteractedRef.current) {
-                console.log("Kullanıcı etkileşimde bulundu, bildirim sesi çalınıyor...");
-                playAlertSound();
-              } else {
-                  console.log("Kullanıcı henüz etkileşimde bulunmadığı için ses çalınmadı.");
-                  // Optionally show a subtle visual cue instead of sound if no interaction yet
-              }
-              
-              // Browser bildirimi göster (showBrowserNotification fonksiyonunu kullan)
-              if (payload.notification?.title) {
-                showBrowserNotification({
-                  title: payload.notification.title,
-                  body: payload.notification.body || '',
-                  url: payload.data?.url || '/'
-                });
-              }
-              
-              // Bildirim sayısını artır
-              setNotificationCount((prev) => prev + 1);
-              setLastNotification(notificationData);
-              
-              // Check if this is a teacher notification or if showToast flag is set
-              if (payload.data?.userRole === 'teacher' || payload.data?.showToast === 'true') {
-                // Show a special toast notification for teachers
-                toast.custom((t) => (
-                  <div
-                    onClick={() => toast.dismiss(t.id)}
-                    className={`$
-                      t.visible ? 'animate-enter' : 'animate-leave'
-                    } max-w-md w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
-                  >
-                    <div className="flex-1 w-0 p-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 pt-0.5">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                          </svg>
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <p className="text-sm font-semibold">{payload.notification?.title || 'Öğretmen Bildirimi'}</p>
-                          <p className="mt-1 text-sm">{payload.notification?.body || ''}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ));
-              } else {
-                // Default toast notification for non-teacher users (e.g., admin)
-                toast.custom((t) => (
-                  <div
-                    onClick={() => toast.dismiss(t.id)}
-                    className={`$
-                      t.visible ? 'animate-enter' : 'animate-leave'
-                    } max-w-md w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
-                  >
-                    <div className="flex-1 w-0 p-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 pt-0.5">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.017 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                          </svg>
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <p className="text-sm font-semibold">{payload.notification?.title || 'Yeni Bildirim'}</p>
-                          <p className="mt-1 text-sm">{payload.notification?.body || ''}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ));
-              }
-            }
-          });
-          
-          messageUnsubscribeRef.current = unsubscribe;
-          console.log('FCM mesaj dinleyicileri kuruldu');
-        }
+      if (!app) {
+         console.error("Firebase App başlatılamadı.");
+         return null;
       }
+      
+      const messaging = getMessaging(app);
+      if (!messaging) {
+          console.error("Firebase Messaging başlatılamadı.");
+          return null;
+      }
+      
+      console.log("Firebase onMessage dinleyicisi kuruluyor...");
+      const onMessageUnsubscribe = onMessage(messaging, (payload) => {
+        // Mevcut pathname'i burada alabiliriz, ama gerek yok gibi çünkü her sayfada aynı işlem yapılacak
+        const currentPath = window.location.pathname; 
+        console.log("Foreground mesajı alındı:", payload, "sayfa:", currentPath);
+
+        if (payload.notification?.title) {
+          const notificationData: Notification = {
+            id: 'fcm-' + Date.now().toString(),
+            message: payload.notification.body || "",
+            isRead: false,
+            fcmData: {
+              title: payload.notification.title,
+              url: payload.data?.url || "",
+              userRole: payload.data?.userRole || user.role // Gelen payload'dan userRole almayı dene
+            }
+          };
+
+          setNotifications((prev) => [notificationData, ...prev]);
+
+          console.log("Bildirim sesi çalınıyor mu kontrol ediliyor...");
+          if (hasUserInteractedRef.current) {
+            console.log("Kullanıcı etkileşimde bulundu, bildirim sesi çalınıyor...");
+            playAlertSound();
+          } else {
+            console.log("Kullanıcı henüz etkileşimde bulunmadığı için ses çalınmadı.");
+          }
+
+          if (payload.notification?.title) {
+            showBrowserNotification({
+              title: payload.notification.title,
+              body: payload.notification.body || '',
+              url: payload.data?.url || '/',
+              onClick: () => { // Browser bildirimine tıklanınca ilgili sayfaya git
+                 if (payload.data?.url) {
+                    router.push(payload.data.url);
+                 }
+              }
+            });
+          }
+
+          setNotificationCount((prev) => prev + 1);
+          setLastNotification(notificationData);
+          
+          // Toast gösterimleri (Bu kısım aynı kalabilir)
+          if (payload.data?.userRole === 'teacher' || payload.data?.showToast === 'true') {
+            // Show a special toast notification for teachers
+            toast.custom((t) => (
+              <div
+                onClick={() => { // Toast'a tıklanınca ilgili sayfaya git ve kapat
+                   toast.dismiss(t.id); 
+                   if (payload.data?.url) router.push(payload.data.url);
+                }}
+                className={`${
+                  t.visible ? 'animate-enter' : 'animate-leave'
+                } max-w-md w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
+              >
+                <div className="flex-1 w-0 p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 pt-0.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <p className="text-sm font-semibold">{payload.notification?.title || 'Öğretmen Bildirimi'}</p>
+                      <p className="mt-1 text-sm">{payload.notification?.body || ''}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ));
+          } else {
+            // Default toast notification for non-teacher users (e.g., admin)
+            toast.custom((t) => (
+              <div
+                onClick={() => { // Toast'a tıklanınca ilgili sayfaya git ve kapat
+                   toast.dismiss(t.id); 
+                   if (payload.data?.url) router.push(payload.data.url);
+                }}
+                className={`${
+                  t.visible ? 'animate-enter' : 'animate-leave'
+                } max-w-md w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
+              >
+                <div className="flex-1 w-0 p-4">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 pt-0.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.017 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <p className="text-sm font-semibold">{payload.notification?.title || 'Yeni Bildirim'}</p>
+                      <p className="mt-1 text-sm">{payload.notification?.body || ''}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ));
+          }
+        }
+      });
+
+      console.log('FCM onMessage dinleyicisi başarıyla kuruldu.');
+      return onMessageUnsubscribe; // Cleanup için unsubscribe fonksiyonunu döndür
+
     } catch (error) {
-      console.error('FCM ayarlanırken hata oluştu:', error);
+      console.error('FCM dinleyicisi kurulurken hata oluştu:', error);
+      return null;
     }
   };
 
