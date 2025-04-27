@@ -3,6 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import * as admin from 'firebase-admin';
 import { ServiceAccount } from 'firebase-admin';
 import { getMessaging } from 'firebase-admin/messaging';
+import { z } from 'zod';
+
+// Zod schema for request body validation (basic example)
+const notifyRequestBodySchema = z.object({
+  target: z.enum(['admin', 'teacher']),
+  issueId: z.string().optional(), // Optional, depending on notification type
+  // Add other expected fields if necessary
+});
 
 // Firebase Admin SDK başlatma
 if (!admin.apps.length) {
@@ -44,235 +52,179 @@ interface IssueRecord {
 
 export async function POST(request: NextRequest) {
   try {
-    const reqBody = await request.json();
-    
-    // Webhook verisini doğrula
-    const { type, table, record, old_record } = reqBody;
-    
-    if (!type || !table || !record) {
-      return NextResponse.json(
-        { error: 'Geçersiz webhook verisi' },
-        { status: 400 }
-      );
+    const body = await request.json();
+
+    // Validate request body
+    const validationResult = notifyRequestBodySchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json({ success: false, error: 'Invalid request body', details: validationResult.error.errors }, { status: 400 });
     }
-    
-    const issueRecord = record as IssueRecord;
-    
-    // Yeni arıza bildirimi oluşturulduğunda
-    if (type === 'INSERT' && table === 'issues') {
-      // Yöneticilerin FCM tokenlarını getir
-      const { data: adminUsers } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('role', 'admin');
-      
-      if (!adminUsers || adminUsers.length === 0) {
-        console.log('Yönetici kullanıcılar bulunamadı');
-        return NextResponse.json({ success: false, message: 'Yönetici bulunamadı' });
+
+    const { target, issueId } = validationResult.data;
+
+    let issueRecord: any = null;
+    if (issueId) {
+       const { data: issueData, error: issueError } = await supabaseAdmin
+        .from('issues')
+        .select('*')
+        .eq('id', issueId)
+        .single();
+
+      if (issueError) {
+        console.error('Arıza kaydı alınamadı:', issueError);
+        return NextResponse.json({ success: false, error: 'Arıza kaydı bulunamadı' }, { status: 404 });
       }
-      
-      // Yönetici ID'lerini al
-      const adminIds = adminUsers.map(admin => admin.id);
-      
-      // Yöneticilerin FCM tokenlarını getir
-      const { data: adminTokens } = await supabaseAdmin
-        .from('user_fcm_tokens')
+      issueRecord = issueData;
+    }
+
+    const sendNotifications = async (tokens: string[], notification: admin.messaging.Notification, data: { [key: string]: string }, userType: string) => {
+      if (tokens.length === 0) {
+        console.log(`${userType} için gönderilecek token bulunamadı.`);
+        return { successCount: 0, failureCount: 0, failedTokens: [] };
+      }
+
+      let successCount = 0;
+      let failureCount = 0;
+      const failedTokens: string[] = [];
+
+      const sendPromises = tokens.map(async (token) => {
+        const message: admin.messaging.Message = {
+          token,
+          notification,
+          data,
+          webpush: {
+            notification: {
+              ...notification,
+              icon: '/okullogo.png', // Consider making this configurable
+              badge: '/icons/badge-128x128.png', // Consider making this configurable
+              actions: [
+                {
+                  action: 'view',
+                  title: 'Görüntüle',
+                },
+              ],
+            },
+            fcmOptions: {
+              link: data.url,
+            },
+          },
+        };
+
+        try {
+          await getMessaging().send(message);
+          successCount++;
+        } catch (error: any) {
+          failureCount++;
+          failedTokens.push(token);
+          console.error(`Bildirim gönderme hatası (token: ${token.substring(0, 10)}...):`, error.code, error.message);
+          // Handle specific error codes (e.g., 'messaging/registration-token-not-registered')
+          if (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token') {
+             console.log(`Geçersiz veya kayıtsız token (${token.substring(0, 10)}...) siliniyor...`);
+             // Attempt to delete the invalid token from Supabase
+             await supabaseAdmin.from('fcm_tokens').delete().eq('token', token);
+          }
+          // Consider adding retry logic for transient errors if needed
+        }
+      });
+
+      await Promise.all(sendPromises);
+      return { successCount, failureCount, failedTokens };
+    };
+
+    if (target === 'admin' && issueRecord) {
+      // Fetch admin tokens
+      const { data: adminTokensData, error: adminTokensError } = await supabaseAdmin
+        .from('fcm_tokens')
         .select('token')
-        .in('user_id', adminIds)
-        .eq('user_role', 'admin')
-        .is('token', 'not.null');
-      
-      // FCM tokenlar var mı kontrol et
-      if (!adminTokens || adminTokens.length === 0) {
-        console.log('Bildirim gönderilecek admin FCM token bulunamadı');
-        return NextResponse.json({ success: false, message: 'Admin token bulunamadı' });
+        .eq('user_role', 'admin');
+
+      if (adminTokensError) {
+        console.error('Admin tokenları alınamadı:', adminTokensError);
+        return NextResponse.json({ success: false, error: 'Admin tokenları alınamadı' }, { status: 500 });
       }
-      
-      // Bildirim içeriği
-      const notification = {
+
+      const adminTokens = (adminTokensData as FCMToken[] || []).map(item => item.token);
+
+      // Prepare admin notification
+      const adminNotification = {
         title: 'Yeni Arıza Bildirimi',
-        body: `${issueRecord.reported_by} tarafından ${issueRecord.device_name} için arıza bildirimi oluşturuldu.`,
+        body: `${issueRecord.device_name} (${issueRecord.location}) için yeni bir arıza bildirimi var.`,
       };
-      
-      // FCM veri yükü
-      const data = {
-        issueId: issueRecord.id,
+      const adminData = {
+        issueId: issueRecord.id.toString(),
         deviceType: issueRecord.device_type,
         userRole: 'admin',
-        clickAction: 'https://atsis.husniyeozdilek.k12.tr/dashboard/issues',
+        clickAction: 'https://atsis.husniyeozdilek.k12.tr/dashboard/issues', // Use env variable?
         url: `/dashboard/issues?id=${issueRecord.id}`,
       };
-      
-      // Tokenları birleştir
-      const tokens = adminTokens.map((item: FCMToken) => item.token);
-      
-      // Her bir token için ayrı mesaj gönderme
-      let successCount = 0;
-      let failureCount = 0;
-      
-      // Her bir token için ayrı ayrı gönder
-      const sendPromises = tokens.map(async (token) => {
-        const message = {
-          token,
-          notification,
-          data,
-          webpush: {
-            notification: {
-              ...notification,
-              icon: '/okullogo.png',
-              badge: '/icons/badge-128x128.png',
-              actions: [
-                {
-                  action: 'view',
-                  title: 'Görüntüle',
-                },
-              ],
-            },
-            fcmOptions: {
-              link: data.url,
-            },
-          },
-        };
-        
-        try {
-          // Tek bir cihaza gönder
-          await getMessaging().send(message);
-          successCount++;
-          return true;
-        } catch (error) {
-          console.error('Bildirim gönderme hatası:', error);
-          failureCount++;
-          return false;
-        }
-      });
-      
-      // Tüm gönderim işlemlerinin tamamlanmasını bekle
-      await Promise.all(sendPromises);
-      
-      console.log(`${successCount} bildirim başarıyla gönderildi, ${failureCount} başarısız`);
-      
+
+      // Send to admins
+      const adminResult = await sendNotifications(adminTokens, adminNotification, adminData, 'Admin');
+      console.log(`Admin: ${adminResult.successCount} başarıyla gönderildi, ${adminResult.failureCount} başarısız.`);
+
       return NextResponse.json({
         success: true,
-        sent: successCount,
-        failed: failureCount,
+        sent: adminResult.successCount,
+        failed: adminResult.failureCount,
+        failedTokens: adminResult.failedTokens, // Optionally return failed tokens
       });
-    }
-    
-    // Arıza durumu güncellendiğinde
-    if (type === 'UPDATE' && table === 'issues' && (old_record as IssueRecord)?.status !== issueRecord.status) {
-      // Bildirimi oluşturan öğretmenin FCM tokenını getir
-      const { data: teacherInfo } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('name', issueRecord.reported_by)
-        .single();
-        
-      if (!teacherInfo) {
-        console.log('Bildirim sahibi öğretmen bulunamadı');
-        return NextResponse.json({ success: false, message: 'Öğretmen bulunamadı' });
-      }
-      
-      // Öğretmenin token'ını al
-      const { data: teacherTokens } = await supabaseAdmin
-        .from('user_fcm_tokens')
+
+    } else if (target === 'teacher' && issueRecord) {
+       // Fetch teacher tokens (assuming user_id is stored with the token)
+       if (!issueRecord.user_id) {
+         return NextResponse.json({ success: false, error: 'Arıza kaydı için öğretmen ID bulunamadı' }, { status: 400 });
+       }
+
+      const { data: teacherTokensData, error: teacherTokensError } = await supabaseAdmin
+        .from('fcm_tokens')
         .select('token')
-        .eq('user_id', teacherInfo.id)
-        .eq('user_role', 'teacher')
-        .is('token', 'not.null');
-      
-      if (!teacherTokens || teacherTokens.length === 0) {
-        console.log('Öğretmen için FCM token bulunamadı');
-        return NextResponse.json({ success: false, message: 'Öğretmen token bulunamadı' });
+        .eq('user_id', issueRecord.user_id) // Assuming user_id links the issue to the teacher
+        .eq('user_role', 'teacher');
+
+      if (teacherTokensError) {
+        console.error('Öğretmen tokenları alınamadı:', teacherTokensError);
+        return NextResponse.json({ success: false, error: 'Öğretmen tokenları alınamadı' }, { status: 500 });
       }
-      
-      // Durum isimleri
-      const statusNames: Record<string, string> = {
-        'beklemede': 'Beklemede',
-        'atandi': 'Atandı',
-        'inceleniyor': 'İnceleniyor',
-        'cozuldu': 'Çözüldü',
-        'kapatildi': 'Kapatıldı'
+
+      const teacherTokens = (teacherTokensData as FCMToken[] || []).map(item => item.token);
+
+      // Prepare teacher notification
+      let teacherNotificationTitle = 'Arıza Kaydı Güncellendi';
+      if (issueRecord.status === 'cozuldu') {
+          teacherNotificationTitle = 'Arıza Kaydınız Çözüldü!';
+      }
+      const teacherNotification = {
+          title: teacherNotificationTitle,
+          body: `"${issueRecord.device_name}" cihazı için durum "${issueRecord.status}" olarak güncellendi.`
       };
-      
-      // Bildirim içeriği
-      const notification = {
-        title: issueRecord.status === 'cozuldu' ? 'Arıza Kaydınız Çözüldü!' : 'Arıza Durumu Güncellendi',
-        body: `"${issueRecord.device_name}" cihazı için bildiriminizin durumu "${statusNames[issueRecord.status] || issueRecord.status}" olarak güncellendi.`,
-      };
-      
-      // FCM veri yükü
-      const data = {
-        issueId: issueRecord.id,
+       const teacherData = {
+        issueId: issueRecord.id.toString(),
         status: issueRecord.status,
         userRole: 'teacher',
-        clickAction: 'https://atsis.husniyeozdilek.k12.tr/teacher/issues',
+        clickAction: 'https://atsis.husniyeozdilek.k12.tr/teacher/issues', // Use env variable?
         url: `/teacher/issues?id=${issueRecord.id}`,
-        showToast: 'true'
+        showToast: 'true' // Keep this if used on the client
       };
-      
-      // Tokenları birleştir
-      const tokens = teacherTokens.map((item: FCMToken) => item.token);
-      
-      // Her bir token için ayrı mesaj gönderme
-      let successCount = 0;
-      let failureCount = 0;
-      
-      // Her bir token için ayrı ayrı gönder
-      const sendPromises = tokens.map(async (token) => {
-        const message = {
-          token,
-          notification,
-          data,
-          webpush: {
-            notification: {
-              ...notification,
-              icon: '/okullogo.png',
-              badge: '/icons/badge-128x128.png',
-              actions: [
-                {
-                  action: 'view',
-                  title: 'Görüntüle',
-                },
-              ],
-            },
-            fcmOptions: {
-              link: data.url,
-            },
-          },
-        };
-        
-        try {
-          // Tek bir cihaza gönder
-          await getMessaging().send(message);
-          successCount++;
-          return true;
-        } catch (error) {
-          console.error('Bildirim gönderme hatası:', error);
-          failureCount++;
-          return false;
-        }
-      });
-      
-      // Tüm gönderim işlemlerinin tamamlanmasını bekle
-      await Promise.all(sendPromises);
-      
-      console.log(`${successCount} durum güncelleme bildirimi gönderildi, ${failureCount} başarısız`);
-      
+
+      // Send to teacher
+       const teacherResult = await sendNotifications(teacherTokens, teacherNotification, teacherData, 'Öğretmen');
+       console.log(`Öğretmen: ${teacherResult.successCount} başarıyla gönderildi, ${teacherResult.failureCount} başarısız.`);
+
       return NextResponse.json({
         success: true,
-        sent: successCount,
-        failed: failureCount,
+        sent: teacherResult.successCount,
+        failed: teacherResult.failureCount,
+        failedTokens: teacherResult.failedTokens, // Optionally return failed tokens
       });
+    } else {
+        return NextResponse.json({ success: false, error: 'Geçersiz hedef veya eksik arıza ID' }, { status: 400 });
     }
-    
-    return NextResponse.json({ success: true, message: 'İşlenecek bildirim bulunamadı' });
-    
-  } catch (error) {
-    console.error('Bildirim gönderirken hata:', error);
-    return NextResponse.json(
-      { error: 'Bildirim gönderilemedi' },
-      { status: 500 }
-    );
+
+  } catch (error: any) {
+    console.error('Bildirim API Hatası:', error);
+    // Distinguish between client errors (4xx) and server errors (5xx)
+    const statusCode = error instanceof z.ZodError ? 400 : 500;
+    return NextResponse.json({ success: false, error: error.message || 'Internal Server Error' }, { status: statusCode });
   }
 }
 

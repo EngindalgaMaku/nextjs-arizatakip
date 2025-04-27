@@ -6,135 +6,114 @@ import { toast } from 'react-hot-toast';
 // Sesli bildirim için sabit
 const NOTIFICATION_ALERT_SOUND = '/notification-alert.mp3';
 
+// --- Start Audio Stability Enhancements ---
+let audioContext: AudioContext | null = null;
+let alertSoundBuffer: AudioBuffer | null = null;
+let isAudioInitialized = false;
+let lastPlayTime = 0;
+const PLAY_COOLDOWN_MS = 1000; // Only play sound max once per second
+
+// Function to initialize AudioContext and load sound
+// This should be called after the first user interaction
+export async function initializeAudio() {
+  if (isAudioInitialized || typeof window === 'undefined') return;
+
+  try {
+    console.log('Initializing AudioContext...');
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Resume context if it's suspended (required by some browsers)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+
+    console.log('Fetching notification sound...');
+    const response = await fetch(NOTIFICATION_ALERT_SOUND);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sound: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    
+    console.log('Decoding audio data...');
+    alertSoundBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    isAudioInitialized = true;
+    console.log('Audio initialized successfully.');
+    
+  } catch (error) {
+    console.error('Failed to initialize audio or load sound:', error);
+    // Keep audioContext null or reset if partially initialized
+    audioContext = null;
+    alertSoundBuffer = null;
+    isAudioInitialized = false; // Mark as not initialized on error
+  }
+}
+
+// Enhanced playAlertSound function
+export function playAlertSound(showVisualFallback = true) {
+  const now = Date.now();
+  
+  // Check if audio is initialized and cooldown period has passed
+  if (!audioContext || !alertSoundBuffer || !isAudioInitialized) {
+    console.warn('Audio not initialized, cannot play sound.');
+    if (showVisualFallback) {
+        showVisualNotificationFallback();
+    }
+    return; // Do not attempt to play if not ready
+  }
+  
+  if (now - lastPlayTime < PLAY_COOLDOWN_MS) {
+      console.log('Skipping sound play due to cooldown.');
+      return; // Exit if played too recently
+  }
+
+  // Check context state again before playing
+  if (audioContext.state === 'suspended') {
+    console.warn('AudioContext is suspended, attempting to resume...');
+    audioContext.resume().then(() => {
+       console.log('AudioContext resumed, trying to play again shortly...');
+       // Optionally try playing again after a short delay, or rely on the next trigger
+    }).catch(err => {
+        console.error('Failed to resume AudioContext:', err);
+        if (showVisualFallback) showVisualNotificationFallback();
+    });
+    if (showVisualFallback) showVisualNotificationFallback(); // Show fallback immediately if suspended
+    return;
+  }
+  
+  if (audioContext.state !== 'running') {
+      console.warn(`AudioContext not running (state: ${audioContext.state}), cannot play sound.`);
+      if (showVisualFallback) showVisualNotificationFallback();
+      return;
+  }
+
+  try {
+    console.log('Attempting to play notification sound via AudioContext...');
+    const source = audioContext.createBufferSource();
+    source.buffer = alertSoundBuffer;
+    source.connect(audioContext.destination);
+    source.start();
+    lastPlayTime = now; // Update last play time on successful start
+    console.log('Notification sound started.');
+
+    source.onended = () => {
+        console.log('Notification sound finished.');
+    };
+
+  } catch (error) {
+    console.error('Error playing sound via AudioContext:', error);
+    if (showVisualFallback) {
+      showVisualNotificationFallback();
+    }
+  }
+}
+// --- End Audio Stability Enhancements ---
+
 interface NotificationOptions {
   title: string;
   body: string;
   url?: string;
   onClick?: () => void;
-}
-
-/**
- * Play notification sound
- * @param {boolean} showVisualFallback - If true, shows a visual fallback notification when sound can't play
- */
-export function playAlertSound(showVisualFallback = true) {
-  try {
-    console.log("Bildirim sesi çalmaya başlıyor...");
-    
-    // Kullanıcının etkileşim durumunu kontrol et
-    const hasInteracted = document.querySelectorAll('*:active').length > 0 || 
-                         document.hasFocus() || 
-                         document.visibilityState === 'visible';
-    
-    console.log("Kullanıcı etkileşim durumu:", hasInteracted);
-    
-    // First play the alert sound
-    const alertAudio = new Audio(NOTIFICATION_ALERT_SOUND);
-    alertAudio.volume = 0.5;
-    alertAudio.muted = true; // Önce sessiz başlat
-    
-    // Debug için daha fazla çıktı
-    alertAudio.addEventListener('canplay', () => {
-      console.log("Alert ses dosyası yüklendi ve çalınmaya hazır");
-      // Yüklendiğinde ses açma
-      try {
-        alertAudio.muted = false;
-      } catch (e) {
-        console.log("Ses açma hatası:", e);
-      }
-    });
-    
-    alertAudio.addEventListener('playing', () => {
-      console.log("Alert ses dosyası çalıyor");
-    });
-    
-    alertAudio.addEventListener('error', (e) => {
-      console.error("Alert ses dosyası çalma hatası:", e);
-    });
-    
-    // Then play the main notification sound after the alert finishes
-    alertAudio.onended = () => {
-      console.log("Alert ses dosyası bitti, ana bildirim sesi başlıyor");
-      const notificationAudio = new Audio('/notification.mp3');
-      notificationAudio.volume = 0.5;
-      notificationAudio.muted = true; // Önce sessiz başlat
-      
-      notificationAudio.addEventListener('canplay', () => {
-        console.log("Ana bildirim ses dosyası yüklendi ve çalınmaya hazır");
-        // Yüklendiğinde ses açma
-        try {
-          notificationAudio.muted = false;
-        } catch (e) {
-          console.log("Ses açma hatası:", e);
-        }
-      });
-      
-      notificationAudio.addEventListener('playing', () => {
-        console.log("Ana bildirim ses dosyası çalıyor");
-      });
-      
-      notificationAudio.addEventListener('error', (e) => {
-        console.error("Ana bildirim ses dosyası çalma hatası:", e);
-      });
-      
-      notificationAudio.play().catch(e => {
-        console.log('Ana bildirim ses dosyası çalma hatası:', e);
-        // Sessiz oynatma deneyin
-        if (e.name === 'NotAllowedError') {
-          console.log("Sessiz oynatma deneniyor...");
-          notificationAudio.muted = true;
-          notificationAudio.play().catch(e2 => {
-            console.log("Sessiz çalma da başarısız oldu:", e2);
-            
-            // Görsel bildirim göster
-            if (showVisualFallback) {
-              showVisualNotificationFallback();
-            }
-          });
-        }
-      });
-    };
-    
-    // Start playing the alert sound
-    alertAudio.play().catch(e => {
-      console.log('Alert ses dosyası çalma hatası:', e);
-      
-      // Kullanıcı etkileşimi olmadan çalma hatası alındığında
-      if (e.name === 'NotAllowedError') {
-        console.log("Sessiz oynatma deneniyor...");
-        alertAudio.muted = true;
-        alertAudio.play().catch(e2 => {
-          console.log("Sessiz çalma da başarısız oldu:", e2);
-          
-          // Fallback olarak sadece vibration kullanmayı dene
-          if ('vibrate' in navigator) {
-            navigator.vibrate([200, 100, 200]);
-            console.log("Vibration kullanıldı");
-          }
-          
-          // If alert sound fails, try to play at least the notification sound
-          const fallbackAudio = new Audio('/notification.mp3');
-          fallbackAudio.volume = 0.5;
-          fallbackAudio.muted = true;
-          fallbackAudio.play().catch(e => {
-            console.log('Yedek ses dosyası çalma hatası:', e);
-            
-            // Görsel bildirim göster
-            if (showVisualFallback) {
-              showVisualNotificationFallback();
-            }
-          });
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Bildirim sesi çalma hatası:', error);
-    
-    // Ses çalınamadığında görsel bildirim göster
-    if (showVisualFallback) {
-      showVisualNotificationFallback();
-    }
-  }
 }
 
 /**

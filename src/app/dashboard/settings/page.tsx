@@ -420,6 +420,8 @@ export default function SettingsPage() {
       setSuccess(false);
       setUpdating(true);
       
+      console.log('Updating teacher access code:', teacherAccessCode);
+      
       // Demo modda doğrudan localStorage'a kaydet
       if (DEMO_MODE) {
         if (typeof window !== 'undefined') {
@@ -441,20 +443,40 @@ export default function SettingsPage() {
       } else {
         // Supabase ile gerçek kayıt
         if (!userId) {
+          console.error('User ID missing for updating teacher code');
           setError('Oturum bilgisi bulunamadı. Lütfen yeniden giriş yapın.');
           return;
         }
         
-        const { error } = await updateSystemSetting(
+        console.log(`Updating teacher code with userId: ${userId}`);
+        const result = await updateSystemSetting(
           TEACHER_ACCESS_CODE_KEY, 
           teacherAccessCode,
           userId
         );
         
-        if (error) {
-          throw error;
+        if (result.error) {
+          console.error('Supabase error updating teacher code:', result.error);
+          throw new Error(`Supabase hatası: ${(result.error as any).message || (result.error as any).details || JSON.stringify(result.error)}`);
         }
         
+        // Verification: Read back from database to confirm update
+        const { data: verifyData, error: verifyError } = await getSystemSetting(TEACHER_ACCESS_CODE_KEY);
+        
+        if (verifyError) {
+          console.error('Error verifying teacher code update:', verifyError);
+          throw new Error(`Güncelleme doğrulaması sırasında hata oluştu: ${verifyError.message}`);
+        }
+        
+        if (!verifyData || verifyData.value !== teacherAccessCode) {
+          console.error('Verification failed - saved value does not match:', {
+            expected: teacherAccessCode,
+            actual: verifyData?.value
+          });
+          throw new Error('Güncelleme doğrulanamadı: Kaydedilen değer beklenen değerle eşleşmiyor');
+        }
+        
+        console.log('Teacher code successfully updated and verified:', teacherAccessCode);
         setSuccess(true);
       }
       

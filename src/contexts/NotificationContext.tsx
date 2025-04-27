@@ -8,7 +8,7 @@ import { getMessaging, onMessage, getToken } from 'firebase/messaging';
 import { requestFCMPermission, clearFCMToken, setupMessageListener } from '@/lib/firebase';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getDeviceTypeName } from '@/lib/helpers';
-import { playAlertSound, showBrowserNotification } from '@/lib/notification';
+import { playAlertSound, showBrowserNotification, initializeAudio } from '@/lib/notification';
 import { 
   supabase, 
   saveFCMToken, 
@@ -59,7 +59,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const trackUserInteraction = () => {
       console.log("Kullanıcı sayfayla etkileşime girdi");
-      hasUserInteractedRef.current = true;
+      if (!hasUserInteractedRef.current) {
+          hasUserInteractedRef.current = true;
+          // Initialize audio *after* first interaction
+          initializeAudio().then(() => {
+              console.log('Audio system initialized after user interaction.');
+          });
+      }
     };
     
     // Çeşitli kullanıcı etkileşimi olaylarını dinle
@@ -168,25 +174,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         // Bildirim göster
         toast.custom((t) => (
           <div
-            className={`${
+            onClick={() => toast.dismiss(t.id)}
+            className={`$
               t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+            } max-w-md w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
           >
             <div className="flex-1 w-0 p-4">
-              <div className="flex items-start">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 pt-0.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.017 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                  </svg>
+                </div>
                 <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-900">Yeni Bildirim</p>
-                  <p className="mt-1 text-sm text-gray-500">{payload.new.mesaj}</p>
+                  <p className="text-sm font-semibold">Yeni Bildirim</p>
+                  <p className="mt-1 text-sm">{payload.new.mesaj}</p>
                 </div>
               </div>
-            </div>
-            <div className="flex border-l border-gray-200">
-              <button
-                onClick={() => toast.dismiss(t.id)}
-                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                Kapat
-              </button>
             </div>
           </div>
         ));
@@ -390,9 +394,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               // Mesajı bildirim listesine ekle
               setNotifications((prev) => [notificationData, ...prev]);
               
-              // Bildirim sesini çal
-              console.log("Bildirim sesi çalınıyor - sayfa:", pathname);
-              playAlertSound();
+              // Bildirim sesini çal (sadece kullanıcı etkileşimi olduysa)
+              console.log("Bildirim sesi çalınıyor mu kontrol ediliyor...");
+              if (hasUserInteractedRef.current) {
+                console.log("Kullanıcı etkileşimde bulundu, bildirim sesi çalınıyor...");
+                playAlertSound();
+              } else {
+                  console.log("Kullanıcı henüz etkileşimde bulunmadığı için ses çalınmadı.");
+                  // Optionally show a subtle visual cue instead of sound if no interaction yet
+              }
               
               // Browser bildirimi göster (showBrowserNotification fonksiyonunu kullan)
               if (payload.notification?.title) {
@@ -412,65 +422,47 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 // Show a special toast notification for teachers
                 toast.custom((t) => (
                   <div
-                    className={`${
+                    onClick={() => toast.dismiss(t.id)}
+                    className={`$
                       t.visible ? 'animate-enter' : 'animate-leave'
-                    } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                    } max-w-md w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
                   >
                     <div className="flex-1 w-0 p-4">
-                      <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                          <svg className="h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 pt-0.5">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                           </svg>
                         </div>
                         <div className="ml-3 flex-1">
-                          <p className="text-sm font-medium text-gray-900">{payload.notification?.title || 'Yeni Bildirim'}</p>
-                          <p className="mt-1 text-sm text-gray-500">{payload.notification?.body || ''}</p>
+                          <p className="text-sm font-semibold">{payload.notification?.title || 'Öğretmen Bildirimi'}</p>
+                          <p className="mt-1 text-sm">{payload.notification?.body || ''}</p>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex border-l border-gray-200">
-                      <button
-                        onClick={() => {
-                          toast.dismiss(t.id);
-                          // Navigate to the issue page
-                          if (payload.data?.url) {
-                            router.push(payload.data.url);
-                          }
-                        }}
-                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        Görüntüle
-                      </button>
                     </div>
                   </div>
-                ), {
-                  duration: 5000, // 5 seconds
-                  position: 'bottom-right',
-                });
+                ));
               } else {
-                // Default toast notification for non-teacher users
+                // Default toast notification for non-teacher users (e.g., admin)
                 toast.custom((t) => (
                   <div
-                    className={`${
+                    onClick={() => toast.dismiss(t.id)}
+                    className={`$
                       t.visible ? 'animate-enter' : 'animate-leave'
-                    } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                    } max-w-md w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 cursor-pointer`}
                   >
                     <div className="flex-1 w-0 p-4">
-                      <div className="flex items-start">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 pt-0.5">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.017 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                          </svg>
+                        </div>
                         <div className="ml-3 flex-1">
-                          <p className="text-sm font-medium text-gray-900">{payload.notification?.title || 'Yeni Bildirim'}</p>
-                          <p className="mt-1 text-sm text-gray-500">{payload.notification?.body || ''}</p>
+                          <p className="text-sm font-semibold">{payload.notification?.title || 'Yeni Bildirim'}</p>
+                          <p className="mt-1 text-sm">{payload.notification?.body || ''}</p>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex border-l border-gray-200">
-                      <button
-                        onClick={() => toast.dismiss(t.id)}
-                        className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        Kapat
-                      </button>
                     </div>
                   </div>
                 ));

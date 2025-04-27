@@ -489,23 +489,35 @@ export async function getTeacherAccessCode() {
 // Sistem ayarını güncelle
 export async function updateSystemSetting(key: string, value: string, userId: string) {
   try {
+    console.log(`Attempting to update system setting: ${key} with value: ${value}`);
+    
     if (DEMO_MODE) {
       // Demo modda sadece localStorage'a kaydet
       if (typeof window !== 'undefined') {
         localStorage.setItem(key, value);
+        console.log(`DEMO MODE: Setting saved to localStorage: ${key}=${value}`);
       }
       return { data: { key, value }, error: null };
     } else {
       // Supabase'e kaydet
+      console.log(`Checking if setting exists: ${key}`);
       const { data: existingData, error: checkError } = await getSystemSetting(key);
       
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116: Sonuç bulunamadı hatası
-        throw checkError;
+      if (checkError) {
+        console.error(`Error checking existing setting: ${key}`, checkError);
+        if (checkError.code !== 'PGRST116') { // PGRST116: Sonuç bulunamadı hatası
+          throw checkError;
+        }
       }
+      
+      console.log(`Existing data for ${key}:`, existingData);
+      
+      let result;
       
       if (existingData) {
         // Mevcut ayarı güncelle
-        return supabase
+        console.log(`Updating existing setting: ${key}`);
+        result = await supabase
           .from('settings')
           .update({
             value,
@@ -515,7 +527,8 @@ export async function updateSystemSetting(key: string, value: string, userId: st
           .eq('key', key);
       } else {
         // Yeni ayar oluştur
-        return supabase
+        console.log(`Inserting new setting: ${key}`);
+        result = await supabase
           .from('settings')
           .insert({
             key,
@@ -525,6 +538,14 @@ export async function updateSystemSetting(key: string, value: string, userId: st
             updated_by: userId
           });
       }
+      
+      if (result.error) {
+        console.error(`Error ${existingData ? 'updating' : 'inserting'} setting:`, result.error);
+        throw result.error;
+      }
+      
+      console.log(`Successfully ${existingData ? 'updated' : 'inserted'} setting: ${key}`);
+      return result;
     }
   } catch (err) {
     console.error('Ayar güncellenirken hata:', err);
