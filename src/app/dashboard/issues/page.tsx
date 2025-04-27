@@ -7,6 +7,7 @@ import EditIssueForm from './edit-form';
 import ViewIssueForm from './view-issue-form';
 import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Swal from 'sweetalert2';
+import { supabase } from '@/lib/supabase';
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -92,6 +93,39 @@ export default function IssuesPage() {
 
   useEffect(() => {
     loadIssues();
+  }, [loadIssues]);
+  
+  // Supabase realtime aboneliği
+  useEffect(() => {
+    console.log('Admin realtime aboneliği kuruluyor...');
+    
+    const issueSubscription = supabase
+      .channel('admin-issues-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'issues'
+        },
+        (payload) => {
+          console.log('Yeni arıza bildirimi alındı:', payload);
+          const newIssue = payload.new as Issue;
+          
+          // Listeyi güncelle
+          loadIssues();
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Realtime subscription status: ${status}`);
+      });
+    
+    return () => {
+      console.log('Realtime aboneliği sonlandırılıyor...');
+      if (issueSubscription) {
+        supabase.removeChannel(issueSubscription);
+      }
+    };
   }, [loadIssues]);
   
   // Sayfa değiştiğinde işlemler
