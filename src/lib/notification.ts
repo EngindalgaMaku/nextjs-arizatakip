@@ -17,9 +17,25 @@ interface NotificationOptions {
  */
 export function playAlertSound() {
   try {
-    const audio = new Audio('/notification.mp3');
-    audio.volume = 0.5;
-    audio.play().catch(e => console.log('Audio play failed:', e));
+    // First play the alert sound
+    const alertAudio = new Audio(NOTIFICATION_ALERT_SOUND);
+    alertAudio.volume = 0.5;
+    
+    // Then play the main notification sound after the alert finishes
+    alertAudio.onended = () => {
+      const notificationAudio = new Audio('/notification.mp3');
+      notificationAudio.volume = 0.5;
+      notificationAudio.play().catch(e => console.log('Audio play failed:', e));
+    };
+    
+    // Start playing the alert sound
+    alertAudio.play().catch(e => {
+      console.log('Alert audio play failed:', e);
+      // If alert sound fails, try to play at least the notification sound
+      const fallbackAudio = new Audio('/notification.mp3');
+      fallbackAudio.volume = 0.5;
+      fallbackAudio.play().catch(e => console.log('Fallback audio play failed:', e));
+    });
   } catch (error) {
     console.error('Error playing notification sound:', error);
   }
