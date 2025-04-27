@@ -10,6 +10,7 @@ interface Notification {
   id: string;
   message: string;
   isRead: boolean;
+  fcmData?: any;
 }
 
 interface NotificationContextType {
@@ -92,7 +93,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         
         if (user) {
           // FCM izinlerini iste
-          const token = await requestFCMPermission();
+          const token = await requestFCMPermission(user.role || 'anonymous');
           if (token) {
             setFcmToken(token);
             console.log('FCM token başarıyla alındı ve kaydedildi');
@@ -114,7 +115,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               const notification = {
                 id: payload.data?.issueId || `fcm-${Date.now()}`,
                 message: payload.notification?.body || 'Yeni bir bildirim',
-                isRead: false
+                isRead: false,
+                fcmData: payload.data // FCM verilerini sakla
               };
               
               // Bildirimleri güncelle
@@ -295,8 +297,48 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       )
     );
     
-    // İlgili arıza detayına yönlendir
-    router.push(`/dashboard/issues?id=${id}`);
+    // Bulabildiğimiz bildirimi al
+    const notification = notifications.find(n => n.id === id);
+    
+    // FCM-spesifik veri var mı kontrol et
+    const isFcmNotification = id.startsWith('fcm-');
+    
+    if (isFcmNotification && notification && notification.fcmData) {
+      // FCM verisi varsa, kullanıcı rolüne göre yönlendir
+      const { url, userRole } = notification.fcmData;
+      
+      // Güncel kullanıcının rolünü kontrol et
+      const checkUserPermission = async () => {
+        try {
+          const { loadUserData } = await import('@/lib/supabase');
+          const userData = await loadUserData();
+          
+          if (userData && userData.role === 'admin') {
+            // Admin her iki URL'ye de gidebilir
+            router.push(url);
+          } else if (userRole === 'teacher' && url.startsWith('/teacher')) {
+            // Öğretmen sadece öğretmen URL'lerine gidebilir
+            router.push(url);
+          } else {
+            // Yetkisiz erişim
+            console.error('Bu bildirimi görüntülemek için yetkiniz yok');
+            // Kullanıcıya uygun sayfaya yönlendir
+            router.push(userData && userData.role === 'admin' ? '/dashboard' : '/teacher');
+          }
+        } catch (error) {
+          console.error('Kullanıcı yetki kontrolünde hata:', error);
+          // Hata durumunda ana sayfaya yönlendir
+          router.push('/');
+        }
+      };
+      
+      checkUserPermission();
+    } else {
+      // Normal bildirimlerde veya FCM verisi yoksa, varsayılan yönlendirme
+      const targetUrl = `/dashboard/issues?id=${id}`;
+      router.push(targetUrl);
+    }
+    
     setShowNotification(false);
   };
 

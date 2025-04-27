@@ -32,9 +32,11 @@ const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 /**
  * FCM için token alır ve kaydeder
  */
-export const requestFCMPermission = async (): Promise<string | null> => {
+export const requestFCMPermission = async (userRole: string): Promise<string | null> => {
   try {
     if (!messaging) return null;
+
+    console.log(`FCM izni isteniyor. Kullanıcı rolü: ${userRole}`);
 
     // İzinleri kontrol et
     if (Notification.permission !== 'granted') {
@@ -59,13 +61,11 @@ export const requestFCMPermission = async (): Promise<string | null> => {
       });
 
       if (currentToken) {
-        console.log('FCM token alındı:', currentToken);
+        console.log('FCM token alındı:', currentToken.substring(0, 10) + '...');
         
-        // Token'ı yerel depolamaya kaydet
+        // Token'ı yerel depolamaya rol bilgisiyle birlikte kaydet
         localStorage.setItem('fcm_token', currentToken);
-        
-        // Burada token'ı backend'e kaydedebiliriz
-        // await registerFCMTokenWithBackend(currentToken);
+        localStorage.setItem('fcm_user_role', userRole);
         
         return currentToken;
       } else {

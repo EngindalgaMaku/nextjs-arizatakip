@@ -9,32 +9,34 @@ export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
     const response = NextResponse.next();
 
-    // Admin ve öğretmen kısmı için yönlendirme kuralları
-    if (path.startsWith('/admin')) {
-      // Admin dashboard erişimi kontrolü
-      if (path.startsWith('/admin/dashboard')) {
-        // Demo modda admin kontrolü bypass edilir
-        if (DEMO_MODE) {
-          console.log('Demo mod: Admin kimlik doğrulama atlandı');
-          return response;
-        }
-        
-        const adminSessionCookie = request.cookies.get('admin-session');
-        if (!adminSessionCookie?.value) {
-          // Session yoksa login sayfasına yönlendir
+    // Dashboard yolları için güvenlik kontrolü
+    if (path.startsWith('/dashboard')) {
+      // Demo modda kontrolü bypass et
+      if (DEMO_MODE) {
+        console.log('Demo mod: Yönetici kimlik doğrulama atlandı');
+        return response;
+      }
+
+      // Supabase ile auth kontrolü yapılmalı
+      const supabaseSessionCookie = request.cookies.get('sb-auth-token');
+      const adminSessionCookie = request.cookies.get('admin-session');
+      
+      if (!supabaseSessionCookie || !adminSessionCookie?.value) {
+        // Session yoksa login sayfasına yönlendir
+        console.log('Yönetici oturumu bulunamadı, giriş sayfasına yönlendiriliyor');
+        return NextResponse.redirect(new URL('/login', request.url));
+      }
+      
+      try {
+        // Admin session kontrolü
+        const session = JSON.parse(adminSessionCookie.value);
+        if (!session || !session.role || session.role !== 'admin') {
+          console.log('Geçersiz yönetici oturumu, giriş sayfasına yönlendiriliyor');
           return NextResponse.redirect(new URL('/login', request.url));
         }
-        
-        try {
-          // Session değerini ayrıştır
-          const session = JSON.parse(adminSessionCookie.value);
-          if (!session || !session.role || session.role !== 'admin') {
-            return NextResponse.redirect(new URL('/login', request.url));
-          }
-        } catch (error) {
-          console.error('Admin session ayrıştırma hatası:', error);
-          return NextResponse.redirect(new URL('/login', request.url));
-        }
+      } catch (error) {
+        console.error('Yönetici oturumu ayrıştırma hatası:', error);
+        return NextResponse.redirect(new URL('/login', request.url));
       }
     } else if (path.startsWith('/teacher')) {
       // Öğretmen bölümü erişimi kontrolü
@@ -82,7 +84,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
+    '/dashboard/:path*',
     '/teacher/:path*',
   ],
 }; 

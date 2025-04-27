@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
       const { data: adminTokens } = await supabaseAdmin
         .from('user_fcm_tokens')
         .select('token')
-        .in('user_id', adminIds);
+        .in('user_id', adminIds)
+        .eq('user_role', 'admin');
       
       // FCM tokenlar var mı kontrol et
       if (!adminTokens || adminTokens.length === 0) {
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
       const data = {
         issueId: issueRecord.id,
         deviceType: issueRecord.device_type,
+        userRole: 'admin',
         clickAction: 'https://atsis.husniyeozdilek.k12.tr/dashboard/issues',
         url: `/dashboard/issues?id=${issueRecord.id}`,
       };
@@ -173,7 +175,8 @@ export async function POST(request: NextRequest) {
       const { data: teacherTokens } = await supabaseAdmin
         .from('user_fcm_tokens')
         .select('token')
-        .eq('user_id', teacherInfo.id);
+        .eq('user_id', teacherInfo.id)
+        .eq('user_role', 'teacher');
       
       if (!teacherTokens || teacherTokens.length === 0) {
         console.log('Öğretmen için FCM token bulunamadı');
@@ -199,6 +202,7 @@ export async function POST(request: NextRequest) {
       const data = {
         issueId: issueRecord.id,
         status: issueRecord.status,
+        userRole: 'teacher',
         clickAction: 'https://atsis.husniyeozdilek.k12.tr/teacher/issues',
         url: `/teacher/issues?id=${issueRecord.id}`,
       };

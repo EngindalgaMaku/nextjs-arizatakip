@@ -629,7 +629,19 @@ export async function saveFCMToken(userId: string, token: string) {
       return { success: false, error: 'Token boş' };
     }
 
-    console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId})`);
+    // Kullanıcı rolünü al
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
+    
+    if (userError) {
+      console.error('FCM token kaydedilemedi: Kullanıcı rolü alınamadı', userError);
+      return { success: false, error: userError };
+    }
+
+    console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId}, Rol: ${userData.role})`);
 
     const { data, error } = await supabase
       .from('user_fcm_tokens')
@@ -637,6 +649,7 @@ export async function saveFCMToken(userId: string, token: string) {
         {
           user_id: userId, 
           token: token,
+          user_role: userData.role, // Kullanıcı rolünü ekle
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
