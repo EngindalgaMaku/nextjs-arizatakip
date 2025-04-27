@@ -5,7 +5,6 @@ import { toast } from 'react-hot-toast';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
-import { BeforeUnloadEvent } from 'next/dist/compiled/@edge-runtime/primitives/events';
 import { getMessaging, onMessage } from 'firebase/messaging';
 import { saveFCMToken, deleteFCMToken } from '@/lib/supabase';
 import { requestFCMPermission, clearFCMToken } from '@/lib/firebase';
@@ -25,7 +24,7 @@ interface NotificationContextType {
   showNotification: boolean;
   closeNotification: () => void;
   handleNotificationClick: (id: string) => void;
-  updateDashboardCounts?: (increment: boolean) => void;
+  updateDashboardCounts: (increment: boolean) => void;
   notificationCount: number;
   lastNotification: any | null;
   setupFCM: (userId: string, userRole: string) => Promise<boolean>;
@@ -324,11 +323,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Bu durumda increment aslında handler fonksiyonu
       updateDashboardCountsRef.current = increment as unknown as (increment: boolean) => void;
     }
-  };
-
-  // Dashboard komponenti bu methodu çağırarak sayı güncelleme fonksiyonunu kaydeder
-  const registerDashboardCountsUpdater = (updater: (increment: boolean) => void) => {
-    updateDashboardCountsRef.current = updater;
   };
 
   // Bildirimi kapat

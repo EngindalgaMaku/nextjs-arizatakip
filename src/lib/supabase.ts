@@ -617,20 +617,47 @@ export async function updatePassword(currentPassword: string, newPassword: strin
 /**
  * Kullanıcının FCM token'ını veritabanına kaydeder
  */
-export async function saveFCMToken(userId: string, token: string, userRole?: string) {
+export async function saveFCMToken(
+  userIdOrParams: string | { 
+    userId: string; 
+    token: string; 
+    userRole?: string;
+    deviceInfo?: {
+      browser: string;
+      platform: string;
+    }
+  }, 
+  token?: string, 
+  userRole?: string
+) {
   try {
+    // Parametreleri ayır
+    let userId: string;
+    let tokenValue: string;
+    let role = userRole;
+    let deviceInfo: any = null;
+    
+    // Obje olarak gönderilmiş mi kontrol et
+    if (typeof userIdOrParams === 'object') {
+      userId = userIdOrParams.userId;
+      tokenValue = userIdOrParams.token;
+      role = userIdOrParams.userRole;
+      deviceInfo = userIdOrParams.deviceInfo;
+    } else {
+      userId = userIdOrParams;
+      tokenValue = token || '';
+    }
+
     if (!userId) {
       console.error('FCM token kaydedilemedi: Kullanıcı ID boş');
       return { success: false, error: 'Kullanıcı ID boş' };
     }
 
-    if (!token) {
+    if (!tokenValue) {
       console.error('FCM token kaydedilemedi: Token boş');
       return { success: false, error: 'Token boş' };
     }
 
-    let role = userRole;
-    
     // Eğer rol belirtilmemişse kullanıcı rolünü al
     if (!role) {
       const { data: userData, error: userError } = await supabase
@@ -647,7 +674,7 @@ export async function saveFCMToken(userId: string, token: string, userRole?: str
       role = userData.role;
     }
 
-    console.log(`FCM token kaydediliyor: ${token.substring(0, 10)}... (Kullanıcı: ${userId}, Rol: ${role})`);
+    console.log(`FCM token kaydediliyor: ${tokenValue.substring(0, 10)}... (Kullanıcı: ${userId}, Rol: ${role})`);
 
     // Önce bu kullanıcı için tüm eski token'ları temizle
     await clearUserTokens(userId);
@@ -658,10 +685,11 @@ export async function saveFCMToken(userId: string, token: string, userRole?: str
       .upsert(
         {
           user_id: userId, 
-          token: token,
+          token: tokenValue,
           user_role: role, // Kullanıcı rolünü ekle
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          device_info: deviceInfo ? JSON.stringify(deviceInfo) : null
         },
         { 
           onConflict: 'user_id,token',
