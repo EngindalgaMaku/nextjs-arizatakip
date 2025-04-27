@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, BellAlertIcon, UsersIcon, DocumentTextIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, PrinterIcon, FilmIcon, DeviceTabletIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
-import { getSession, getIssues, getUsers, getAllIssues } from '@/lib/supabase';
+import { getSession, getIssues, getUsers, getAllIssues, supabase } from '@/lib/supabase';
 import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/lib/helpers';
 import { useNotifications } from '@/contexts/NotificationContext';
 import Swal from 'sweetalert2';
@@ -49,81 +49,31 @@ export default function DashboardPage() {
     }
   }, [updateDashboardCounts, handleCountUpdate]);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
-      try {
-        const session = await getSession();
-        if (!session) {
-          router.push('/login');
-          return;
-        }
-        
-        // Supabase'den verileri getir
-        const { data: issues, error: issuesError } = await getAllIssues();
-        const { data: users, error: usersError } = await getUsers();
-        
-        if (issuesError) {
-          console.error('Arızalar yüklenirken hata oluştu:', issuesError);
-          Swal.fire({
-            title: 'Hata!',
-            text: 'Veriler yüklenirken bir hata oluştu. Supabase bağlantınızı kontrol edin.',
-            icon: 'error',
-            confirmButtonText: 'Tamam',
-            confirmButtonColor: '#3085d6'
-          });
-          
-          // Hata durumunda sayıları sıfırla
-          setCounts({
-            openIssuesCount: 0,
-            resolvedIssuesCount: 0,
-            usersCount: 0,
-            totalIssuesCount: 0
-          });
-          setRecentIssues([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        // İstatistikleri hesapla
-        const issuesData = issues || [];
-        const usersData = users || [];
-        
-        const openIssues = issuesData.filter(issue => 
-          issue.status !== 'cozuldu' && issue.status !== 'kapatildi'
-        );
-        
-        const resolvedIssues = issuesData.filter(issue => 
-          issue.status === 'cozuldu' || issue.status === 'kapatildi'
-        );
-        
-        setCounts({
-          openIssuesCount: openIssues.length,
-          resolvedIssuesCount: resolvedIssues.length,
-          usersCount: usersData.length,
-          totalIssuesCount: issuesData.length
+  // Dashboard verilerini yükleme fonksiyonu
+  const loadDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      const session = await getSession();
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+      
+      // Supabase'den verileri getir
+      const { data: issues, error: issuesError } = await getAllIssues();
+      const { data: users, error: usersError } = await getUsers();
+      
+      if (issuesError) {
+        console.error('Arızalar yüklenirken hata oluştu:', issuesError);
+        Swal.fire({
+          title: 'Hata!',
+          text: 'Veriler yüklenirken bir hata oluştu. Supabase bağlantınızı kontrol edin.',
+          icon: 'error',
+          confirmButtonText: 'Tamam',
+          confirmButtonColor: '#3085d6'
         });
-
-        // Son eklenen 5 arızayı al - yeni arızalar en üstte
-        const sortedIssues = [...issuesData]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 5)
-          .map(issue => ({
-            id: issue.id,
-            device_type: issue.device_type,
-            device_name: issue.device_name,
-            description: issue.description,
-            status: issue.status,
-            reported_by: issue.reported_by,
-            room_number: issue.room_number || 'Belirtilmedi',
-            created_at: issue.created_at
-          }));
-
-        setRecentIssues(sortedIssues);
-      } catch (err) {
-        console.error('Dashboard verileri yüklenemedi:', err);
         
-        // Hata durumunda sıfır değerler göster
+        // Hata durumunda sayıları sıfırla
         setCounts({
           openIssuesCount: 0,
           resolvedIssuesCount: 0,
@@ -131,11 +81,62 @@ export default function DashboardPage() {
           totalIssuesCount: 0
         });
         setRecentIssues([]);
-      } finally {
         setIsLoading(false);
+        return;
       }
-    };
+      
+      // İstatistikleri hesapla
+      const issuesData = issues || [];
+      const usersData = users || [];
+      
+      const openIssues = issuesData.filter(issue => 
+        issue.status !== 'cozuldu' && issue.status !== 'kapatildi'
+      );
+      
+      const resolvedIssues = issuesData.filter(issue => 
+        issue.status === 'cozuldu' || issue.status === 'kapatildi'
+      );
+      
+      setCounts({
+        openIssuesCount: openIssues.length,
+        resolvedIssuesCount: resolvedIssues.length,
+        usersCount: usersData.length,
+        totalIssuesCount: issuesData.length
+      });
 
+      // Son eklenen 5 arızayı al - yeni arızalar en üstte
+      const sortedIssues = [...issuesData]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5)
+        .map(issue => ({
+          id: issue.id,
+          device_type: issue.device_type,
+          device_name: issue.device_name,
+          description: issue.description,
+          status: issue.status,
+          reported_by: issue.reported_by,
+          room_number: issue.room_number || 'Belirtilmedi',
+          created_at: issue.created_at
+        }));
+
+      setRecentIssues(sortedIssues);
+    } catch (err) {
+      console.error('Dashboard verileri yüklenemedi:', err);
+      
+      // Hata durumunda sıfır değerler göster
+      setCounts({
+        openIssuesCount: 0,
+        resolvedIssuesCount: 0,
+        usersCount: 0,
+        totalIssuesCount: 0
+      });
+      setRecentIssues([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     // Check authentication first
     const checkAuth = async () => {
       try {
@@ -158,6 +159,58 @@ export default function DashboardPage() {
       }
     });
   }, [router]);
+
+  // Supabase realtime aboneliği
+  useEffect(() => {
+    console.log('Dashboard realtime aboneliği kuruluyor...');
+    
+    const issueSubscription = supabase
+      .channel('dashboard-issues-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'issues'
+        },
+        (payload) => {
+          console.log('Dashboard: Yeni arıza bildirimi alındı:', payload);
+          
+          // Sayıları güncelle
+          setCounts(prev => ({
+            ...prev,
+            openIssuesCount: prev.openIssuesCount + 1,
+            totalIssuesCount: prev.totalIssuesCount + 1
+          }));
+          
+          // Son arızalar listesini güncelle
+          const newIssue = payload.new;
+          const formattedIssue = {
+            id: newIssue.id,
+            device_type: newIssue.device_type,
+            device_name: newIssue.device_name,
+            description: newIssue.description,
+            status: newIssue.status,
+            reported_by: newIssue.reported_by,
+            room_number: newIssue.room_number || 'Belirtilmedi',
+            created_at: newIssue.created_at
+          };
+          
+          // Yeni arızayı listenin başına ekle ve listenin boyutunu 5'te tut
+          setRecentIssues(prev => [formattedIssue, ...prev.slice(0, 4)]);
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Dashboard realtime subscription status: ${status}`);
+      });
+    
+    return () => {
+      console.log('Dashboard realtime aboneliği sonlandırılıyor...');
+      if (issueSubscription) {
+        supabase.removeChannel(issueSubscription);
+      }
+    };
+  }, []);
 
   // Bildirim geldiğinde son arızaları da güncelle
   useEffect(() => {
