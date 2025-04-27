@@ -380,94 +380,92 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        {filteredIssues.length === 0 ? (
-          <div className="py-10 px-4 text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">Arıza kaydı bulunamadı</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || selectedStatus !== 'all' || selectedType !== 'all' || selectedLocation !== 'all' || selectedReporter !== 'all' 
-                ? 'Arama kriterlerinize uygun arıza kaydı bulunamadı' 
-                : 'Henüz arıza kaydı bulunmamaktadır'}
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {filteredIssues.map((issue) => (
-              <li key={issue.id} className="px-4 py-4">
-                <div 
-                  className="bg-white overflow-hidden border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
-                  onClick={() => viewIssueDetails(issue)}
-                >
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
-                          <span className="text-indigo-700 font-medium">{getDeviceTypeName(issue.device_type as any).charAt(0)}</span>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
-                          <div className="text-xs text-gray-500">{getDeviceTypeName(issue.device_type as any)}</div>
-                        </div>
+    <div className="space-y-6"> 
+      {filteredIssues.length === 0 ? (
+        <div className="py-10 px-4 text-center text-gray-500">
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Arıza kaydı bulunamadı</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchTerm || selectedStatus !== 'all' || selectedType !== 'all' || selectedLocation !== 'all' || selectedReporter !== 'all' 
+              ? 'Arama kriterlerinize uygun arıza kaydı bulunamadı' 
+              : 'Henüz arıza kaydı bulunmamaktadır'}
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-gray-200"> 
+          {filteredIssues.map((issue: IssueData) => (
+            <li key={issue.id} className="px-4 py-4 sm:px-0">
+              <div 
+                className="bg-white overflow-hidden border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => viewIssueDetails(issue)}
+              >
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                        <span className="text-indigo-700 font-medium">{getDeviceTypeName(issue.device_type as any).charAt(0)}</span>
                       </div>
-                      <span className={`px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${getStatusColor(issue.status as any)}`}>
-                        {getStatusName(issue.status as any)}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{issue.device_name}</div>
+                        <div className="text-xs text-gray-500">{getDeviceTypeName(issue.device_type as any)}</div>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded-full ${getStatusColor(issue.status as any)}`}>
+                      {getStatusName(issue.status as any)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-wrap text-sm text-gray-500 mt-2">
+                    <div className="w-1/2 mb-1">
+                      <span className="font-medium">Konum:</span> {getLocationName(issue.device_location as any)} ({issue.room_number})
+                    </div>
+                    <div className="w-1/2 mb-1">
+                      <span className="font-medium">Öncelik:</span> <span className={`px-1.5 py-0.5 rounded-full text-xs ${getPriorityColor(issue.priority as any)}`}>
+                        {(issue.priority as any) === 'dusuk' ? 'Düşük' :
+                          (issue.priority as any) === 'normal' ? 'Normal' :
+                          (issue.priority as any) === 'yuksek' ? 'Yüksek' :
+                          (issue.priority as any) === 'kritik' ? 'Kritik' : issue.priority}
                       </span>
                     </div>
-                    
-                    <div className="flex flex-wrap text-sm text-gray-500 mt-2">
-                      <div className="w-1/2 mb-1">
-                        <span className="font-medium">Konum:</span> {getLocationName(issue.device_location as any)} ({issue.room_number})
-                      </div>
-                      <div className="w-1/2 mb-1">
-                        <span className="font-medium">Öncelik:</span> <span className={`px-1.5 py-0.5 rounded-full text-xs ${getPriorityColor(issue.priority as any)}`}>
-                          {(issue.priority as any) === 'dusuk' ? 'Düşük' :
-                            (issue.priority as any) === 'normal' ? 'Normal' :
-                            (issue.priority as any) === 'yuksek' ? 'Yüksek' :
-                            (issue.priority as any) === 'kritik' ? 'Kritik' : issue.priority}
-                        </span>
-                      </div>
-                      <div className="w-full mb-1">
-                        <span className="font-medium">Oluşturan:</span> {issue.reported_by}
-                      </div>
-                      <div className="w-full">
-                        <span className="font-medium">Tarih:</span> {issue.created_at}
-                      </div>
+                    <div className="w-full mb-1">
+                      <span className="font-medium">Oluşturan:</span> {issue.reported_by}
                     </div>
-                    
-                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end space-x-2">
-                      <button
-                        className="p-2 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          viewIssueDetails(issue);
-                        }}
-                        title="Detay Görüntüle"
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        className="p-2 rounded-md text-red-600 hover:bg-red-50 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteIssue(issue.id);
-                        }}
-                        title="Sil"
-                      >
-                        <TrashIcon className="w-5 h-5" />
-                      </button>
+                    <div className="w-full">
+                      <span className="font-medium">Tarih:</span> {issue.created_at}
                     </div>
                   </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end space-x-2">
+                    <button
+                      className="p-2 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        viewIssueDetails(issue);
+                      }}
+                      title="Detay Görüntüle"
+                    >
+                      <EyeIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      className="p-2 rounded-md text-red-600 hover:bg-red-50 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteIssue(issue.id);
+                      }}
+                      title="Sil"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* View Modal */}
       {isViewModalOpen && currentIssue && (
         <div className="modal-overlay" onClick={closeViewModal}>
@@ -666,17 +664,27 @@ export default function IssuesPage() {
   // useSearchParams'ı useEffect içinde kullan
   useEffect(() => {
     // Client-side kodu olduğunu belirt
-    const searchParams = new URLSearchParams(window.location.search);
-    const id = searchParams.get('id');
-    setIssueId(id);
+    if (typeof window !== 'undefined') { // Check if window is defined
+      const searchParams = new URLSearchParams(window.location.search);
+      const id = searchParams.get('id');
+      setIssueId(id);
+    }
   }, []);
 
   return (
-    <div className="container mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div> 
+      <div className="flex justify-between items-center mb-6 px-4 sm:px-0"> {/* Added padding for consistency */} 
         <h1 className="text-2xl font-bold text-gray-900">Arıza Bildirimleri</h1>
+        {/* Buton buraya taşınabilir veya başka yerde kalabilir */} 
       </div>
-      <IssueList selectedId={issueId} onSelectIssue={setSelectedIssue} />
+      {/* Wrap IssueList in a dashboard-style card */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="p-4 sm:p-6"> {/* Added padding */} 
+           {/* Filter controls can be added here inside the card header if desired */}
+           {/* Example: <div className="mb-4">...filters...</div> */}
+          <IssueList selectedId={issueId} onSelectIssue={setSelectedIssue} />
+        </div>
+      </div>
     </div>
   );
 } 
