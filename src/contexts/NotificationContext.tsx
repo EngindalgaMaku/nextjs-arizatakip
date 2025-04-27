@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { usePathname, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
 import { getMessaging, onMessage, getToken } from 'firebase/messaging';
 import { requestFCMPermission, clearFCMToken, setupMessageListener } from '@/lib/firebase';
@@ -52,12 +51,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [notificationCount, setNotificationCount] = useState(0);
   const [lastNotification, setLastNotification] = useState<any | null>(null);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
-
-  // Supabase bağlantısını oluştur
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  );
 
   // Sayfadan ayrılırken uyarı göster
   useEffect(() => {

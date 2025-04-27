@@ -1,9 +1,7 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from './supabase';
 import { type Database } from './database.types';
 
 export async function signIn(email: string, password: string) {
-  const supabase = createClientComponentClient<Database>();
-  
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -13,18 +11,16 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
-  const supabase = createClientComponentClient<Database>();
-  return supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  return { error };
 }
 
 export async function getSession() {
-  const supabase = createClientComponentClient<Database>();
   const { data, error } = await supabase.auth.getSession();
   return { session: data.session, error };
 }
 
 export async function getUser() {
-  const supabase = createClientComponentClient<Database>();
   const { data, error } = await supabase.auth.getUser();
   return { user: data.user, error };
 }
