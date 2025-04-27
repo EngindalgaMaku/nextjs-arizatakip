@@ -8,7 +8,8 @@ import {
   UserGroupIcon, 
   DocumentTextIcon,
   Cog6ToothIcon,
-  ArrowLeftOnRectangleIcon
+  ArrowLeftOnRectangleIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline';
 
 interface NavItemProps {
@@ -76,6 +77,13 @@ export default function Sidebar() {
           icon={<Cog6ToothIcon />} 
           label="Ayarlar"
           active={pathname.startsWith('/dashboard/settings')} 
+        />
+
+        <NavItem 
+          href="/dashboard/guide" 
+          icon={<BookOpenIcon />} 
+          label="Kullanım Kılavuzu"
+          active={pathname === '/dashboard/guide'} 
         />
       </nav>
       
