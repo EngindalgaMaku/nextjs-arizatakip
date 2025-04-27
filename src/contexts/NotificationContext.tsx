@@ -6,19 +6,16 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
 import { getMessaging, onMessage, getToken } from 'firebase/messaging';
-import { requestFCMPermission, clearFCMToken } from '@/lib/firebase';
+import { requestFCMPermission, clearFCMToken, setupMessageListener } from '@/lib/firebase';
 import { BellIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { getDeviceTypeName } from '@/lib/helpers';
 import { playAlertSound } from '@/lib/notification';
 import { 
   supabase, 
-  subscribeToRealtimeUpdates, 
-  getEnrolledClasses, 
   saveFCMToken, 
   deleteFCMToken
 } from "@/lib/supabase";
-import { useUser } from "@/contexts/UserContext";
-import { firebaseApp, initializeFirebaseMessaging, setupMessageListener } from "@/lib/firebase";
+import { firebaseApp } from "@/lib/firebase";
 
 interface Notification {
   id: string;
@@ -94,21 +91,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return false;
       }
       
-      // Token'ı Supabase'e kaydet
-      const saveResult = await saveFCMToken({
-        userId,
-        token: fcmToken,
-        userRole,
-        deviceInfo: {
-          browser: navigator.userAgent,
-          platform: navigator.platform
-        }
-      });
-      
-      if (!saveResult) {
-        console.error('Token Supabase\'e kaydedilemedi');
-        return false;
-      }
+      // Token zaten kaydedildi, durumu güncelle
+      fcmInitialized.current = true;
+      console.log('FCM başarıyla kuruldu');
       
       // FCM mesaj dinleyici
       if ('serviceWorker' in navigator) {
@@ -160,7 +145,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             }
           });
           
-          fcmInitialized.current = true;
           console.log('FCM başarıyla kuruldu');
           return true;
         } catch (error) {
@@ -393,12 +377,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Firebase token alma işlemi
   useEffect(() => {
     if (user && user.id) {
-      initializeFirebaseMessaging()
+      // Messaging'i başlat ve token al
+      requestFCMPermission(user.id, user.role || 'anonymous')
         .then((token) => {
           if (token) {
             console.log("FCM token alındı:", token);
             setFcmToken(token);
-            saveFCMToken(user.id, token, user.role);
           }
         })
         .catch((error) => {
@@ -406,48 +390,38 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         });
 
       // Mesaj dinleyicisi
-      setupMessageListener((payload) => {
-        console.log("Foreground mesajı alındı:", payload);
-        if (payload.notification?.title) {
-          const notificationData = {
-            id: Date.now().toString(),
-            title: payload.notification.title,
-            message: payload.notification.body || "",
-            url: payload.data?.url || "",
-            status: "unread",
-            read: false,
-            timestamp: new Date().toISOString(),
-          };
-          
-          // Mesajı bildirim listesine ekle
-          setNotifications((prev) => {
-            // Aynı ID ile bildirim varsa güncelle, yoksa ekle
-            const existingNotificationIndex = prev.findIndex(n => n.id === notificationData.id);
-            if (existingNotificationIndex !== -1) {
-              const updatedNotifications = [...prev];
-              updatedNotifications[existingNotificationIndex] = notificationData;
-              return updatedNotifications;
-            }
-            // Yeni bildirim ekle
-            return [notificationData, ...prev];
-          });
-          
-          // Bildirim sesini çal
-          playAlertSound();
-          
-          // Okunmamış bildirimleri güncelle
-          setNotificationCount((prev) => prev + 1);
-          setLastNotification(notificationData);
-        }
-      });
-
-      // Temizleme işlemi
-      return () => {
-        if (fcmToken) {
-          console.log("FCM token temizleniyor...");
-          deleteFCMToken(user.id, fcmToken).catch(console.error);
-        }
-      };
+      const messaging = getMessaging(firebaseApp);
+      if (messaging) {
+        const unsubscribe = onMessage(messaging, (payload) => {
+          console.log("Foreground mesajı alındı:", payload);
+          if (payload.notification?.title) {
+            const notificationData: Notification = {
+              id: 'fcm-' + Date.now().toString(),
+              message: payload.notification.body || "",
+              isRead: false,
+              fcmData: {
+                title: payload.notification.title,
+                url: payload.data?.url || "",
+                userRole: user.role
+              }
+            };
+            
+            // Mesajı bildirim listesine ekle
+            setNotifications((prev) => [notificationData, ...prev]);
+            
+            // Bildirim sesini çal
+            playAlertSound();
+            
+            // Okunmamış bildirimleri güncelle
+            setNotificationCount((prev) => prev + 1);
+            setLastNotification(notificationData);
+          }
+        });
+        
+        return () => {
+          if (unsubscribe) unsubscribe();
+        };
+      }
     }
   }, [user]);
 

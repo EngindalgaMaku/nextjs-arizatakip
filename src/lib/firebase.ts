@@ -21,13 +21,13 @@ const isBrowser = typeof window !== 'undefined';
 
 /**
  * Firebase Cloud Messaging'i başlat ve token al
- * @param saveFCMToken Token kaydetme fonksiyonu
+ * @param saveFCMTokenFn Token kaydetme fonksiyonu
  * @param userId Kullanıcı ID
  * @param userRole Kullanıcı rolü
  * @returns 
  */
 export async function initializeFirebaseMessaging(
-  saveFCMToken: (userId: string, token: string, userRole: string) => Promise<void>,
+  saveFCMTokenFn: (userId: string, token: string, userRole?: string) => Promise<any>,
   userId: string,
   userRole: string
 ) {
@@ -86,7 +86,7 @@ export async function initializeFirebaseMessaging(
 
       // Token kaydet
       if (token) {
-        await saveFCMToken(userId, token, userRole);
+        await saveFCMTokenFn(userId, token, userRole);
       }
 
       return { messaging, token };
@@ -178,5 +178,80 @@ export const clearFCMToken = async (): Promise<boolean> => {
     return false;
   }
 };
+
+// FCM izinlerini iste ve token al
+export async function requestFCMPermission(userId: string, userRole: string): Promise<string | null> {
+  try {
+    if (!isBrowser) return null;
+
+    // Tarayıcı bildirim API'sini kontrol et
+    if (!("Notification" in window)) {
+      console.error("Bu tarayıcı bildirim desteği sunmuyor");
+      return null;
+    }
+
+    // İzin kontrolü
+    if (Notification.permission === "denied") {
+      console.warn("Bildirim izni reddedilmiş durumda");
+      return null;
+    }
+
+    // FCM desteği kontrolü
+    const isMessagingSupported = await isSupported();
+    if (!isMessagingSupported) {
+      console.warn("Firebase Cloud Messaging bu tarayıcıda desteklenmiyor");
+      return null;
+    }
+
+    // Service worker kaydı
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/',
+        });
+        console.log('Service Worker kaydedildi:', registration);
+      } catch (err) {
+        console.error('Service Worker kaydı başarısız:', err);
+        return null;
+      }
+    } else {
+      console.warn('Service Worker bu tarayıcıda desteklenmiyor');
+      return null;
+    }
+
+    // Messaging nesnesi
+    const messaging = getMessaging(firebaseApp);
+
+    // İzin iste
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.warn('Bildirim izni verilmedi');
+      return null;
+    }
+
+    // Token al
+    const token = await getToken(messaging, {
+      vapidKey: 'BBXCgNXccb-2nRV9Tm5NQXx0gXKgDFt1_exf3RhI6IgNn5FnMOrcKXKpY55D3l9YS-U_FtLm5fX_1xgfWPeYtWs',
+    });
+
+    if (!token) {
+      console.error('FCM token alınamadı');
+      return null;
+    }
+
+    console.log('FCM token alındı:', token);
+
+    // Token'ı kaydet
+    const result = await saveFCMToken(userId, token, userRole);
+    if (!result || result.error) {
+      console.error('Token kaydedilemedi:', result?.error);
+    }
+
+    return token;
+  } catch (error) {
+    console.error('FCM izni alınırken hata:', error);
+    return null;
+  }
+}
 
 export default firebaseApp; 
