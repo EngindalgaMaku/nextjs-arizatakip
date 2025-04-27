@@ -9,9 +9,6 @@ import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/
 import { useNotifications } from '@/contexts/NotificationContext';
 import { playAlertSound, showBrowserNotification } from '@/lib/notification';
 import Swal from 'sweetalert2';
-import { DashboardLayout } from '@/layouts/DashboardLayout';
-import DashboardCards from '@/components/dashboard/DashboardCards';
-import { ChartCard } from '@/components/dashboard/ChartCard';
 import { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import DemographicTable from '@/components/dashboard/DemographicTable';
@@ -23,6 +20,9 @@ import dashboardReducer from '@/reducers/dashboardReducer';
 import { UserRole } from '@/generated/client';
 import { cache } from 'react';
 import { NotificationTestButton } from '@/components/dashboard/NotificationTestButton';
+import DashboardCards from '@/components/dashboard/DashboardCards';
+import { ChartCard } from '@/components/dashboard/ChartCard';
+import { DashboardLayout } from '@/layouts/DashboardLayout';
 
 // Demo modu sabit değişkeni
 const DEMO_MODE = false;
@@ -267,7 +267,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="admin-content">
+    <DashboardLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-6">
           <h1 className="text-3xl font-bold text-gray-900">Yönetim Paneli</h1>
@@ -699,6 +699,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 } 
