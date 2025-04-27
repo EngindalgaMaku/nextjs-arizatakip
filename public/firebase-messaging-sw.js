@@ -22,9 +22,56 @@ firebase.initializeApp({
 // Firebase Messaging nesnesini al
 const messaging = firebase.messaging();
 
+// Mevcut kullanıcı rolünü alır
+const getUserRole = () => {
+  // IndexedDB'den veya localStorage'dan rol bilgisini alma girişimi
+  return new Promise((resolve) => {
+    // Bilinen rol anahtarları
+    const knownRoleKeys = ['fcm_user_role', 'userRole', 'role'];
+    
+    // IndexedDB yoklama (asenkron)
+    let roleFound = false;
+    
+    // Service worker'da localStorage doğrudan erişilemez, clients API kullanmamız gerekiyor
+    self.clients.matchAll().then(clients => {
+      if (clients.length > 0) {
+        // İlk client'a mesaj gönder, rol bilgisi iste
+        const client = clients[0];
+        client.postMessage({ type: 'GET_USER_ROLE' });
+        
+        // Cevabı beklemek yerine, varsayılan olarak genel rol (zamanı korumak için)
+        setTimeout(() => {
+          if (!roleFound) resolve('any');
+        }, 100);
+        
+        // Mesaj dinleyicisi
+        self.addEventListener('message', event => {
+          if (event.data && event.data.type === 'USER_ROLE_RESPONSE') {
+            roleFound = true;
+            resolve(event.data.role || 'any');
+          }
+        });
+      } else {
+        // Client yoksa, varsayılan rol
+        resolve('any');
+      }
+    }).catch(() => resolve('any'));
+  });
+};
+
 // Arkaplanda bildirim alındığında
-messaging.onBackgroundMessage((payload) => {
+messaging.onBackgroundMessage(async (payload) => {
   console.log('[firebase-messaging-sw.js] Arkaplanda mesaj alındı ', payload);
+  
+  // Rol kontrolü
+  const userRole = await getUserRole();
+  const messageRole = payload.data?.userRole || 'any';
+  
+  // Bildirim bu kullanıcının rolü için değilse gösterme
+  if (userRole !== 'any' && messageRole !== 'any' && userRole !== messageRole) {
+    console.log(`[firebase-messaging-sw.js] Bildirim rolü (${messageRole}) kullanıcı rolüyle (${userRole}) uyuşmuyor. Bildirim gösterilmeyecek.`);
+    return;
+  }
   
   // Bildirim başlığı ve içeriği
   const notificationTitle = payload.notification?.title || 'Yeni Bildirim';
@@ -51,6 +98,17 @@ self.addEventListener('notificationclick', (event) => {
   
   // URL varsa tarayıcıyı aç ve o sayfaya yönlendir
   const urlToOpen = event.notification.data?.url || '/dashboard';
+  const userRole = event.notification.data?.userRole || 'any';
+  
+  // Rolüne göre yönlendirme kontrolü
+  let targetUrl;
+  if (userRole === 'admin') {
+    targetUrl = urlToOpen.startsWith('/') ? urlToOpen : '/dashboard';
+  } else if (userRole === 'teacher') {
+    targetUrl = urlToOpen.startsWith('/teacher') ? urlToOpen : '/teacher/issues';
+  } else {
+    targetUrl = urlToOpen; // varsayılan
+  }
   
   // Tüm istemcileri kontrol et
   event.waitUntil(
@@ -62,14 +120,14 @@ self.addEventListener('notificationclick', (event) => {
           // Açık bir sekme varsa onu öne getir ve URL'e yönlendir
           if (client.url && 'focus' in client) {
             client.focus();
-            client.navigate(urlToOpen);
+            client.navigate(targetUrl);
             return;
           }
         }
         
         // Açık bir pencere yoksa yeni bir tane aç
         if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
+          return clients.openWindow(targetUrl);
         }
       })
   );
@@ -86,4 +144,11 @@ self.addEventListener('activate', (event) => {
   console.log('[firebase-messaging-sw.js] Service Worker aktifleşti');
   // Tüm istemciler üzerinde kontrol sahibi ol
   event.waitUntil(clients.claim());
+});
+
+// Client'lardan gelen mesajları dinle
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SET_USER_ROLE') {
+    console.log('[firebase-messaging-sw.js] Kullanıcı rolü güncellendi:', event.data.role);
+  }
 }); 

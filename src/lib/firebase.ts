@@ -86,6 +86,14 @@ export const requestFCMPermission = async (userRole: string): Promise<string | n
         localStorage.setItem('fcm_token', currentToken);
         localStorage.setItem('fcm_user_role', userRole);
         
+        // Service worker'a rol değişimini bildir
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_USER_ROLE',
+            role: userRole
+          });
+        }
+        
         return currentToken;
       } else {
         console.log('FCM token alınamadı');

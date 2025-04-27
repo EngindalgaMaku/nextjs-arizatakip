@@ -69,6 +69,41 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // Periyodik kontrol (SPA geçişlerini yakalamak için)
     const interval = setInterval(checkRouteChange, 1000);
 
+    // Service worker mesaj dinleyicisi ekle
+    const setupServiceWorkerCommunication = () => {
+      // Service worker mesaj olayını dinle
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'GET_USER_ROLE') {
+          // Service worker rol bilgisi istediğinde, mevcut rolü gönder
+          const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
+          
+          // Tüm service worker'lara cevap gönder
+          navigator.serviceWorker.ready.then(registration => {
+            if (registration.active) {
+              registration.active.postMessage({
+                type: 'USER_ROLE_RESPONSE',
+                role: userRole
+              });
+            }
+          });
+        }
+      });
+    };
+    
+    // Service worker kurulumu yoklaması
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(() => {
+        setupServiceWorkerCommunication();
+        
+        // Service worker'a mevcut rol bilgisini gönder
+        const userRole = localStorage.getItem('fcm_user_role') || 'anonymous';
+        navigator.serviceWorker.controller?.postMessage({
+          type: 'SET_USER_ROLE',
+          role: userRole
+        });
+      });
+    }
+
     return () => {
       // Aboneliği temizle
       if (supabaseSubscription.current) {
