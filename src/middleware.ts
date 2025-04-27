@@ -17,11 +17,10 @@ export function middleware(request: NextRequest) {
         return response;
       }
 
-      // Supabase ile auth kontrolü yapılmalı
-      const supabaseSessionCookie = request.cookies.get('sb-auth-token');
+      // Admin session cookie kontrolü
       const adminSessionCookie = request.cookies.get('admin-session');
       
-      if (!supabaseSessionCookie || !adminSessionCookie?.value) {
+      if (!adminSessionCookie?.value) {
         // Session yoksa login sayfasına yönlendir
         console.log('Yönetici oturumu bulunamadı, giriş sayfasına yönlendiriliyor');
         return NextResponse.redirect(new URL('/login', request.url));
@@ -34,6 +33,9 @@ export function middleware(request: NextRequest) {
           console.log('Geçersiz yönetici oturumu, giriş sayfasına yönlendiriliyor');
           return NextResponse.redirect(new URL('/login', request.url));
         }
+        
+        // Oturum geçerliyse devam et
+        return response;
       } catch (error) {
         console.error('Yönetici oturumu ayrıştırma hatası:', error);
         return NextResponse.redirect(new URL('/login', request.url));
@@ -59,6 +61,9 @@ export function middleware(request: NextRequest) {
           if (!session || !session.role || session.role !== 'teacher') {
             return NextResponse.redirect(new URL('/teacher/login', request.url));
           }
+          
+          // Oturum geçerliyse devam et
+          return response;
         } catch (error) {
           console.error('Öğretmen session ayrıştırma hatası:', error);
           return NextResponse.redirect(new URL('/teacher/login', request.url));

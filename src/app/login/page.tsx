@@ -120,10 +120,14 @@ export default function LoginPage() {
           }), {
             maxAge: 60 * 60 * 24 * 365, // 1 yıl
             path: '/',
+            sameSite: 'lax'
           });
           
-          // Yönlendirme
-          router.push('/dashboard');
+          console.log('Oturum cookie kaydedildi, dashboard sayfasına yönlendiriliyor');
+          
+          // Tarayıcı yönlendirme sorunlarını önlemek için doğrudan URL yönlendirmesi
+          window.location.href = window.location.origin + '/dashboard';
+          return;
         } else {
           throw new Error('Kullanıcı bilgileri alınamadı');
         }
