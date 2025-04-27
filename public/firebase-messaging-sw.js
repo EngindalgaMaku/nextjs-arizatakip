@@ -8,12 +8,12 @@ importScripts('https://www.gstatic.com/firebasejs/9.2.0/firebase-messaging-compa
 // NOT: Bu değerleri .env dosyasından alamayız, çünkü service worker'lar doğrudan bunlara erişemez
 // Bu nedenle, build zamanında veya manuel olarak güncellenmelidir
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDCpkjyNxxrzTn3rXM1kuH5zn0pgIORi0g",
+  authDomain: "atsis-38f7e.firebaseapp.com",
+  projectId: "atsis-38f7e",
+  storageBucket: "atsis-38f7e.firebasestorage.app",
+  messagingSenderId: "943049988733",
+  appId: "1:943049988733:web:e8c073b8760198da65ef14"
 };
 
 firebase.initializeApp(firebaseConfig);
