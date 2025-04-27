@@ -1,7 +1,9 @@
 // Firebase yapılandırması
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, isSupported, Messaging } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported, Messaging, MessagePayload } from 'firebase/messaging';
 import { deleteFCMToken, saveFCMToken } from './supabase';
+import { useEffect, useState } from 'react';
+import { playAlertSound } from './notification';
 
 // Firebase yapılandırması
 const firebaseConfig = {
@@ -84,7 +86,7 @@ export async function initializeFirebaseMessaging(
       // Token al
       console.log('FCM token alınıyor...');
       const token = await getToken(messaging, {
-        vapidKey: "BH5kBlbDmaRPQuJZ3wrNGCcCmQyqNaZaYtwOXzFOKRmhoKPfQ4ng67pIasoVjNBWPXb4CTUo4X6T2AsGADWYy7s",
+        vapidKey: "BMdnO_kiiVOWpNxAkvVqP9OJOYgKSXvK3Sgoe_UlSF5MLvPRIhVr6GKjUIYYJcknF8CFTVNKTcuUx2n6HBZvDsw",
         serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
       });
       
@@ -267,7 +269,7 @@ export async function requestFCMPermission(userId: string, userRole: string): Pr
       
       const messaging = getMessaging(app);
       const token = await getToken(messaging, {
-        vapidKey: "BH5kBlbDmaRPQuJZ3wrNGCcCmQyqNaZaYtwOXzFOKRmhoKPfQ4ng67pIasoVjNBWPXb4CTUo4X6T2AsGADWYy7s",
+        vapidKey: "BMdnO_kiiVOWpNxAkvVqP9OJOYgKSXvK3Sgoe_UlSF5MLvPRIhVr6GKjUIYYJcknF8CFTVNKTcuUx2n6HBZvDsw",
         serviceWorkerRegistration: registration
       });
 
@@ -294,5 +296,104 @@ export async function requestFCMPermission(userId: string, userRole: string): Pr
     return null;
   }
 }
+
+// Window türü için global tanım ekle
+declare global {
+  interface Window {
+    playAlertSound?: () => void;
+  }
+}
+
+// Test bildirim gönderme fonksiyonu - geliştirme amaçlı
+export async function sendTestPushNotification(title: string = 'Test Bildirimi', body: string = 'Bu bir test bildirimidir'): Promise<boolean> {
+  if (!isBrowser) return false;
+
+  try {
+    // FCM desteği kontrolü
+    const isMessagingSupported = await isSupported();
+    if (!isMessagingSupported) {
+      console.warn("Firebase Cloud Messaging bu tarayıcıda desteklenmiyor");
+      return false;
+    }
+
+    // Messaging nesnesi oluştur
+    const app = firebaseApp();
+    const messaging = getMessaging(app);
+
+    // Bildirim gösterme izni kontrolü
+    if (Notification.permission !== 'granted') {
+      console.warn("Bildirim izni verilmemiş");
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.error("Bildirim izni reddedildi");
+        return false;
+      }
+    }
+
+    // Test mesajını manuel olarak işle
+    const testPayload = {
+      notification: {
+        title,
+        body
+      },
+      data: {
+        url: '/dashboard',
+        time: new Date().toISOString()
+      }
+    };
+
+    // Bildirim sesi çal ve toast göster
+    if (typeof window.playAlertSound === 'function') {
+      window.playAlertSound();
+    } else {
+      // Ses dosyasını direkt çal
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(e => console.error("Ses çalınamadı:", e));
+    }
+
+    // Toast veya browser bildirimi göster
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification(title, {
+        body,
+        icon: '/okullogo.png'
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+        window.location.href = '/dashboard';
+      };
+    }
+
+    console.log('Test bildirimi gönderildi:', testPayload);
+    return true;
+  } catch (error) {
+    console.error('Test bildirimi gönderilirken hata:', error);
+    return false;
+  }
+}
+
+/**
+ * Test function to trigger a notification sound and browser notification
+ */
+export const triggerTestNotification = () => {
+  try {
+    // Play alert sound
+    playAlertSound();
+    
+    // Show browser notification
+    if (Notification.permission === 'granted') {
+      new Notification('Test Notification', {
+        body: 'This is a test notification from the admin panel',
+        icon: '/logo.png'
+      });
+      console.log('Test notification sent successfully');
+    } else {
+      console.warn('Notification permission not granted');
+    }
+  } catch (error) {
+    console.error('Error triggering test notification:', error);
+  }
+};
 
 export default firebaseApp; 

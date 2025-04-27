@@ -11,6 +11,11 @@ import {
   UserIcon,
   DevicePhoneMobileIcon 
 } from '@heroicons/react/24/outline';
+import { cookies } from 'next/headers';
+import supabase from '@/lib/supabase-browser';
+import { getSiteSettings } from '@/lib/site-settings';
+import { COOKIE_NAME } from '@/constants';
+import { requestFCMPermission, triggerTestNotification } from '@/lib/firebase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -142,6 +147,15 @@ export default function LoginPage() {
               localStorage.removeItem('fcm_user_role');
               
               console.log('Bildirim ayarları sıfırlandı, yönetici paneline yönlendiriliyor');
+              
+              // Test bildirimi gönder
+              const { sendTestPushNotification } = await import('@/lib/firebase');
+              await sendTestPushNotification(
+                'Hoş Geldiniz', 
+                `${userData.name || 'Yönetici'} olarak başarıyla giriş yaptınız.`
+              );
+              console.log('Test bildirimi gönderildi');
+              
             } catch (error) {
               console.error('Bildirim sıfırlama hatası:', error);
             }
