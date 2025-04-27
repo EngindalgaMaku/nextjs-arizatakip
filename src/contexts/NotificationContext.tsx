@@ -86,69 +86,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       
       // Token zaten kaydedildi, durumu güncelle
       fcmInitialized.current = true;
-      console.log('FCM başarıyla kuruldu');
       
-      // FCM mesaj dinleyici
-      if ('serviceWorker' in navigator) {
-        try {
-          // Ön plandaki mesajları dinle
-          const app = firebaseApp();
-          const messaging = getMessaging(app);
-          onMessage(messaging, (payload) => {
-            console.log('Ön planda bildirim alındı:', payload);
-            
-            // Bildirim sesi çal
-            playAlertSound();
-            
-            // Bildirim göster
-            const title = payload.notification?.title || 'Yeni Bildirim';
-            const body = payload.notification?.body || '';
-            
-            toast.custom((t) => (
-              <div
-                className={`${
-                  t.visible ? 'animate-enter' : 'animate-leave'
-                } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-              >
-                <div className="flex-1 w-0 p-4">
-                  <div className="flex items-start">
-                    <div className="ml-3 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{title}</p>
-                      <p className="mt-1 text-sm text-gray-500">{body}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex border-l border-gray-200">
-                  <button
-                    onClick={() => toast.dismiss(t.id)}
-                    className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    Kapat
-                  </button>
-                </div>
-              </div>
-            ));
-            
-            // Bildirim sayısını ve son bildirimi güncelle
-            setNotificationCount((prev) => prev + 1);
-            setLastNotification(payload);
-            
-            // Bildirime tıklanınca yönlendirme
-            if (payload.data?.url) {
-              router.push(payload.data.url);
-            }
-          });
-          
-          console.log('FCM başarıyla kuruldu');
-          return true;
-        } catch (error) {
-          console.error('FCM mesaj dinleyici hatası:', error);
-          return false;
-        }
-      } else {
-        console.warn('Service Worker desteği yok, FCM ön plan bildirimleri çalışmayacak');
-        return false;
-      }
+      // NOT: Artık onMessage dinleyicisini burada kurmaya gerek yok
+      // çünkü useEffect içinde zaten kuruyoruz
+      
+      console.log('FCM başarıyla kuruldu');
+      return true;
     } catch (error) {
       console.error('FCM kurulum hatası:', error);
       return false;
@@ -371,6 +314,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Firebase token alma işlemi
   useEffect(() => {
     if (user && user.id) {
+      console.log("Bildirim dinleyicisi kurulumu için useEffect tetiklendi - pathname:", pathname);
+      
       // Messaging'i başlat ve token al
       requestFCMPermission(user.id, user.role || 'anonymous')
         .then((token) => {
@@ -388,6 +333,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (app) {
         const messaging = getMessaging(app);
         if (messaging) {
+          console.log("Firebase mesaj dinleyicisi kuruluyor - sayfa:", pathname);
+          
           const unsubscribe = onMessage(messaging, (payload) => {
             console.log("Foreground mesajı alındı:", payload);
             if (payload.notification?.title) {
@@ -406,21 +353,49 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               setNotifications((prev) => [notificationData, ...prev]);
               
               // Bildirim sesini çal
+              console.log("Bildirim sesi çalınıyor - sayfa:", pathname);
               playAlertSound();
               
               // Okunmamış bildirimleri güncelle
               setNotificationCount((prev) => prev + 1);
               setLastNotification(notificationData);
+              
+              // Ayrıca toast bildirimi göster
+              toast.custom((t) => (
+                <div
+                  className={`${
+                    t.visible ? 'animate-enter' : 'animate-leave'
+                  } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                >
+                  <div className="flex-1 w-0 p-4">
+                    <div className="flex items-start">
+                      <div className="ml-3 flex-1">
+                        <p className="text-sm font-medium text-gray-900">{payload.notification?.title || 'Yeni Bildirim'}</p>
+                        <p className="mt-1 text-sm text-gray-500">{payload.notification?.body || ''}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex border-l border-gray-200">
+                    <button
+                      onClick={() => toast.dismiss(t.id)}
+                      className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Kapat
+                    </button>
+                  </div>
+                </div>
+              ));
             }
           });
           
           return () => {
+            console.log("Firebase mesaj dinleyicisi temizleniyor - sayfa:", pathname);
             if (unsubscribe) unsubscribe();
           };
         }
       }
     }
-  }, [user]);
+  }, [user, pathname]);
 
   // Supabase realtime aboneliği
   useEffect(() => {
