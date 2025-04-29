@@ -10,7 +10,6 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { playAlertSound, showBrowserNotification } from '@/lib/notification';
 import Swal from 'sweetalert2';
 import { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import DemographicTable from '@/components/dashboard/DemographicTable';
 import { getSchoolInfo } from '@/actions/schoolActions';
 import { getDashboardStats } from '@/actions/dashboardActions';

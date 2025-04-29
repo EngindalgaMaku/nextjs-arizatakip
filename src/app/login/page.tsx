@@ -11,7 +11,6 @@ import {
   UserIcon,
   DevicePhoneMobileIcon 
 } from '@heroicons/react/24/outline';
-import { cookies } from 'next/headers';
 import supabase from '@/lib/supabase-browser';
 import { getSiteSettings } from '@/lib/site-settings';
 import { COOKIE_NAME } from '@/constants';

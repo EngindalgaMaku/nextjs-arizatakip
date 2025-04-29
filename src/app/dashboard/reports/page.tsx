@@ -33,6 +33,7 @@ export default function ReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [librariesLoaded, setLibrariesLoaded] = useState(false);
   const [lastGeneratedReport, setLastGeneratedReport] = useState<string | null>(null);
   const [issues, setIssues] = useState<any[]>([]);
   const [jsPDF, setJsPDF] = useState<JsPDFType>(null);
@@ -62,6 +63,7 @@ export default function ReportsPage() {
           // Set state with loaded libraries
           setJsPDF(jsPDFModule.default);
           setXlsxLib(XLSXModule);
+          setLibrariesLoaded(true);
         } catch (error) {
           console.error('Error loading report libraries:', error);
         }
@@ -450,26 +452,45 @@ export default function ReportsPage() {
     return null;
   };
   
-  const handleGenerateReport = async (reportId: string, format: string) => {
-    // Kullanıcıya güncelleme yapılıyor mesajı göster
-    Swal.fire({
-      title: 'Güncelleme Yapılıyor',
-      text: 'PDF raporları için güncelleme çalışması yapılmaktadır. Lütfen daha sonra tekrar deneyiniz.',
-      icon: 'info',
-      confirmButtonText: 'Tamam',
-      confirmButtonColor: '#3085d6'
-    });
-  };
-  
-  const handleDownloadReport = () => {
-    // Kullanıcıya güncelleme yapılıyor mesajı göster  
-    Swal.fire({
-      title: 'Güncelleme Yapılıyor',
-      text: 'PDF raporları için güncelleme çalışması yapılmaktadır. Lütfen daha sonra tekrar deneyiniz.',
-      icon: 'info',
-      confirmButtonText: 'Tamam',
-      confirmButtonColor: '#3085d6'
-    });
+  const handleGenerateReport = async (reportName: string, format: string) => {
+    // Check if libraries are loaded
+    if ((format === 'PDF' && typeof jsPDF !== 'function') || (format === 'Excel' && typeof xlsxLib !== 'object')) {
+      Swal.fire('Hata!', 'Raporlama kütüphaneleri henüz yüklenmedi. Lütfen biraz bekleyip tekrar deneyin.', 'error');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      let generatedFileName: string | null = null;
+      if (format === 'PDF') {
+        generatedFileName = createPDF(reportName);
+      } else if (format === 'Excel') {
+        generatedFileName = createExcel(reportName);
+      } else if (format === 'CSV') {
+        // TODO: Implement CSV generation if needed
+        Swal.fire('Bilgi', 'CSV rapor formatı henüz desteklenmiyor.', 'info');
+      }
+
+      if (generatedFileName) {
+        // Update the last generated time (optional, maybe better handled by listing actual files)
+         console.log(`${format} report generated: ${generatedFileName}`);
+         // Optionally show a success message
+         /*
+         Swal.fire({
+           title: 'Başarılı!',
+           text: `${format} formatındaki "${reportName}" raporu başarıyla oluşturuldu ve indirildi.`,
+           icon: 'success',
+           timer: 2000,
+           showConfirmButton: false
+         });
+         */
+      }
+    } catch (error) {
+      console.error(`Error generating ${format} report:`, error);
+      Swal.fire('Hata!', `Rapor oluşturulurken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`, 'error');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Rapor formatına göre arkaplan rengi belirleme
@@ -542,10 +563,11 @@ export default function ReportsPage() {
           
           <button
             type="button"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             onClick={() => handleGenerateReport('Özel Rapor', 'PDF')}
+            disabled={isGenerating || !librariesLoaded}
           >
-            Özel Rapor Oluştur
+            {isGenerating ? 'Oluşturuluyor...' : 'Özel Rapor Oluştur'}
           </button>
         </div>
       </div>
@@ -574,18 +596,11 @@ export default function ReportsPage() {
                     <div className="flex space-x-2">
                       <button
                         type="button"
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                         onClick={() => handleGenerateReport(report.name, report.format)}
-                        disabled={isGenerating}
+                        disabled={isGenerating || !librariesLoaded}
                       >
                         {isGenerating ? 'Oluşturuluyor...' : 'Oluştur'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDownloadReport}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        İndir
                       </button>
                     </div>
                   </div>
