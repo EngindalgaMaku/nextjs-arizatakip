@@ -3,14 +3,25 @@ import { notFound } from 'next/navigation';
 import React from 'react';
 import { getDeviceTypeLabel } from '@/types/devices'; // Helper for device type label
 
-interface DevicePublicPageProps {
+// Next.js App Router sayfası için doğru props tipi
+type PageProps = {
   params: {
-    barcode: string; // Get barcode value from URL
+    barcode: string;
   };
+  searchParams: Record<string, string | string[] | undefined>;
+};
+
+// Type for the processed device data
+interface PublicDeviceData {
+  name: string;
+  type: string | null;
+  serial_number: string | null;
+  barcode_value: string | null;
+  locationName: string | null;
 }
 
 // Server-side function to fetch device data by barcode value
-async function getDeviceByBarcode(barcodeValue: string) {
+async function getDeviceByBarcode(barcodeValue: string): Promise<PublicDeviceData | null> {
   if (!barcodeValue) {
     return null;
   }
@@ -36,27 +47,30 @@ async function getDeviceByBarcode(barcodeValue: string) {
     return null; // Return null for other errors too
   }
 
-  // Supabase might return location as an object or null
-  // Let's flatten it slightly for easier access in the component
+  // Extract location name, handling both array and object formats
+  let locationName: string | null = null;
+  if (data.locations) {
+    if (Array.isArray(data.locations) && data.locations.length > 0) {
+      locationName = data.locations[0].name || null;
+    } else if (typeof data.locations === 'object') {
+      locationName = (data.locations as any).name || null;
+    }
+  }
+
+  // Return processed device data
   return {
-    ...data,
-    locationName: data.locations?.name || null,
+    name: data.name,
+    type: data.type,
+    serial_number: data.serial_number,
+    barcode_value: data.barcode_value,
+    locationName: locationName
   };
 }
 
-// Type for the fetched device data with flattened location name
-interface PublicDeviceData {
-    name: string;
-    type: string | null;
-    serial_number: string | null;
-    barcode_value: string | null;
-    locationName: string | null;
-}
-
 // Server Component Page
-export default async function DevicePublicPage({ params }: DevicePublicPageProps) {
+export default async function DevicePublicPage({ params }: PageProps) {
   const { barcode } = params;
-  const device = await getDeviceByBarcode(barcode) as PublicDeviceData | null;
+  const device = await getDeviceByBarcode(barcode);
 
   if (!device) {
     notFound(); // Trigger Next.js 404 page

@@ -2,14 +2,25 @@ import { supabase } from '@/lib/supabase'; // Server-side client
 import { notFound } from 'next/navigation';
 import React from 'react';
 
-interface LocationPublicPageProps {
+// Next.js App Router sayfası için doğru props tipi
+type PageProps = {
   params: {
-    barcode: string; // Get barcode value from URL
+    barcode: string;
   };
+  searchParams: Record<string, string | string[] | undefined>;
+};
+
+// Type for location data
+interface LocationData {
+  name: string;
+  properties: Array<{
+    key: string;
+    value: any;
+  }> | null;
 }
 
 // Server-side function to fetch location data by barcode value
-async function getLocationByBarcode(barcodeValue: string) {
+async function getLocationByBarcode(barcodeValue: string): Promise<LocationData | null> {
   if (!barcodeValue) {
     return null;
   }
@@ -30,11 +41,12 @@ async function getLocationByBarcode(barcodeValue: string) {
     // For other errors, maybe return null or throw a generic error
     return null;
   }
-  return data;
+  
+  return data as LocationData;
 }
 
 // Server Component Page
-export default async function LocationPublicPage({ params }: LocationPublicPageProps) {
+export default async function LocationPublicPage({ params }: PageProps) {
   const { barcode } = params;
   const location = await getLocationByBarcode(barcode);
 
@@ -42,7 +54,7 @@ export default async function LocationPublicPage({ params }: LocationPublicPageP
     notFound(); // Trigger Next.js 404 page
   }
 
-  const properties = location.properties as Record<string, any> | null;
+  const properties = location.properties;
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8 flex items-center justify-center">
