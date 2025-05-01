@@ -158,8 +158,8 @@ export default function DashboardLayout({
                     className="mr-3" 
                   />
                   <div>
-                    <h1 className="text-2xl font-bold text-white">ATSİS</h1>
-                    <p className="text-sm text-blue-200"></p>
+                    <h1 className="text-lg font-bold text-white leading-tight">H.Ö. Ticaret M.T.A.L.</h1>
+                    <p className="text-sm text-blue-200">Şeflik Paneli</p>
                   </div>
                 </div>
               </div>
