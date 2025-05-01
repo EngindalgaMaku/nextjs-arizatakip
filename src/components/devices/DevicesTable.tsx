@@ -3,7 +3,7 @@
 import React from 'react';
 import { Device } from '@/types/devices'; // Use the base Device type
 import { getDeviceTypeLabel } from '@/types/devices'; // Helper to get type label
-import { PencilIcon, TrashIcon, QrCodeIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline'; // Add arrow icons
+import { PencilIcon, TrashIcon, QrCodeIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon, ExclamationTriangleIcon, PlusIcon } from '@heroicons/react/24/outline'; // Add arrow, issue, and plus icons
 
 interface DevicesTableProps {
   devices: Device[]; // Use Device type
@@ -11,6 +11,8 @@ interface DevicesTableProps {
   onDelete: (deviceId: string) => void;
   onViewQrCode: (device: Device) => void; // Add handler for viewing QR code
   onViewProperties?: (device: Device) => void; // Optional: Add handler for viewing properties
+  onViewIssues?: (device: Device) => void; // Optional: Add handler for viewing issues
+  onAddIssue?: (device: Device) => void; // Optional: Add handler for adding issues
   onMove?: (deviceId: string, direction: 'up' | 'down') => void; // Add handler for moving devices
   isLoading?: boolean; // Loading state for actions
 }
@@ -21,6 +23,8 @@ export default function DevicesTable({
   onDelete,
   onViewQrCode,
   onViewProperties,
+  onViewIssues,
+  onAddIssue,
   onMove,
   isLoading = false,
 }: DevicesTableProps) {
@@ -95,8 +99,7 @@ export default function DevicesTable({
                 {/* TODO: Add status mapping/label if needed */}
                 {device.status || '-'}
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-center">
-                {/* Add Eye icon for properties view */}
+              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-center space-x-2">
                 <button
                   onClick={() => onViewProperties ? onViewProperties(device) : null}
                   disabled={isLoading || !device.properties || device.properties.length === 0}
@@ -105,8 +108,25 @@ export default function DevicesTable({
                 >
                   <EyeIcon className="h-5 w-5" aria-hidden="true" />
                 </button>
+                <button
+                  onClick={() => onViewIssues ? onViewIssues(device) : null}
+                  disabled={isLoading || !device.issues || device.issues.length === 0}
+                  title="Arıza Kayıtlarını Görüntüle"
+                  className="text-yellow-600 hover:text-yellow-800 disabled:text-gray-300 disabled:cursor-not-allowed"
+                >
+                  <ExclamationTriangleIcon className="h-5 w-5" aria-hidden="true" />
+                </button>
               </td>
               <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
+                {/* Add Issue Button */}
+                <button
+                  onClick={() => onAddIssue && onAddIssue(device)}
+                  disabled={isLoading}
+                  title="Arıza Ekle"
+                  className="text-green-600 hover:text-green-800 disabled:text-gray-300 disabled:cursor-not-allowed"
+                >
+                  <PlusIcon className="h-5 w-5" aria-hidden="true" />
+                </button>
                 {/* QR Code Button */}
                 <button
                   onClick={() => onViewQrCode(device)}

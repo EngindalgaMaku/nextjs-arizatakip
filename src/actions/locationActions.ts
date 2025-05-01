@@ -26,6 +26,22 @@ export async function fetchLocations(): Promise<Location[]> {
   return data as Location[];
 }
 
+// Fetch only laboratory locations for selection
+export async function fetchLaboratoryLocations(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('id, name')
+    .eq('type', 'laboratuvar') // Filter by type
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching laboratory locations:', error);
+    // Depending on desired behavior, you might throw or return empty
+    return []; 
+  }
+  return data || [];
+}
+
 // --- CRUD Operations --- 
 
 /**

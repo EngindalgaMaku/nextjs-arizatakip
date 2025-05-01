@@ -25,11 +25,12 @@ const locationTypes = [
 // Departman listesi
 const departments = [
   { value: 'bilisim', label: 'Bilişim Teknolojileri' },
-  { value: 'elektronik', label: 'Elektrik-Elektronik' },
-  { value: 'makine', label: 'Makine' },
-  { value: 'tekstil', label: 'Tekstil' },
   { value: 'muhasebe', label: 'Muhasebe' },
-  { value: 'ortak_alan', label: 'Ortak Kullanım' },
+  { value: 'halkla_iliskiler', label: 'Halkla İlişkiler' },
+  { value: 'gazetecilik', label: 'Gazetecilik' },
+  { value: 'radyo_tv', label: 'Radyo ve Televizyon' },
+  { value: 'plastik_sanatlar', label: 'Plastik Sanatlar' },
+  { value: 'idare', label: 'İdare' },
   { value: 'diger', label: 'Diğer' },
 ];
 

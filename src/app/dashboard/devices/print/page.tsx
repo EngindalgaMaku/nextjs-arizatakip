@@ -74,7 +74,6 @@ export default function DevicesPrintPage() {
             /* Adjust columns for A4 - e.g., 4 columns might fit better */
             grid-template-columns: repeat(4, 1fr);
             gap: 1cm 0.5cm; /* Adjust gap */
-            page-break-inside: avoid;
           }
            .qr-code-item {
             page-break-inside: avoid;
@@ -98,7 +97,7 @@ export default function DevicesPrintPage() {
             margin: 1cm;
         }
       `}</style>
-      <div className="printable-grid grid grid-cols-4 gap-2">
+      <div className="printable-grid grid grid-cols-4 gap-2 pt-4">
         {devices.map((device) => {
           // Generate the full URL for the QR code
           const deviceUrl = `${APP_BASE_URL}/cihaz/${device.barcode_value}`;

@@ -2,18 +2,22 @@
 
 import React from 'react';
 import { Location } from '@/types/locations';
-import { PencilIcon, TrashIcon, QrCodeIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, QrCodeIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { formatDate } from '@/lib/helpers'; // Assuming you have a date formatter
 
 // Departman değerlerini etiketlerine dönüştüren yardımcı fonksiyon
 const getDepartmentLabel = (departmentValue: string | null): string => {
   const departmentMap: Record<string, string> = {
     'bilisim': 'Bilişim Teknolojileri',
-    'elektronik': 'Elektrik-Elektronik',
-    'makine': 'Makine',
-    'tekstil': 'Tekstil',
+    // 'elektronik': 'Elektrik-Elektronik',
+    // 'makine': 'Makine',
+    // 'tekstil': 'Tekstil',
     'muhasebe': 'Muhasebe',
-    'ortak_alan': 'Ortak Kullanım',
+    'halkla_iliskiler': 'Halkla İlişkiler',
+    'gazetecilik': 'Gazetecilik',
+    'radyo_tv': 'Radyo ve Televizyon',
+    'plastik_sanatlar': 'Plastik Sanatlar',
+    'idare': 'İdare',
     'diger': 'Diğer'
   };
   
@@ -25,8 +29,9 @@ interface LocationsTableProps {
   onEdit: (location: Location) => void;
   onDelete: (locationId: string) => void;
   onViewQrCode: (location: Location) => void;
-  onViewProperties: (location: Location) => void;
-  onMove: (locationId: string, direction: 'up' | 'down') => void;
+  onViewProperties?: (location: Location) => void;
+  onViewSchedule?: (location: Location) => void;
+  onMove?: (locationId: string, direction: 'up' | 'down') => void;
   isLoading?: boolean; // Optional loading state for delete/actions
 }
 
@@ -36,6 +41,7 @@ export default function LocationsTable({
   onDelete,
   onViewQrCode,
   onViewProperties,
+  onViewSchedule,
   onMove,
   isLoading = false,
 }: LocationsTableProps) {
@@ -77,7 +83,7 @@ export default function LocationsTable({
                 <div className="inline-flex flex-col mr-2 align-middle">
                    <button
                       type="button"
-                      onClick={() => onMove(location.id, 'up')}
+                      onClick={() => onMove && onMove(location.id, 'up')}
                       disabled={index === 0 || isLoading || location.sort_order === null}
                       className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
                       title="Yukarı Taşı"
@@ -86,7 +92,7 @@ export default function LocationsTable({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onMove(location.id, 'down')}
+                      onClick={() => onMove && onMove(location.id, 'down')}
                       disabled={index === locations.length - 1 || isLoading || location.sort_order === null}
                       className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
                       title="Aşağı Taşı"
@@ -104,7 +110,7 @@ export default function LocationsTable({
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <button
-                  onClick={() => onViewProperties(location)}
+                  onClick={() => onViewProperties?.(location)}
                   disabled={isLoading || !location.properties || Object.keys(location.properties).length === 0}
                   title="Özellikleri Görüntüle"
                   className="text-gray-600 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed"
@@ -113,6 +119,14 @@ export default function LocationsTable({
                 </button>
               </td>
               <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
+                <button
+                  onClick={() => onViewSchedule?.(location)}
+                  disabled={isLoading}
+                  title="Ders Programı"
+                  className="text-teal-600 hover:text-teal-800 disabled:text-gray-300"
+                >
+                  <CalendarDaysIcon className="h-5 w-5" aria-hidden="true" />
+                </button>
                 <button
                   onClick={() => onViewQrCode(location)}
                   disabled={isLoading || !location.barcode_value}

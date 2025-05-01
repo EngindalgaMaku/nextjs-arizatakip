@@ -1,5 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
-// import { DeviceType, DeviceLocation, IssueStatus, IssuePriority } from './enums';
+// Import the *browser* client instance
+import supabase from './supabase-browser'; 
+// Re-export it for convenience if needed elsewhere, though direct import is preferred
+export { supabase };
 
 // .env.local'den ortam değişkenleri
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gcxbfmqyvqchcrudxpmh.supabase.co";
@@ -7,9 +9,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOi
 
 // Demo modunu kontrol et - Supabase bağlantısı yoksa true yapın
 export const DEMO_MODE = false;
-
-// Supabase istemcisini oluştur
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type User = {
   id: string;  // UUID formatında

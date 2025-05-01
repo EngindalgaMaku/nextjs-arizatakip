@@ -9,6 +9,7 @@ import LocationQRCodeModal from '@/components/locations/LocationQRCodeModal'; //
 import LocationPropertiesModal from '@/components/locations/LocationPropertiesModal'; // Import Properties Modal
 import Swal from 'sweetalert2'; // For feedback
 import { PlusIcon, PrinterIcon, MagnifyingGlassIcon, FunnelIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'; // For button icon
+import { useRouter } from 'next/navigation'; // For navigation to schedule page
 // Import other necessary components and hooks later
 // import LocationsTable from '@/components/locations/LocationsTable';
 
@@ -25,11 +26,12 @@ const locationTypes = [
 // Define department options for filtering
 const departments = [
   { value: 'bilisim', label: 'Bilişim Teknolojileri' },
-  { value: 'elektronik', label: 'Elektrik-Elektronik' },
-  { value: 'makine', label: 'Makine' },
-  { value: 'tekstil', label: 'Tekstil' },
   { value: 'muhasebe', label: 'Muhasebe' },
-  { value: 'ortak_alan', label: 'Ortak Kullanım' },
+  { value: 'halkla_iliskiler', label: 'Halkla İlişkiler' },
+  { value: 'gazetecilik', label: 'Gazetecilik' },
+  { value: 'radyo_tv', label: 'Radyo ve Televizyon' },
+  { value: 'plastik_sanatlar', label: 'Plastik Sanatlar' },
+  { value: 'idare', label: 'İdare' },
   { value: 'diger', label: 'Diğer' },
 ];
 
@@ -50,6 +52,7 @@ export default function LocationsPage() {
   const [qrCodeLocation, setQrCodeLocation] = useState<Location | null>(null); // State for QR location
   const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false); // State for properties modal
   const [viewingPropertiesLocation, setViewingPropertiesLocation] = useState<Location | null>(null); // State for properties data
+  const router = useRouter(); // Router for navigation
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -273,6 +276,11 @@ export default function LocationsPage() {
     setPageSize(Number(e.target.value));
   };
 
+  // Handler to open schedule page
+  const handleViewSchedule = (location: Location) => {
+    router.push(`/dashboard/locations/${location.id}/schedule`);
+  };
+
   if (isLoading) {
     return <div>Yükleniyor...</div>; // Loading...
   }
@@ -384,6 +392,7 @@ export default function LocationsPage() {
           onDelete={handleDeleteLocation}
           onViewQrCode={handleViewQrCode}
           onViewProperties={handleViewProperties}
+          onViewSchedule={handleViewSchedule} // Navigate to schedule page
           onMove={handleMoveLocation}
           isLoading={isDeleting || isMoving || isSubmitting}
         />

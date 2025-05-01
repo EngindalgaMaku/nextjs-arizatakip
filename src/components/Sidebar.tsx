@@ -9,7 +9,8 @@ import {
   DocumentTextIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
-  BookOpenIcon
+  BookOpenIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 
 interface NavItemProps {
@@ -59,10 +60,10 @@ export default function Sidebar() {
         />
         
         <NavItem 
-          href="/dashboard/users" 
-          icon={<UserGroupIcon />} 
-          label="Kullanıcılar"
-          active={pathname.startsWith('/dashboard/users')} 
+          href="/dashboard/classes" 
+          icon={<AcademicCapIcon />} 
+          label="Sınıf/Öğrenci İşlemleri"
+          active={pathname.startsWith('/dashboard/classes')} 
         />
         
         <NavItem 
@@ -72,11 +73,22 @@ export default function Sidebar() {
           active={pathname.startsWith('/dashboard/reports')} 
         />
         
+        <div className="pt-4 pb-2 px-3">
+          <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Yönetimsel İşlemler</h4>
+        </div>
+        
         <NavItem 
           href="/dashboard/settings" 
           icon={<Cog6ToothIcon />} 
           label="Ayarlar"
           active={pathname.startsWith('/dashboard/settings')} 
+        />
+        
+        <NavItem 
+          href="/dashboard/users" 
+          icon={<UserGroupIcon />} 
+          label="Kullanıcılar"
+          active={pathname.startsWith('/dashboard/users')} 
         />
 
         <NavItem 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -13,18 +13,19 @@ export const metadata: Metadata = {
   title: "Hüsniye Özdilek Ticaret M.T.A.L. - Arıza Takip Sistemi (ATSİS)",
   description: "Hüsniye Özdilek Ticaret M.T.A.L. Arıza Takip Sistemi (ATSİS)",
   manifest: "/manifest.json",
-  themeColor: "#4338CA",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "ATSİS"
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#4338CA",
 };
 
 export default function RootLayout({

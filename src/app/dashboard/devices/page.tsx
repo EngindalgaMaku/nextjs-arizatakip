@@ -9,15 +9,34 @@ import DeviceForm from '@/components/devices/DeviceForm';
 import DevicesTable from '@/components/devices/DevicesTable';
 import DeviceQRCodeModal from '@/components/devices/DeviceQRCodeModal'; // Import QR Code Modal
 import DevicePropertiesModal from '@/components/devices/DevicePropertiesModal'; // Import Properties Modal
+import DeviceIssuesModal from '@/components/devices/DeviceIssuesModal'; // Import Issues Modal
+import DeviceAddIssueModal from '@/components/devices/DeviceAddIssueModal'; // Import Add Issue Modal
 import Swal from 'sweetalert2';
 import { PlusIcon, PrinterIcon, MagnifyingGlassIcon, FunnelIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'; // Add icons and pagination icons
 
+// Import departments list (assuming it's exported from location types or a constants file)
+// If not exported, we need to define it here or import from where it is defined.
+// Example: import { departments } from '@/types/locations'; 
+// For now, let's redefine it here based on the previous update:
+const departments = [
+  { value: 'bilisim', label: 'Bilişim Teknolojileri' },
+  { value: 'muhasebe', label: 'Muhasebe' },
+  { value: 'halkla_iliskiler', label: 'Halkla İlişkiler' },
+  { value: 'gazetecilik', label: 'Gazetecilik' },
+  { value: 'radyo_tv', label: 'Radyo ve Televizyon' },
+  { value: 'plastik_sanatlar', label: 'Plastik Sanatlar' },
+  { value: 'idare', label: 'İdare' },
+  { value: 'diger', label: 'Diğer' },
+];
+
 // Placeholder for Location data used in form select
-type LocationSelectItem = Pick<Location, 'id' | 'name'>;
+// No longer needed, we'll use the full Location object
+// type LocationSelectItem = Pick<Location, 'id' | 'name'>;
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]); // Use Device type
-  const [locations, setLocations] = useState<LocationSelectItem[]>([]); // For form dropdown
+  // Change state to hold full Location objects
+  const [locations, setLocations] = useState<Location[]>([]); // For form dropdown
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false); // For create/update form
   const [isProcessing, setIsProcessing] = useState(false); // For delete action
@@ -29,6 +48,10 @@ export default function DevicesPage() {
   const [qrCodeDevice, setQrCodeDevice] = useState<Device | null>(null); // State for QR device
   const [isPropertiesModalOpen, setIsPropertiesModalOpen] = useState(false);
   const [viewingPropertiesDevice, setViewingPropertiesDevice] = useState<Device | null>(null);
+  const [isIssuesModalOpen, setIsIssuesModalOpen] = useState(false);
+  const [viewingIssuesDevice, setViewingIssuesDevice] = useState<Device | null>(null);
+  const [isAddIssueModalOpen, setIsAddIssueModalOpen] = useState(false);
+  const [viewingAddIssueDevice, setViewingAddIssueDevice] = useState<Device | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -44,12 +67,13 @@ export default function DevicesPage() {
     setError(null);
     try {
       const [devicesData, locationsData] = await Promise.all([
-        fetchDevices(), // Fetches Device[] now
-        fetchLocations()
+        fetchDevices(), 
+        fetchLocations() // fetchLocations should return Location[] including department
       ]);
 
       setDevices(devicesData);
-      setLocations(locationsData.map(loc => ({ id: loc.id, name: loc.name })));
+      // Store the full locations data
+      setLocations(locationsData);
 
     } catch (err) {
       console.error('Failed to load devices or locations:', err);
@@ -211,6 +235,16 @@ export default function DevicesPage() {
     setIsPropertiesModalOpen(true);
   };
 
+  const handleViewIssues = (device: Device) => {
+    setViewingIssuesDevice(device);
+    setIsIssuesModalOpen(true);
+  };
+
+  const handleAddIssue = (device: Device) => {
+    setViewingAddIssueDevice(device);
+    setIsAddIssueModalOpen(true);
+  };
+
   const handleOpenPrintView = () => {
     window.open('/dashboard/devices/print', '_blank');
   };
@@ -370,6 +404,8 @@ export default function DevicesPage() {
             onDelete={handleDeleteDevice}
             onViewQrCode={handleViewQrCode}
             onViewProperties={handleViewProperties}
+            onViewIssues={handleViewIssues}
+            onAddIssue={handleAddIssue}
             onMove={handleMoveDevice}
             isLoading={isProcessing || isMoving}
          />
@@ -489,32 +525,33 @@ export default function DevicesPage() {
 
       {/* Create Device Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 z-50 flex justify-center items-center p-4 transition-opacity duration-300 ease-out">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full animate-fade-in-scale">
-            <h2 className="text-lg font-medium mb-4">Yeni Cihaz Oluştur</h2>
-             <DeviceForm
-               onSubmit={handleCreateDevice}
-               onClose={() => setIsCreateModalOpen(false)}
-               isSubmitting={isSubmitting}
-               availableLocations={locations}
-               initialData={null}
-             />
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 z-50 flex justify-center items-center p-4">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full">
+             <h2 className="text-lg font-medium mb-4">Yeni Cihaz Oluştur</h2>
+            <DeviceForm
+              onSubmit={handleCreateDevice}
+              onClose={() => setIsCreateModalOpen(false)}
+              isSubmitting={isSubmitting}
+              availableLocations={locations} // Pass full locations
+              availableDepartments={departments} // Pass departments
+            />
           </div>
         </div>
       )}
 
       {/* Edit Device Modal */}
       {isEditModalOpen && editingDevice && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 z-50 flex justify-center items-center p-4 transition-opacity duration-300 ease-out">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full animate-fade-in-scale">
-            <h2 className="text-lg font-medium mb-4">Cihazı Düzenle</h2>
-             <DeviceForm
-               onSubmit={handleUpdateDevice}
-               onClose={handleCloseEditModal}
-               isSubmitting={isSubmitting}
-               availableLocations={locations}
-               initialData={editingDevice}
-             />
+         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 z-50 flex justify-center items-center p-4">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full">
+             <h2 className="text-lg font-medium mb-4">Cihaz Düzenle</h2>
+            <DeviceForm
+              initialData={editingDevice}
+              onSubmit={handleUpdateDevice}
+              onClose={handleCloseEditModal}
+              isSubmitting={isSubmitting}
+              availableLocations={locations} // Pass full locations
+              availableDepartments={departments} // Pass departments
+            />
           </div>
         </div>
       )}
@@ -532,6 +569,23 @@ export default function DevicesPage() {
         <DevicePropertiesModal
           device={viewingPropertiesDevice}
           onClose={() => setIsPropertiesModalOpen(false)}
+        />
+      )}
+
+      {/* Issues Modal */}
+      {isIssuesModalOpen && viewingIssuesDevice && (
+        <DeviceIssuesModal
+          device={viewingIssuesDevice}
+          onClose={() => { setIsIssuesModalOpen(false); setViewingIssuesDevice(null); }}
+        />
+      )}
+
+      {/* Add Issue Modal */}
+      {isAddIssueModalOpen && viewingAddIssueDevice && (
+        <DeviceAddIssueModal
+          device={viewingAddIssueDevice}
+          onClose={() => setIsAddIssueModalOpen(false)}
+          onSuccess={() => { setIsAddIssueModalOpen(false); setViewingAddIssueDevice(null); loadInitialData(); }}
         />
       )}
     </div>

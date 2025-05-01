@@ -11,9 +11,12 @@ import {
   UserGroupIcon,
   DocumentChartBarIcon,
   Cog6ToothIcon,
-  MapPinIcon
+  MapPinIcon,
+  AcademicCapIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline';
 import { signOut, loadUserData } from "@/lib/supabase";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 export default function DashboardLayout({
   children,
@@ -28,6 +31,8 @@ export default function DashboardLayout({
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+  // Initialize React Query client
+  const [queryClient] = useState(() => new QueryClient());
   
   // Path adını kontrol ederek başlık oluştur
   const getPageTitle = () => {
@@ -122,7 +127,7 @@ export default function DashboardLayout({
   };
 
   // Determine if the current page is the print view
-  const isPrintView = pathname === '/dashboard/locations/print';
+  const isPrintView = pathname === '/dashboard/locations/print' || pathname === '/dashboard/devices/print';
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -184,6 +189,11 @@ export default function DashboardLayout({
                 Gösterge Paneli
               </Link>
 
+              {/* Add Header for Okul Şeflik Yönetimi */}
+              <div className="pt-4 pb-2 px-3">
+                <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Okul Şeflik Yönetimi</h4>
+              </div>
+
               <Link
                 href="/dashboard/issues"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -192,20 +202,7 @@ export default function DashboardLayout({
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <svg
-                  className="mr-3 h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
+                <ClipboardDocumentListIcon className="mr-3 h-5 w-5" />
                 Arızalar
               </Link>
 
@@ -217,49 +214,52 @@ export default function DashboardLayout({
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <svg
-                  className="mr-3 h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
-                </svg>
-                Öğretmenler
+                <UserGroupIcon className="mr-3 h-5 w-5" />
+                Öğretmen Arıza İstatistikleri
               </Link>
 
+              {/* Header for Alan Şeflik Yönetimi */}
+              <div className="pt-4 pb-2 px-3">
+                <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Alan Şeflik Yönetimi</h4>
+              </div>
+
               <Link
-                href="/dashboard/users"
+                href="/dashboard/area-teachers"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/users")
+                  pathname === "/dashboard/area-teachers"
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <svg
-                  className="mr-3 h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
-                </svg>
-                Kullanıcılar
+                <AcademicCapIcon className="mr-3 h-5 w-5" />
+                Alan Öğretmenleri
+              </Link>
+              
+              {/* Dal Yönetimi Link */}
+              <Link
+                href="/dashboard/dallar"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.includes("/dallar")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <AcademicCapIcon className="mr-3 h-5 w-5" /> {/* Veya farklı bir ikon */} 
+                Dal Yönetimi
               </Link>
 
-              {/* Konumlar Link */}
+              <Link
+                href="/dashboard/classes"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.includes("/classes")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <AcademicCapIcon className="mr-3 h-5 w-5" />
+                Sınıf/Öğrenci İşlemleri
+              </Link>
+
               <Link
                 href="/dashboard/locations"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -269,10 +269,9 @@ export default function DashboardLayout({
                 }`}
               >
                 <MapPinIcon className="mr-3 h-5 w-5" />
-                Konumlar
+                Lab./Sınıf/Odalar
               </Link>
 
-              {/* Cihazlar Link (Yeni Eklendi) */}
               <Link
                 href="/dashboard/devices" 
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -294,22 +293,14 @@ export default function DashboardLayout({
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <svg
-                  className="mr-3 h-5 w-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
+                <DocumentChartBarIcon className="mr-3 h-5 w-5" />
                 Raporlar
               </Link>
+
+              {/* Header for Yönetimsel İşlemler */}
+              <div className="pt-4 pb-2 px-3">
+                <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Yönetimsel İşlemler</h4>
+              </div>
 
               <Link
                 href="/dashboard/settings"
@@ -340,6 +331,30 @@ export default function DashboardLayout({
                   />
                 </svg>
                 Ayarlar
+              </Link>
+
+              <Link
+                href="/dashboard/users"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.includes("/users")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <UserGroupIcon className="mr-3 h-5 w-5" />
+                Kullanıcılar
+              </Link>
+
+              <Link
+                href="/dashboard/guide" 
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname === '/dashboard/guide'
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              > 
+                <BookOpenIcon className="mr-3 h-5 w-5" />
+                Kullanım Kılavuzu
               </Link>
             </nav>
             
@@ -451,7 +466,9 @@ export default function DashboardLayout({
 
         {/* Main Content Area - Adjust padding for print view */}
         <main className={`flex-1 overflow-y-auto bg-gray-50 ${isPrintView ? 'p-0' : 'p-4 md:p-6'}`}>
-          {children}
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
         </main>
       </div>
     </div>

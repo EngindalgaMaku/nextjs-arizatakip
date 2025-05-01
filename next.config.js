@@ -14,6 +14,14 @@ const nextConfig = {
     // Build sırasında hataları göster ama başarısız olmasına izin verme
     ignoreDuringBuilds: true,
   },
+  // Add Tamagui packages to transpile
+  transpilePackages: [
+    'tamagui',
+    '@tamagui/core',
+    '@tamagui/config',
+    '@tamagui/text',
+    // Add any other Tamagui packages you use here
+  ],
 };
 
 module.exports = withPWA(nextConfig); 

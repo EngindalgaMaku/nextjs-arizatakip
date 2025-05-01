@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { loadUserData, supabase } from '@/lib/supabase';
+import supabaseBrowserClient from '@/lib/supabase-browser';
+import { loadUserData } from '@/lib/supabase';
 
 interface User {
   id: string;
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Çıkış yapma fonksiyonu
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await supabaseBrowserClient.auth.signOut();
       setUser(null);
     } catch (error) {
       console.error('Çıkış yapılırken hata:', error);

@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'; // Server-side client
 import { notFound } from 'next/navigation';
 import React from 'react';
-import { getDeviceTypeLabel } from '@/types/devices'; // Helper for device type label
+import { getDeviceTypeLabel, getDeviceStatusLabel } from '@/types/devices'; // Helper for device type label
 
 // Next.js App Router sayfası için doğru props tipi
 type PageProps = {
@@ -18,6 +18,7 @@ interface PublicDeviceData {
   serial_number: string | null;
   barcode_value: string | null;
   locationName: string | null;
+  status: string | null;
 }
 
 // Server-side function to fetch device data by barcode value
@@ -26,7 +27,7 @@ async function getDeviceByBarcode(barcodeValue: string): Promise<PublicDeviceDat
     return null;
   }
 
-  // Select necessary fields for public view, including location name
+  // Select necessary fields for public view, including location name and status
   const { data, error } = await supabase
     .from('devices')
     .select(`
@@ -34,6 +35,7 @@ async function getDeviceByBarcode(barcodeValue: string): Promise<PublicDeviceDat
       type,
       serial_number,
       barcode_value,
+      status,
       locations ( name )
     `)
     .eq('barcode_value', barcodeValue)
@@ -63,12 +65,13 @@ async function getDeviceByBarcode(barcodeValue: string): Promise<PublicDeviceDat
     type: data.type,
     serial_number: data.serial_number,
     barcode_value: data.barcode_value,
-    locationName: locationName
+    locationName: locationName,
+    status: data.status
   };
 }
 
 // Server Component Page
-export default async function DevicePublicPage({ params }: PageProps) {
+export default async function DevicePublicPage({ params }: any) {
   const { barcode } = params;
   const device = await getDeviceByBarcode(barcode);
 
@@ -91,6 +94,10 @@ export default async function DevicePublicPage({ params }: PageProps) {
             <div className="flex justify-between border-t pt-2">
                 <span className="font-semibold text-gray-600">Tipi:</span>
                 <span className="text-gray-800 text-right">{getDeviceTypeLabel(device.type) || '-'}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2">
+                <span className="font-semibold text-gray-600">Durumu:</span>
+                <span className="text-gray-800 text-right">{getDeviceStatusLabel(device.status) || '-'}</span>
             </div>
             <div className="flex justify-between border-t pt-2">
                 <span className="font-semibold text-gray-600">Seri No:</span>

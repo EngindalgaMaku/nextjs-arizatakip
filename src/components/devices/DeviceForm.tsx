@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { Device, DeviceFormData, DeviceSchema, deviceTypes } from '@/types/devices';
 import { Location, PropertyField } from '@/types/locations'; // Need Location for dropdown type
@@ -18,12 +18,19 @@ const deviceStatuses = [
     { value: 'pasif', label: 'Pasif' },
 ];
 
+// Department type (mirroring the one passed from page)
+interface DepartmentSelectItem {
+    value: string;
+    label: string;
+}
+
 interface DeviceFormProps {
   onSubmit: (data: DeviceFormData) => Promise<void>;
   onClose: () => void;
   initialData?: Device | null; // Use Device type here
   isSubmitting: boolean;
-  availableLocations: LocationSelectItem[]; // Pass locations for the dropdown
+  availableLocations: Location[]; // Pass locations for the dropdown
+  availableDepartments: DepartmentSelectItem[]; // Add prop for departments
 }
 
 export default function DeviceForm({
@@ -31,7 +38,8 @@ export default function DeviceForm({
   onClose,
   initialData,
   isSubmitting,
-  availableLocations
+  availableLocations,
+  availableDepartments
 }: DeviceFormProps) {
 
   // Helper to format date for input type="date" (YYYY-MM-DD)
@@ -51,20 +59,44 @@ export default function DeviceForm({
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
+    watch
   } = useForm<DeviceFormData>({ // Use DeviceFormData here
     // Include all fields in defaultValues
     defaultValues: {
       name: initialData?.name || '',
       type: initialData?.type || '',
       serial_number: initialData?.serial_number || '',
+      department: initialData?.location?.department || '',
       location_id: initialData?.location_id || '',
       properties: initialData?.properties || [],
       purchase_date: formatDateForInput(initialData?.purchase_date),
       warranty_expiry_date: formatDateForInput(initialData?.warranty_expiry_date),
-      status: initialData?.status || '',
+      status: initialData?.status || 'aktif',
       notes: initialData?.notes || '',
     },
   });
+
+  // Department selection state for filtering locations
+  const [selectedDepartment, setSelectedDepartment] = useState<string>(() => {
+    // Derive initial department from initialData.location or empty
+    return initialData?.location?.department || '';
+  });
+
+  // Filter locations based on selected department
+  const filteredLocations = React.useMemo(() => {
+    if (!selectedDepartment) {
+      return availableLocations;
+    }
+    return availableLocations.filter(loc => loc.department === selectedDepartment);
+  }, [selectedDepartment, availableLocations]);
+
+  // Handle department change
+  const handleDepartmentChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDepartment(event.target.value);
+    // Reset location selection when department changes
+    setValue('location_id', '');
+  };
 
   const { fields, append, remove, move } = useFieldArray<DeviceFormData, "properties", "id">({
     control,
@@ -73,32 +105,37 @@ export default function DeviceForm({
 
   // Reset form when initialData changes (e.g., when opening edit modal)
   useEffect(() => {
+     if (!initialData) return;
+     
      const resetData = {
         name: initialData?.name || '',
         type: initialData?.type || '',
         serial_number: initialData?.serial_number || '',
+        department: availableLocations.find(loc => loc.id === initialData?.location_id)?.department || '',
         location_id: initialData?.location_id || '',
         properties: initialData?.properties || [],
         purchase_date: formatDateForInput(initialData?.purchase_date),
         warranty_expiry_date: formatDateForInput(initialData?.warranty_expiry_date),
-        status: initialData?.status || '',
+        status: initialData?.status || 'aktif',
         notes: initialData?.notes || '',
      };
     reset(resetData);
-  }, [initialData, reset]);
-
+    // Set department based on resetData location
+    const initDept = availableLocations.find(loc => loc.id === resetData.location_id)?.department || '';
+    setSelectedDepartment(initDept);
+  }, [initialData, reset, availableLocations, setValue]);
 
   const handleFormSubmit = async (data: DeviceFormData) => {
      // Ensure empty strings become null for optional fields if needed by backend/schema
      const processedData: DeviceFormData = {
          ...data,
-         location_id: data.location_id === '' ? null : data.location_id,
+         department: selectedDepartment,
+         location_id: data.location_id,
          serial_number: data.serial_number === '' ? null : data.serial_number,
          purchase_date: data.purchase_date === '' ? null : data.purchase_date,
          warranty_expiry_date: data.warranty_expiry_date === '' ? null : data.warranty_expiry_date,
-         status: data.status === '' ? null : data.status,
+         status: data.status,
          notes: data.notes === '' ? null : data.notes,
-         // Properties should already be in the correct format from useFieldArray
      };
 
     // Client-side validation before submitting
@@ -117,6 +154,10 @@ export default function DeviceForm({
     // Submit the validated data
     await onSubmit(validation.data);
   };
+
+  // Add console log here to check props
+  console.log('DeviceForm - availableDepartments:', availableDepartments);
+  console.log('DeviceForm - availableLocations:', availableLocations);
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -171,18 +212,39 @@ export default function DeviceForm({
             {errors.serial_number && <p className="mt-1 text-sm text-red-600">{errors.serial_number.message}</p>}
           </div>
 
+          {/* Department Select */}
+          <div>
+            <label htmlFor="department" className="block text-sm font-medium text-gray-700">
+              Departman <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="department"
+              value={selectedDepartment}
+              onChange={handleDepartmentChange}
+              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${!selectedDepartment ? 'border-red-500' : ''}`}
+            >
+              <option value="">-- Departman Seçin --</option>
+              {availableDepartments.map((dept) => (
+                <option key={dept.value} value={dept.value}>
+                  {dept.label}
+                </option>
+              ))}
+            </select>
+            {!selectedDepartment && <p className="mt-1 text-sm text-red-600">Departman seçilmelidir.</p>}
+          </div>
+
           {/* Location Select */}
           <div>
             <label htmlFor="location_id" className="block text-sm font-medium text-gray-700">
-                Bulunduğu Konum
+                Bulunduğu Konum <span className="text-red-500">*</span>
             </label>
             <select
               id="location_id"
-              {...register('location_id')}
+              {...register('location_id', { required: 'Konum seçilmelidir.' })}
               className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.location_id ? 'border-red-500' : ''}`}
             >
-              <option value="">-- Konum Seçin (Opsiyonel) --</option>
-              {availableLocations.map((loc) => (
+              <option value="">-- Konum Seçin --</option>
+              {filteredLocations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name}
                 </option>
@@ -191,17 +253,16 @@ export default function DeviceForm({
             {errors.location_id && <p className="mt-1 text-sm text-red-600">{errors.location_id.message}</p>}
           </div>
 
-           {/* Status Select */}
-           <div>
+          {/* Status Select */}
+          <div>
             <label htmlFor="status" className="block text-sm font-medium text-gray-700">
-                Durum
+                Durum <span className="text-red-500">*</span>
             </label>
             <select
               id="status"
               {...register('status')}
               className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.status ? 'border-red-500' : ''}`}
             >
-              <option value="">-- Durum Seçin (Opsiyonel) --</option>
               {deviceStatuses.map((stat) => (
                 <option key={stat.value} value={stat.value}>
                   {stat.label}
@@ -250,11 +311,11 @@ export default function DeviceForm({
               rows={3}
               {...register('notes')}
               className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.notes ? 'border-red-500' : ''}`}
-            ></textarea>
+            />
             {errors.notes && <p className="mt-1 text-sm text-red-600">{errors.notes.message}</p>}
-        </div>
+          </div>
 
-      {/* Dynamic Properties Section (Keep as is, matches updated schema) */}
+      {/* Dynamic Properties Section */}
       <div className="space-y-3 pt-4 border-t border-gray-200">
          <h3 className="text-sm font-medium text-gray-900">Ek Özellikler</h3>
          {fields.map((field, index) => (
@@ -291,4 +352,4 @@ export default function DeviceForm({
       </div>
     </form>
   );
-} 
+}

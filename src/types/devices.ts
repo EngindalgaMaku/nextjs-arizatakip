@@ -2,6 +2,22 @@
 import { z } from 'zod';
 import { PropertyField, PropertyFieldSchema, Location } from './locations'; // Keep Location import if needed for joins
 
+// Issue record for devices
+export interface Issue {
+  reported_by: string;
+  description: string;
+  date: string; // ISO date string
+  evaluation: string; // Assessment or evaluation of the issue
+}
+
+// Zod schema for Issue
+export const IssueSchema = z.object({
+  reported_by: z.string().min(1, 'Bildirilen kişi/yer boş olamaz.'),
+  description: z.string().min(1, 'Açıklama boş olamaz.'),
+  date: z.string().refine(val => !!Date.parse(val), 'Geçerli bir tarih girilmelidir.'),
+  evaluation: z.string().optional().default(''),
+});
+
 // Define the structure for a Device
 export interface Device {
   id: string; // uuid
@@ -15,6 +31,7 @@ export interface Device {
   warranty_expiry_date: string | null; // ISO date string (YYYY-MM-DD from form)
   status: string | null; // e.g., 'aktif', 'arizali', 'bakimda'
   notes: string | null;
+  issues?: Issue[] | null;
   created_at: string; // ISO date string
   updated_at: string; // ISO date string
   location?: Location | null; // Optional relation data if joined
@@ -25,11 +42,13 @@ export const DeviceSchema = z.object({
   name: z.string().min(3, 'Cihaz adı en az 3 karakter olmalıdır.'),
   type: z.string().min(1, 'Cihaz tipi seçilmelidir.').nullable(), // Type is required now in form
   serial_number: z.string().nullable().optional(),
-  location_id: z.string().uuid('Geçerli bir konum seçilmelidir.').nullable().optional(), // Validate UUID if provided
+  location_id: z.string().uuid('Geçerli bir konum seçilmelidir.'),
+  department: z.string().min(1, 'Departman seçilmelidir.'),
+  issues: z.array(IssueSchema).nullable().optional().default([]),
   properties: z.array(PropertyFieldSchema).nullable().optional().default([]),
   purchase_date: z.string().nullable().optional(),
   warranty_expiry_date: z.string().nullable().optional(),
-  status: z.string().nullable().optional(),
+  status: z.string().min(1, 'Durum seçilmelidir.'),
   notes: z.string().nullable().optional(),
   // barcode_value is generated, not part of the form
 });
@@ -50,4 +69,19 @@ export const deviceTypes = [
 export function getDeviceTypeLabel(value: string | null | undefined): string {
     if (!value) return 'Bilinmiyor';
     return deviceTypes.find(dt => dt.value === value)?.label || value;
+}
+
+// Define allowed device statuses
+export const deviceStatuses = [
+    { value: 'active', label: 'Aktif' },
+    { value: 'faulty', label: 'Arızalı' },
+    { value: 'maintenance', label: 'Bakımda' },
+    { value: 'inactive', label: 'Pasif' },
+    // Add other statuses as needed
+];
+
+// Helper function to get device status label
+export function getDeviceStatusLabel(value: string | null | undefined): string {
+    if (!value) return 'Bilinmiyor';
+    return deviceStatuses.find(ds => ds.value === value)?.label || value;
 } 

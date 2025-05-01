@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'; // Server-side client
 import { notFound } from 'next/navigation';
 import React from 'react';
+import { ScheduleUpsertEntry } from '@/types/schedules';
+import LocationSchedule from '@/components/schedules/LocationSchedule';
 
 // Next.js App Router sayfası için doğru props tipi
 type PageProps = {
@@ -45,10 +47,26 @@ async function getLocationByBarcode(barcodeValue: string): Promise<LocationData 
   return data as LocationData;
 }
 
+// Server-side fetch for schedule entries
+async function getScheduleEntriesByLab(labId: string): Promise<ScheduleUpsertEntry[]> {
+  const { data, error } = await supabase
+    .from('schedule_entries')
+    .select('lab_id, day, period, subject, class_name, teacher')
+    .eq('lab_id', labId)
+    .order('day', { ascending: true })
+    .order('period', { ascending: true });
+  if (error) {
+    console.error('Error fetching schedule entries:', error);
+    return [];
+  }
+  return (data as ScheduleUpsertEntry[]) || [];
+}
+
 // Server Component Page
-export default async function LocationPublicPage({ params }: PageProps) {
+export default async function LocationPublicPage({ params }: any) {
   const { barcode } = params;
   const location = await getLocationByBarcode(barcode);
+  const scheduleEntries = await getScheduleEntriesByLab(barcode);
 
   if (!location) {
     notFound(); // Trigger Next.js 404 page
@@ -65,6 +83,11 @@ export default async function LocationPublicPage({ params }: PageProps) {
         <p className="text-lg text-indigo-600 font-semibold mb-4 text-center border-b pb-2">
           {location.name}
         </p>
+
+        {/* If schedule entries exist, show schedule component */}
+        {scheduleEntries && scheduleEntries.length > 0 && (
+          <LocationSchedule entries={scheduleEntries} />
+        )}
 
         {properties && Array.isArray(properties) && properties.length > 0 ? (
           <div className="max-h-96 overflow-y-auto pr-2 mt-4">
