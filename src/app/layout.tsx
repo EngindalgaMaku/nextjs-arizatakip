@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "react-hot-toast";
+// Remove QueryClient imports
+// import { QueryClient, QueryClientProvider } from '@tanstack/react-query'; 
+// import React from 'react';
 
-// Provider'ları import et
+// Import the new provider
+import { QueryProvider } from "@/providers/QueryProvider"; 
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -33,6 +37,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Remove useState for queryClient
+  // const [queryClient] = React.useState(() => new QueryClient());
+
   return (
     <html lang="tr">
       <head>
@@ -41,6 +48,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={inter.className}>
+         {/* Remove QueryProvider wrapper */}
         <AuthProvider>
           <NotificationProvider>
             {children}
