@@ -31,11 +31,11 @@ export const PropertyFieldSchema = z.object({
 export const LocationSchema = z.object({
   name: z.string().min(3, 'Konum adı en az 3 karakter olmalıdır.'),
   type: z.string().nullable().optional(),
-  department: z.string().nullable().optional(), // Add department field to schema
+  department: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
-  // Update properties to be an array of the PropertyFieldSchema
   properties: z.array(PropertyFieldSchema).optional().default([]),
 });
 
 // Type inferred from the schema for form validation
+// This type will automatically update when LocationSchema changes
 export type LocationFormData = z.infer<typeof LocationSchema>; 

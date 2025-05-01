@@ -3,6 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import { DalDers, DalDersFormSchema, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod'; // Assuming zod might be needed or remove if not
 
 /**
  * Fetch all lessons for a specific branch (dal).
@@ -215,4 +216,39 @@ export async function fetchDistinctDersAdlari(): Promise<string[]> {
   ];
 
   return distinctNames.sort(); // Sort alphabetically
+}
+
+/**
+ * Fetches distinct lessons suitable for select options.
+ * Returns an array of { id, dersAdi } objects.
+ * Uses the ID of the first occurrence found for each distinct name.
+ */
+export async function fetchAllDersOptions(): Promise<{ id: string; dersAdi: string }[]> {
+  // Fetch all lessons, selecting only id and ders_adi
+  const { data, error } = await supabase
+    .from('dal_dersleri')
+    .select('id, ders_adi')
+    .order('ders_adi'); // Order to potentially get consistent "first" ID
+
+  if (error) {
+    console.error('Error fetching all ders options:', error);
+    return [];
+  }
+
+  if (!data) {
+    return [];
+  }
+
+  // Use a Map to keep only the first entry for each distinct ders_adi
+  const distinctDersMap = new Map<string, { id: string; dersAdi: string }>();
+  for (const ders of data) {
+    if (ders.ders_adi && !distinctDersMap.has(ders.ders_adi)) {
+      distinctDersMap.set(ders.ders_adi, { id: ders.id, dersAdi: ders.ders_adi });
+    }
+  }
+
+  // Convert Map values back to an array
+  const options = Array.from(distinctDersMap.values());
+
+  return options; // Already sorted by ders_adi due to initial query order
 } 

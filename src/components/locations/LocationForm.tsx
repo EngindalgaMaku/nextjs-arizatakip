@@ -40,7 +40,6 @@ export default function LocationForm({
   initialData,
   isSubmitting
 }: LocationFormProps) {
-  // No conversion needed if initialData.properties is already array
   const initialPropertiesArray = initialData?.properties || [];
 
   const { 
@@ -55,45 +54,37 @@ export default function LocationForm({
       type: initialData?.type || '',
       department: initialData?.department || '',
       description: initialData?.description || '',
-      properties: initialPropertiesArray, // Should be array now
+      properties: initialPropertiesArray, 
     },
   });
 
-  // UseFieldArray with PropertyField type hint
   const { fields, append, remove, move } = useFieldArray<LocationFormData, "properties", "id">({
     control,
     name: "properties",
   });
 
-  // Reset form if initialData changes
   useEffect(() => {
      const resetData = {
         name: initialData?.name || '',
         type: initialData?.type || '',
         department: initialData?.department || '',
         description: initialData?.description || '',
-        properties: initialData?.properties || [], // Expect array
+        properties: initialData?.properties || [],
      };
     reset(resetData);
   }, [initialData, reset]);
 
   const handleFormSubmit = async (data: LocationFormData) => {
-    // Data structure should already match LocationFormData, including properties array.
-    // Validate the final structure with Zod before submitting.
     const validation = LocationSchema.safeParse(data);
 
     if (!validation.success) {
         console.error("Zod Validation Error:", validation.error.errors);
-        // Find the first property-related error if any
         const propError = validation.error.errors.find(e => e.path.includes('properties'));
         const firstErrorMessage = validation.error.errors[0]?.message || 'Bilinmeyen doğrulama hatası.';
         const displayMessage = propError ? `Özellik Hatası (${propError.path.join('.')}): ${propError.message}` : `Doğrulama Hatası: ${firstErrorMessage}`;
-
         alert(displayMessage);
-        return; // Stop submission
+        return;
     }
-
-    // If validation passes, submit the validated data
     await onSubmit(validation.data);
   };
 

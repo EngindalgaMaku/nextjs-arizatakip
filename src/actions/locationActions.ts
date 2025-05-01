@@ -42,6 +42,31 @@ export async function fetchLaboratoryLocations(): Promise<{ id: string; name: st
   return data || [];
 }
 
+/**
+ * Fetches a single location by its ID.
+ */
+export async function fetchLocationById(id: string): Promise<Location | null> {
+  if (!id) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('locations')
+    .select('*') // Select all columns for details
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error(`Error fetching location ${id}:`, error);
+    if (error.code === 'PGRST116') {
+      return null; // Return null if not found
+    }
+    throw error; // Throw other errors
+  }
+
+  return data as Location | null;
+}
+
 // --- CRUD Operations --- 
 
 /**
@@ -49,15 +74,14 @@ export async function fetchLaboratoryLocations(): Promise<{ id: string; name: st
  * @param formData - Data from the location form.
  */
 export async function createLocation(formData: LocationFormData): Promise<{ success: boolean; error?: string; location?: Location }> {
-  // Validate input data using the imported schema
   const validation = LocationSchema.safeParse(formData);
   if (!validation.success) {
     console.error('Validation Error:', validation.error.errors);
     return { success: false, error: validation.error.errors.map(e => e.message).join(', ') };
   }
 
-  // Include properties in the destructured data
-  const { name, type, description, properties } = validation.data;
+  // Revert destructuring
+  const { name, type, description, properties, department } = validation.data;
 
   try {
     // Get the current maximum sort_order
@@ -74,19 +98,22 @@ export async function createLocation(formData: LocationFormData): Promise<{ succ
     }
 
     const nextOrder = (maxOrderData?.sort_order ?? 0) + 1;
-
-    // Insert the main location data, including the new sort_order
-    const { data: newLocationData, error: insertError } = await supabase
-      .from('locations')
-      .insert({
+    
+    // Revert insertData structure
+    const insertData = {
         name,
         type: type || null,
-        department: validation.data.department || null,
+        department: department || null,
         description: description || null,
         properties: properties || [],
-        sort_order: nextOrder, // Assign the calculated sort order
-        // barcode_value will be updated in a second step
-      })
+        sort_order: nextOrder,
+        // Remove selected_..._id fields
+      };
+
+    // Insert the main location data
+    const { data: newLocationData, error: insertError } = await supabase
+      .from('locations')
+      .insert(insertData)
       .select()
       .single();
 
@@ -130,32 +157,34 @@ export async function createLocation(formData: LocationFormData): Promise<{ succ
  * @param formData - Data from the location form.
  */
 export async function updateLocation(id: string, formData: LocationFormData): Promise<{ success: boolean; error?: string; location?: Location }> {
-  // Validate ID
   if (!id) {
-    // Use a standard English error message to avoid syntax issues
-    return { success: false, error: 'Location ID to update not provided.'}; 
+    return { success: false, error: 'Location ID to update not provided.'};
   }
 
-  // Validate input data using the imported schema
   const validation = LocationSchema.safeParse(formData);
   if (!validation.success) {
     console.error('Validation Error:', validation.error.errors);
     return { success: false, error: validation.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { name, type, description, properties } = validation.data;
+  // Revert destructuring
+  const { name, type, description, properties, department } = validation.data;
 
   try {
-    const { data: updatedLocation, error } = await supabase
-      .from('locations')
-      .update({
+     // Revert updateData structure
+     const updateData = {
         name,
         type: type || null,
-        department: validation.data.department || null,
+        department: department || null,
         description: description || null,
-        properties: properties || {},
+        properties: properties || [], // Ensure properties is an array
+        // Remove selected_..._id fields
         updated_at: new Date().toISOString(),
-      })
+      };
+
+    const { data: updatedLocation, error } = await supabase
+      .from('locations')
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();

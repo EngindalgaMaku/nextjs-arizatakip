@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { ScheduleUpsertEntry } from '@/types/schedules';
+import { ScheduleEntry } from '@/types/schedules';
 import { PrinterIcon } from '@heroicons/react/24/outline';
 
 const dayLabels = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
@@ -30,12 +30,12 @@ const colors = [
 ];
 
 // Build a subject->color map
-function getSubjectColorMap(entries: ScheduleUpsertEntry[]) {
+function getLessonColorMap(entries: ScheduleEntry[]) {
   const map: Record<string, string> = {};
   let idx = 0;
   for (const e of entries) {
-    if (e.subject && !map[e.subject]) {
-      map[e.subject] = colors[idx % colors.length];
+    if (e.lesson_name && !map[e.lesson_name]) {
+      map[e.lesson_name] = colors[idx % colors.length];
       idx++;
     }
   }
@@ -43,7 +43,7 @@ function getSubjectColorMap(entries: ScheduleUpsertEntry[]) {
 }
 
 interface ScheduleTimelineProps {
-  entries: ScheduleUpsertEntry[];
+  entries: ScheduleEntry[];
 }
 
 // Global print styles: hide everything except timeline
@@ -73,13 +73,13 @@ const printStyles = `
 
 export default function ScheduleTimeline({ entries }: ScheduleTimelineProps) {
   // Build a lookup for quick access
-  const gridMap: Record<string, ScheduleUpsertEntry> = {};
+  const gridMap: Record<string, ScheduleEntry> = {};
   entries.forEach(e => {
     gridMap[`${e.day}-${e.period}`] = e;
   });
 
   // Determine color for each subject
-  const subjectColorMap = React.useMemo(() => getSubjectColorMap(entries), [entries]);
+  const lessonColorMap = React.useMemo(() => getLessonColorMap(entries), [entries]);
 
   // Print handler: just call window.print()
   const handlePrint = () => window.print();
@@ -120,16 +120,16 @@ export default function ScheduleTimeline({ entries }: ScheduleTimelineProps) {
                   const day = dIdx + 1;
                   const key = `${day}-${period}`;
                   const entry = gridMap[key];
-                  const has = entry && entry.subject;
-                  const bgClass = entry?.subject ? subjectColorMap[entry.subject] : '';
+                  const hasLesson = entry && entry.lesson_name;
+                  const bgClass = hasLesson ? lessonColorMap[entry.lesson_name as string] : '';
                   return (
                     <div
                       key={key}
                       className={`border p-1 overflow-auto ${bgClass}`}
                     >
-                      {entry?.subject && <div className="font-semibold text-sm">{entry.subject}</div>}
+                      {entry?.lesson_name && <div className="font-semibold text-sm">{entry.lesson_name}</div>}
                       {entry?.class_name && <div className="text-xs mt-1">Sınıf: {entry.class_name}</div>}
-                      {entry?.teacher && <div className="text-xs mt-1">Öğretmen: {entry.teacher}</div>}
+                      {entry?.teacher_name && <div className="text-xs mt-1">Öğretmen: {entry.teacher_name}</div>}
                     </div>
                   );
                 }),

@@ -1,11 +1,11 @@
 "use client";
 
 import React from 'react';
-import { ScheduleUpsertEntry } from '@/types/schedules';
+import { ScheduleEntry } from '@/types/schedules';
 import ScheduleTimeline from '@/components/schedules/ScheduleTimeline';
 
 interface LocationScheduleProps {
-  entries: ScheduleUpsertEntry[];
+  entries: ScheduleEntry[];
 }
 
 export default function LocationSchedule({ entries }: LocationScheduleProps) {

@@ -1,8 +1,9 @@
 import { supabase } from '@/lib/supabase'; // Server-side client
 import { notFound } from 'next/navigation';
 import React from 'react';
-import { ScheduleUpsertEntry } from '@/types/schedules';
+import { ScheduleEntry, ScheduleEntrySchema } from '@/types/schedules';
 import LocationSchedule from '@/components/schedules/LocationSchedule';
+import { z } from 'zod'; // Import Zod for validation
 
 // Next.js App Router sayfası için doğru props tipi
 type PageProps = {
@@ -21,56 +22,90 @@ interface LocationData {
   }> | null;
 }
 
-// Server-side function to fetch location data by barcode value
-async function getLocationByBarcode(barcodeValue: string): Promise<LocationData | null> {
+// Update function return type definition to include 'id'
+async function getLocationByBarcode(barcodeValue: string): Promise<(LocationData & { id: string }) | null> {
   if (!barcodeValue) {
     return null;
   }
 
-  // Select only necessary fields for public view
+  // Select name, properties, and id
   const { data, error } = await supabase
     .from('locations')
-    .select('name, properties') // Only fetch name and properties
+    .select('name, properties, id') 
     .eq('barcode_value', barcodeValue)
-    .single(); // Expect only one match
+    .single();
 
   if (error) {
     console.error('Error fetching location by barcode:', error);
-    // Don't expose detailed errors publicly, but handle not found
-    if (error.code === 'PGRST116') { // PostgREST code for "Resource not found" from .single()
+    if (error.code === 'PGRST116') { 
         return null;
     }
-    // For other errors, maybe return null or throw a generic error
     return null;
   }
   
-  return data as LocationData;
+  // No need for assertion here anymore, return type handles it
+  return data; 
 }
 
-// Server-side fetch for schedule entries
-async function getScheduleEntriesByLab(labId: string): Promise<ScheduleUpsertEntry[]> {
+// Update server-side fetch for schedule entries
+async function getScheduleEntriesByLab(labId: string): Promise<ScheduleEntry[]> {
   const { data, error } = await supabase
     .from('schedule_entries')
-    .select('lab_id, day, period, subject, class_name, teacher')
+    // Select required fields and joined names
+    .select(`
+      *,
+      lessons ( name ),
+      classes ( name ),
+      teachers ( name )
+    `)
     .eq('lab_id', labId)
     .order('day', { ascending: true })
     .order('period', { ascending: true });
+
   if (error) {
-    console.error('Error fetching schedule entries:', error);
+    console.error('Error fetching schedule entries by lab:', error);
     return [];
   }
-  return (data as ScheduleUpsertEntry[]) || [];
+
+  // Map data to camelCase and extract joined names
+  const mappedData = data?.map(entry => ({
+    id: entry.id,
+    lab_id: entry.lab_id,
+    day: entry.day,
+    period: entry.period,
+    lesson_id: entry.lesson_id,
+    class_id: entry.class_id,
+    teacher_id: entry.teacher_id,
+    created_at: entry.created_at,
+    updated_at: entry.updated_at,
+    // Extract nested names or null
+    lesson_name: entry.lessons ? entry.lessons.name : null,
+    class_name: entry.classes ? entry.classes.name : null,
+    teacher_name: entry.teachers ? entry.teachers.name : null,
+  })) || [];
+
+  // Validate fetched data (optional but recommended)
+  const parseResult = z.array(ScheduleEntrySchema).safeParse(mappedData);
+  if (!parseResult.success) {
+      console.error('Fetched public schedule data validation failed:', parseResult.error);
+      // Handle validation error, e.g., return empty array or throw
+      return [];
+  }
+
+  return parseResult.data;
 }
 
 // Server Component Page
-export default async function LocationPublicPage({ params }: any) {
+export default async function LocationPublicPage({ params }: PageProps) {
   const { barcode } = params;
   const location = await getLocationByBarcode(barcode);
-  const scheduleEntries = await getScheduleEntriesByLab(barcode);
-
+  
   if (!location) {
     notFound(); // Trigger Next.js 404 page
   }
+
+  // Now location.id should be correctly typed
+  const scheduleEntries = await getScheduleEntriesByLab(location.id);
 
   const properties = location.properties;
 
