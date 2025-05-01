@@ -130,6 +130,8 @@ export function ClassFormModal({ initialData, classId, onSubmit, onClose, loadin
                     <select
                       id="classPresidentName"
                       {...field}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value || null)}
                       className={`mt-1 block w-full rounded p-2 border ${errors.classPresidentName ? 'border-red-500' : 'border-gray-300'}`}
                       disabled={isLoadingStudents} // Disable while loading students
                     >
