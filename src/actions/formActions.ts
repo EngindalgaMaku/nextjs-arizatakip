@@ -16,6 +16,7 @@ import {
 } from '@/types/forms';
 import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const FORMS_PATH = '/dashboard/forms'; // Path for revalidation
 
@@ -55,9 +56,14 @@ export async function fetchForms(): Promise<Form[]> {
 
 /**
  * Fetch a single form by ID, including its fields.
+ * Accepts an optional Supabase client instance, creates one if not provided.
  */
-export async function fetchFormById(id: string): Promise<Form | null> {
-  const supabase = createServerActionClient({ cookies });
+export async function fetchFormById(
+  id: string,
+  supabaseClient?: SupabaseClient // Make client optional
+): Promise<Form | null> {
+  // Use passed client or create a new one if not provided
+  const supabase = supabaseClient || createServerActionClient({ cookies });
 
   const { data, error } = await supabase
     .from('forms')
@@ -556,9 +562,14 @@ export async function submitFormResponse(
 
 /**
  * Fetches all responses for a specific form.
+ * Accepts an optional Supabase client instance, creates one if not provided.
  */
-export async function fetchFormResponses(formId: string): Promise<FormResponse[]> {
-    const supabase = createServerActionClient({ cookies });
+export async function fetchFormResponses(
+  formId: string,
+  supabaseClient?: SupabaseClient // Make client optional
+): Promise<FormResponse[]> {
+    // Use passed client or create a new one if not provided
+    const supabase = supabaseClient || createServerActionClient({ cookies });
 
     if (!formId) {
         console.error('fetchFormResponses called without formId');
@@ -566,7 +577,7 @@ export async function fetchFormResponses(formId: string): Promise<FormResponse[]
     }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabase // Use the determined client
             .from('form_responses')
             .select('*')
             .eq('form_id', formId)
@@ -586,6 +597,42 @@ export async function fetchFormResponses(formId: string): Promise<FormResponse[]
     } catch (err) {
         console.error('Unexpected error fetching form responses:', err);
         return [];
+    }
+}
+
+/**
+ * Deletes a specific form response by its ID.
+ * @param responseId The ID of the response to delete.
+ * @returns An object indicating success or failure.
+ */
+export async function deleteFormResponse(responseId: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = createServerActionClient({ cookies });
+
+    if (!responseId) {
+        return { success: false, error: 'Silinecek yanıt IDsi belirtilmedi.' };
+    }
+
+    try {
+        const { error } = await supabase
+            .from('form_responses')
+            .delete()
+            .eq('id', responseId);
+
+        if (error) {
+            console.error(`Error deleting response ${responseId}:`, error);
+            // Ensure admin role has DELETE permission on form_responses.
+            return { success: false, error: 'Yanıt silinirken bir hata oluştu.' };
+        }
+
+        // Optionally, revalidate the responses page path if needed, 
+        // but client-side invalidation might be sufficient.
+        // Example: revalidatePath(`/dashboard/forms/[formId]/responses`); 
+
+        return { success: true };
+
+    } catch (err) {
+        console.error('Unexpected error deleting form response:', err);
+        return { success: false, error: 'Yanıt silinirken beklenmedik bir hata oluştu.' };
     }
 }
 
