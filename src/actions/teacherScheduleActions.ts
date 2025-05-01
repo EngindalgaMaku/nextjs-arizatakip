@@ -11,35 +11,40 @@ import { z } from 'zod'; // Import z from zod
 import { revalidatePath } from 'next/cache';
 
 /**
- * Fetch all schedule entries for a specific teacher.
+ * Fetch the schedule for a specific teacher, joining with classes table.
  */
 export async function fetchTeacherSchedule(teacherId: string): Promise<TeacherScheduleEntry[]> {
-  if (!teacherId) {
-    console.warn('fetchTeacherSchedule called without teacherId');
-    return [];
-  }
+  if (!teacherId) return [];
+
   const { data, error } = await supabase
     .from('teacher_schedules')
-    .select('*')
-    .eq('teacher_id', teacherId);
+    // Select all from schedules and the name from classes
+    .select(`
+      *,
+      classes ( name )
+    `)
+    .eq('teacher_id', teacherId)
+    .order('day_of_week', { ascending: true })
+    .order('time_slot', { ascending: true });
 
   if (error) {
     console.error(`Error fetching schedule for teacher ${teacherId}:`, error);
-    throw error; // Or return empty array depending on desired error handling
+    throw error;
   }
 
-  console.log(`[fetchTeacherSchedule] Raw data from Supabase for teacher ${teacherId}:`, data);
-
-  // Map snake_case to camelCase
+  // Map data to camelCase and extract class name
   const mappedData = data?.map(entry => ({
-      id: entry.id,
-      teacherId: entry.teacher_id,
-      dayOfWeek: entry.day_of_week,
-      timeSlot: entry.time_slot,
-      className: entry.class_name,
-      locationName: entry.location_name,
-      createdAt: entry.created_at,
-      updatedAt: entry.updated_at,
+    id: entry.id,
+    teacherId: entry.teacher_id,
+    dayOfWeek: entry.day_of_week,
+    timeSlot: entry.time_slot,
+    className: entry.class_name, // Lesson name
+    locationName: entry.location_name,
+    classId: entry.class_id, // Class ID
+    // Extract nested class name or null
+    classNameDisplay: entry.classes ? entry.classes.name : null,
+    createdAt: entry.created_at,
+    updatedAt: entry.updated_at,
   })) || [];
 
   // Validate fetched data (optional but recommended)
@@ -54,7 +59,7 @@ export async function fetchTeacherSchedule(teacherId: string): Promise<TeacherSc
 }
 
 /**
- * Create a new schedule entry for a teacher.
+ * Create a new schedule entry.
  */
 export async function createTeacherScheduleEntry(
   teacherId: string,
@@ -67,41 +72,71 @@ export async function createTeacherScheduleEntry(
     return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
   }
 
+  // *** Start: Location Conflict Check ***
+  if (parse.data.locationName) {
+    const { data: conflictingEntry, error: conflictError } = await supabase
+      .from('teacher_schedules')
+      .select('id') // We only need to know if one exists
+      .eq('day_of_week', dayOfWeek)
+      .eq('time_slot', timeSlot)
+      .eq('location_name', parse.data.locationName)
+      .maybeSingle(); // Check if any entry exists
+
+    if (conflictError) {
+      console.error('Error checking for location conflict during create:', conflictError);
+      return { success: false, error: 'Konum uygunluğu kontrol edilirken bir hata oluştu.' };
+    }
+
+    if (conflictingEntry) {
+      return { success: false, error: 'Bu konum/laboratuvar belirtilen saatte zaten kullanımda.' };
+    }
+  }
+  // *** End: Location Conflict Check ***
+
   const entryData = {
     teacher_id: teacherId,
     day_of_week: dayOfWeek,
     time_slot: timeSlot,
-    class_name: parse.data.className || null,
+    class_name: parse.data.className,
     location_name: parse.data.locationName || null,
+    class_id: parse.data.classId || null, // Save classId (or null)
   };
 
   try {
     const { data, error } = await supabase
       .from('teacher_schedules')
       .insert(entryData)
-      .select()
+      // Fetch the created entry with class name
+      .select(`
+        *,
+        classes ( name )
+      `)
       .single();
 
     if (error || !data) {
-      console.error('Error creating teacher schedule entry:', error?.message);
-      // Handle unique constraint violation specifically? (error.code === '23505')
-      if (error?.code === '23505') {
-          return { success: false, error: 'Bu zaman dilimi için zaten bir ders programı mevcut.' };
+      console.error('Error creating schedule entry:', error?.message);
+       if (error?.code === '23505') { // Handle unique constraint (teacher, day, slot)
+          return { success: false, error: 'Bu zaman dilimi için zaten bir ders mevcut.' };
       }
-      return { success: false, error: error?.message || 'Entry could not be created' };
+      return { success: false, error: error?.message || 'Ders programı girdisi oluşturulamadı.' };
     }
-    // Map response back to camelCase
+
+    revalidatePath(`/dashboard/teachers/${teacherId}/schedule`);
+
+    // Map back to camelCase including class name
     const createdEntry = {
-        id: data.id,
-        teacherId: data.teacher_id,
-        dayOfWeek: data.day_of_week,
-        timeSlot: data.time_slot,
-        className: data.class_name,
-        locationName: data.location_name,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+      id: data.id,
+      teacherId: data.teacher_id,
+      dayOfWeek: data.day_of_week,
+      timeSlot: data.time_slot,
+      className: data.class_name,
+      locationName: data.location_name,
+      classId: data.class_id,
+      classNameDisplay: data.classes ? data.classes.name : null,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
     };
-     revalidatePath(`/dashboard/area-teachers/${teacherId}/schedule`);
+
     return { success: true, entry: createdEntry as TeacherScheduleEntry };
   } catch (err) {
     console.error('createTeacherScheduleEntry error:', err);
@@ -121,36 +156,88 @@ export async function updateTeacherScheduleEntry(
     return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
   }
 
+  // Fetch original entry to get day/time for conflict check and teacherId for revalidation
+  const { data: existingEntryData, error: fetchOriginalError } = await supabase
+      .from('teacher_schedules')
+      .select('teacher_id, day_of_week, time_slot, location_name') // Get needed fields
+      .eq('id', entryId)
+      .single();
+
+  if (fetchOriginalError) {
+       console.error('Error fetching original entry details for update:', fetchOriginalError);
+       return { success: false, error: 'Güncellenecek ders bilgisi alınamadı.' };
+  }
+
+  // *** Start: Location Conflict Check for Update ***
+  // Check only if locationName is provided and is different from the original
+  if (parse.data.locationName && parse.data.locationName !== existingEntryData.location_name) {
+      const { data: conflictingEntry, error: conflictError } = await supabase
+        .from('teacher_schedules')
+        .select('id')
+        .eq('day_of_week', existingEntryData.day_of_week)
+        .eq('time_slot', existingEntryData.time_slot)
+        .eq('location_name', parse.data.locationName)
+        .neq('id', entryId) // Exclude the entry being updated
+        .maybeSingle();
+
+      if (conflictError) {
+        console.error('Error checking for location conflict during update:', conflictError);
+        return { success: false, error: 'Konum uygunluğu kontrol edilirken bir hata oluştu.' };
+      }
+
+      if (conflictingEntry) {
+        return { success: false, error: 'Bu konum/laboratuvar belirtilen saatte zaten kullanımda.' };
+      }
+  }
+  // *** End: Location Conflict Check for Update ***
+
   const entryData = {
-    class_name: parse.data.className || null,
+    class_name: parse.data.className,
     location_name: parse.data.locationName || null,
-    // day/time/teacher not updated here, only content
+    class_id: parse.data.classId || null, // Update classId
   };
 
   try {
+    // Revalidation teacherId fetch is now done above
+    const teacherIdForRevalidation = existingEntryData.teacher_id;
+
     const { data, error } = await supabase
       .from('teacher_schedules')
       .update(entryData)
       .eq('id', entryId)
-      .select()
+      // Fetch the updated entry with class name
+      .select(`
+        *,
+        classes ( name )
+      `)
       .single();
 
     if (error || !data) {
-      console.error('Error updating teacher schedule entry:', error?.message);
-      return { success: false, error: error?.message || 'Entry could not be updated' };
+      console.error('Error updating schedule entry:', error?.message);
+       if (error?.code === '23505') { // Handle potential unique constraint issues if fields changed
+          return { success: false, error: 'Güncelleme benzersizlik kısıtlamasını ihlal ediyor.' };
+      }
+      return { success: false, error: error?.message || 'Ders programı girdisi güncellenemedi.' };
     }
-     const updatedEntry = {
-        id: data.id,
-        teacherId: data.teacher_id,
-        dayOfWeek: data.day_of_week,
-        timeSlot: data.time_slot,
-        className: data.class_name,
-        locationName: data.location_name,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+
+    if (teacherIdForRevalidation) {
+        revalidatePath(`/dashboard/teachers/${teacherIdForRevalidation}/schedule`);
+    }
+
+    // Map back to camelCase
+    const updatedEntry = {
+       id: data.id,
+      teacherId: data.teacher_id,
+      dayOfWeek: data.day_of_week,
+      timeSlot: data.time_slot,
+      className: data.class_name,
+      locationName: data.location_name,
+      classId: data.class_id,
+      classNameDisplay: data.classes ? data.classes.name : null,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
     };
-    // TODO: Figure out how to get teacherId here for revalidation if needed
-    // revalidatePath(`/dashboard/area-teachers/${teacherId}/schedule`);
+
     return { success: true, entry: updatedEntry as TeacherScheduleEntry };
   } catch (err) {
     console.error('updateTeacherScheduleEntry error:', err);

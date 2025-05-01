@@ -374,31 +374,21 @@ export default function DashboardLayout({
       <div className={`flex-1 flex flex-col overflow-hidden ${isPrintView ? 'w-full' : ''}`}>
         {/* Header - Conditionally Rendered */}
         {!isPrintView && (
-          <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 md:px-6">
+          <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shadow-sm">
             <div className="flex items-center">
               {/* Hamburger menu for mobile */}
               <button
-                className="md:hidden mr-3 p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                className="mr-4 md:hidden text-gray-600 hover:text-gray-800 focus:outline-none"
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                aria-label="Toggle sidebar"
               >
-                <svg
-                  className="h-6 w-6"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
                 </svg>
               </button>
               
               {/* Current Page Title */}
-              <h1 className="text-lg font-semibold text-gray-700">{getPageTitle()}</h1>
+              <h2 className="text-xl font-semibold text-gray-800">{getPageTitle()}</h2>
             </div>
             
             {/* Profile Menu */}
@@ -411,53 +401,50 @@ export default function DashboardLayout({
                     setIsSidebarOpen(false);
                   }
                 }}
-                className="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full p-1"
+                className="flex items-center text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 p-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <span className="text-indigo-800 font-medium">
-                    {userData?.name ? userData.name.charAt(0) : "U"}
-                  </span>
-                </div>
-                <div className="hidden md:flex md:items-center">
-                  <span className="text-sm font-medium text-gray-700">
-                    {loading ? "Yükleniyor..." : userData?.name || "Kullanıcı"}
-                  </span>
-                  <ChevronDownIcon className="ml-1 h-4 w-4 text-gray-500" />
-                </div>
+                {loading ? (
+                  <span className="text-gray-500">Yükleniyor...</span>
+                ) : userData ? (
+                   <>
+                      {userData.user_metadata?.avatar_url && (
+                        <Image 
+                          src={userData.user_metadata.avatar_url}
+                          alt="Profil" 
+                          width={32} 
+                          height={32}
+                          className="rounded-full mr-2" 
+                        />
+                      )}
+                      <span className="mr-1 hidden sm:inline">{userData.user_metadata?.full_name || userData.email}</span>
+                      <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                   </>
+                ) : (
+                  <span className="text-red-500">Veri yüklenemedi</span>
+                )}
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">
-                      {userData?.name || "Kullanıcı"}
-                    </p>
-                    <p className="text-xs text-gray-500">{userData?.email || ""}</p>
-                  </div>
-                  <Link
-                    href="/dashboard/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                  >
-                    Profil
-                  </Link>
-                  <Link
-                    href="/teacher/login"
-                    className="block px-4 py-2 text-sm text-indigo-600 hover:bg-gray-100 w-full text-left"
-                  >
-                    Öğretmen Moduna Geç
-                  </Link>
-                  <Link
-                    href="/dashboard/settings"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                  >
-                    Ayarlar
-                  </Link>
-                  <button
-                    onClick={handleSignOut}
-                    className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
-                  >
-                    Çıkış Yap
-                  </button>
+                <div 
+                   className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 ring-1 ring-black ring-opacity-5"
+                   role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabIndex={-1}
+                >
+                   {/* Add profile/settings links here if needed */}
+                   {/* 
+                   <Link href="/dashboard/profile" 
+                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                     role="menuitem" tabIndex={-1} id="user-menu-item-0">
+                       Profil
+                   </Link>
+                   */}
+                   <button
+                      onClick={handleSignOut}
+                      className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 focus:outline-none focus:ring-0"
+                      role="menuitem" tabIndex={-1} id="user-menu-item-1"
+                    >
+                     <LogOutIcon className="mr-2 h-4 w-4" />
+                     Çıkış Yap
+                   </button>
                 </div>
               )}
             </div>

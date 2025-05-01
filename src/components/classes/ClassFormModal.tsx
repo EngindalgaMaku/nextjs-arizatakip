@@ -10,6 +10,8 @@ import type { Student } from '@/types/students'; // Import Student type
 import { useQuery } from '@tanstack/react-query';
 import { fetchTeachers } from '@/actions/teacherActions';
 import { fetchStudentsByClass } from '@/actions/studentActions'; // Import student fetch action
+import { fetchDallar } from '@/actions/dalActions'; // Import fetchDallar
+import type { Dal } from '@/types/dallar'; // Import Dal type
 
 interface ClassFormModalProps {
   initialData?: ClassFormValues;
@@ -36,6 +38,12 @@ export function ClassFormModal({ initialData, classId, onSubmit, onClose, loadin
     enabled: !!classId && isEditing, // Only run query if classId is present and we are editing
   });
 
+  // Fetch Dallar for the dropdown
+  const { data: dallarList = [], isLoading: isLoadingDallar } = useQuery<Dal[]>({ 
+    queryKey: ['dallar'],
+    queryFn: fetchDallar,
+  });
+
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<ClassFormValues>({
     resolver: zodResolver(ClassSchema),
     defaultValues: initialData ?? {
@@ -47,7 +55,7 @@ export function ClassFormModal({ initialData, classId, onSubmit, onClose, loadin
   });
 
   // Combined loading state
-  const isBusy = loading || isSubmitting || isLoadingTeachers || (isEditing && isLoadingStudents);
+  const isBusy = loading || isSubmitting || isLoadingTeachers || (isEditing && isLoadingStudents) || isLoadingDallar;
 
   return (
     <Modal isOpen onClose={onClose} title={isEditing ? 'Sınıf Düzenle' : 'Yeni Sınıf'}>
@@ -67,10 +75,31 @@ export function ClassFormModal({ initialData, classId, onSubmit, onClose, loadin
             <input id="className" autoFocus type="text" placeholder="10-A, ATP 11-B vb." {...register('name')} aria-invalid={errors.name ? 'true' : 'false'} className={`mt-1 block w-full rounded p-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'}`}/>
             {errors.name && <p className="text-red-600 text-sm">{errors.name.message}</p>}
           </div>
-          {/* Department */}
+          {/* Department Dropdown */}
           <div>
-            <label htmlFor="department" className="block text-sm font-medium text-gray-700">Alan/Dal</label>
-            <input id="department" type="text" placeholder="Bilişim Teknolojileri, Tesisat..." {...register('department')} className={`mt-1 block w-full rounded p-2 border ${errors.department ? 'border-red-500' : 'border-gray-300'}`}/>
+            <label htmlFor="department" className="block text-sm font-medium text-gray-700">Dal</label>
+            <Controller
+                name="department"
+                control={control}
+                render={({ field }) => (
+                    <select
+                        id="department"
+                        {...field}
+                        value={field.value ?? ''} // Handle null/undefined
+                        onChange={(e) => field.onChange(e.target.value || null)} // Send null if default option selected
+                        className={`mt-1 block w-full rounded p-2 border ${errors.department ? 'border-red-500' : 'border-gray-300'}`}
+                        disabled={isLoadingDallar} // Disable while loading
+                    >
+                        <option value="">-- Dal Seçiniz --</option>
+                        {dallarList.map((dal) => (
+                            <option key={dal.id} value={dal.name}>
+                                {dal.name}
+                            </option>
+                        ))}
+                    </select>
+                )}
+            />
+            {isLoadingDallar && <p className="text-sm text-gray-500 mt-1">Dallar yükleniyor...</p>}
             {errors.department && <p className="text-red-600 text-sm">{errors.department.message}</p>}
           </div>
            {/* Class Teacher Dropdown */}

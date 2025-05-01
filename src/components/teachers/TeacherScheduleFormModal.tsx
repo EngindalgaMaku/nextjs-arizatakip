@@ -13,6 +13,9 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { fetchLaboratoryLocations } from '@/actions/locationActions';
 import { fetchDistinctDersAdlari } from '@/actions/dalDersActions';
+import { fetchClasses } from '@/actions/classActions';
+import type { Class } from '@/types/classes';
+import { Controller } from 'react-hook-form';
 
 interface TeacherScheduleFormModalProps {
   initialData?: TeacherScheduleFormValues;
@@ -42,21 +45,27 @@ export function TeacherScheduleFormModal({
       queryFn: fetchDistinctDersAdlari,
   });
 
+  const { data: classesList = [], isLoading: isLoadingClasses } = useQuery<Class[]>({ 
+      queryKey: ['classes'],
+      queryFn: fetchClasses,
+  });
+
   const dayName = DAYS_OF_WEEK.find(d => d.id === dayOfWeek)?.name;
   const slotTime = TIME_SLOTS.find(s => s.id === timeSlot)?.time;
   const modalTitle = initialData
     ? `Dersi Düzenle (${dayName} - ${slotTime})`
     : `Yeni Ders Ekle (${dayName} - ${slotTime})`;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<TeacherScheduleFormValues>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<TeacherScheduleFormValues>({
     resolver: zodResolver(TeacherScheduleFormSchema),
     defaultValues: initialData ?? {
       className: '',
       locationName: '',
+      classId: null,
     },
   });
 
-  const isBusy = loading || isSubmitting || isLoadingLabs || isLoadingDersler;
+  const isBusy = loading || isSubmitting || isLoadingLabs || isLoadingDersler || isLoadingClasses;
 
   return (
     <Modal isOpen onClose={onClose} title={modalTitle}>
@@ -81,6 +90,34 @@ export function TeacherScheduleFormModal({
             </datalist>
             {isLoadingDersler && <p className="text-xs text-gray-500 mt-1">Ders adları yükleniyor...</p>}
             {errors.className && <p className="text-red-600 text-sm">{errors.className.message}</p>}
+          </div>
+
+          {/* Class Selection Dropdown */}
+          <div>
+            <label htmlFor="classId" className="block text-sm font-medium text-gray-700">Sınıf</label>
+            <Controller
+                name="classId"
+                control={control}
+                render={({ field }) => (
+                    <select
+                        id="classId"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                        className={`mt-1 block w-full rounded p-2 border ${errors.classId ? 'border-red-500' : 'border-gray-300'}`}
+                        disabled={isLoadingClasses}
+                    >
+                        <option value="">-- Sınıf Seçiniz (İsteğe Bağlı) --</option>
+                        {classesList.map((cls) => (
+                            <option key={cls.id} value={cls.id}>
+                                {cls.name} {cls.department ? `(${cls.department})` : ''} 
+                            </option>
+                        ))}
+                    </select>
+                )}
+            />
+            {isLoadingClasses && <p className="text-sm text-gray-500 mt-1">Sınıflar yükleniyor...</p>}
+            {errors.classId && <p className="text-red-600 text-sm">{errors.classId.message}</p>}
           </div>
 
           {/* Location Name Input with Datalist */}

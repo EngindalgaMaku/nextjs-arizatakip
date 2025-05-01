@@ -5,9 +5,44 @@ import {
   DAYS_OF_WEEK,
   TIME_SLOTS,
   TeacherScheduleEntry,
-  TeacherScheduleGridData
+  TeacherScheduleGridData,
+  SinifSeviyesi // Import SinifSeviyesi if needed, though not directly used here now
 } from '@/types/teacherSchedules';
 import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon } from '@heroicons/react/20/solid';
+
+// Define a list of Tailwind background color classes
+const COLOR_PALETTE = [
+  'bg-blue-100 text-blue-800',
+  'bg-green-100 text-green-800',
+  'bg-yellow-100 text-yellow-800',
+  'bg-purple-100 text-purple-800',
+  'bg-pink-100 text-pink-800',
+  'bg-indigo-100 text-indigo-800',
+  'bg-red-100 text-red-800',
+  'bg-teal-100 text-teal-800',
+];
+
+// Simple hash function to get a somewhat consistent index
+function simpleStringHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
+
+// Function to get a color class based on lesson name
+function getLessonColorClass(lessonName?: string | null): string {
+  if (!lessonName) {
+    return 'bg-gray-50'; // Default for empty slots (though we don't color empty ones)
+  }
+  const hash = simpleStringHash(lessonName);
+  const index = hash % COLOR_PALETTE.length;
+  return COLOR_PALETTE[index];
+}
 
 interface TeacherScheduleGridProps {
   scheduleData: TeacherScheduleEntry[];
@@ -60,25 +95,36 @@ export function TeacherScheduleGrid({ scheduleData, onAdd, onEdit, onDelete }: T
               </td>
               {DAYS_OF_WEEK.map(day => {
                 const entry = gridData[day.id]?.[slot.id];
+                // Get the color class based on the lesson name
+                const colorClass = entry?.className ? getLessonColorClass(entry.className) : '';
+
                 return (
-                  <td key={`${day.id}-${slot.id}`} className="px-4 py-4 whitespace-normal text-sm text-gray-700 text-center relative group border-r h-24 align-top">
+                   // Apply a base padding/style, background comes from inner div if entry exists
+                  <td key={`${day.id}-${slot.id}`} className="px-1 py-1 whitespace-normal text-sm text-gray-700 text-center relative group border-r h-24 align-top">
                     {entry ? (
-                      <div className="flex flex-col items-center justify-between h-full">
-                        <div className="text-center">
-                            <p className="font-semibold">{entry.className || '-'}</p>
-                            {entry.locationName && <p className="text-xs text-gray-500">({entry.locationName})</p>}
+                       // Apply the dynamic background color and padding to this inner div
+                      <div className={`flex flex-col items-center justify-between h-full rounded p-2 ${colorClass}`}>
+                        <div className="text-center flex-grow"> {/* Allow content to grow */}
+                            <p className="font-semibold break-words">{entry.className || '-'}</p>
+                            {/* Display Class Name if available */} 
+                            {entry.classNameDisplay && (
+                               <p className="text-xs font-medium mt-0.5 break-words">[{entry.classNameDisplay}]</p> 
+                            )}
+                            {/* Display Location Name if available */} 
+                            {entry.locationName && <p className="text-xs mt-1 break-words">({entry.locationName})</p>}
                         </div>
-                        <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Action buttons container */}
+                        <div className="absolute bottom-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 rounded p-0.5">
                           <button
                             onClick={() => onEdit(entry)}
-                            className="p-1 text-blue-600 hover:text-blue-800 rounded hover:bg-blue-100"
+                            className="p-1 text-blue-700 hover:text-blue-900 rounded hover:bg-blue-100"
                             title="Düzenle"
                           >
                             <PencilSquareIcon className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => onDelete(entry.id)}
-                            className="p-1 text-red-600 hover:text-red-800 rounded hover:bg-red-100"
+                            className="p-1 text-red-700 hover:text-red-900 rounded hover:bg-red-100"
                             title="Sil"
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -86,6 +132,7 @@ export function TeacherScheduleGrid({ scheduleData, onAdd, onEdit, onDelete }: T
                         </div>
                       </div>
                     ) : (
+                       // Empty slot with add button
                       <div className="flex items-center justify-center h-full">
                          <button
                             onClick={() => onAdd(day.id, slot.id)}
