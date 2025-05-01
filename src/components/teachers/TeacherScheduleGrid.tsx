@@ -6,7 +6,6 @@ import {
   TIME_SLOTS,
   TeacherScheduleEntry,
   TeacherScheduleGridData,
-  SinifSeviyesi // Import SinifSeviyesi if needed, though not directly used here now
 } from '@/types/teacherSchedules';
 import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { PlusCircleIcon } from '@heroicons/react/20/solid';
