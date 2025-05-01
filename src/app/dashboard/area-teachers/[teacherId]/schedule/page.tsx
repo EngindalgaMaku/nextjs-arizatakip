@@ -162,8 +162,18 @@ export default function TeacherSchedulePage() {
 
       {isModalOpen && selectedDaySlot && (
         <TeacherScheduleFormModal
-          // Pass only relevant fields from editingEntry if it exists
-          initialData={editingEntry ? { className: editingEntry.className, locationName: editingEntry.locationName } : undefined}
+          // Pass only relevant fields from editingEntry if it exists, ensuring correct types
+          initialData={editingEntry ? {
+              className: editingEntry.className ?? '', // Ensure string
+              locationName: editingEntry.locationName ?? null, // Ensure string or null
+              classId: editingEntry.classId ?? null // Include classId, ensure string or null
+            } : {
+              // Defaults for adding new
+              className: '',
+              locationName: null,
+              classId: null
+            }
+          }
           dayOfWeek={selectedDaySlot.day}
           timeSlot={selectedDaySlot.slot}
           onSubmit={handleFormSubmit}
