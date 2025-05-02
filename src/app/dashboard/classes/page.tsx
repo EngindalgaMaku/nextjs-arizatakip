@@ -19,16 +19,20 @@ export default function ClassesPage() {
     queryFn: fetchClasses,
   });
 
-  // Fetch Teachers (needed for display in table)
+  // Fetch Teachers 
+  // Explicitly cast the queryFn result to Teacher[]
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery<Teacher[], Error>({
     queryKey: ['teachers'],
-    queryFn: fetchTeachers,
+    queryFn: () => fetchTeachers() as Promise<Teacher[]>, // Add type assertion here
   });
 
   // Create a map for quick teacher name lookup
   const teachersMap = React.useMemo(() => {
     const map = new Map<string, string>();
-    teachers.forEach(teacher => map.set(teacher.id, teacher.name));
+    // Since we asserted Teacher[], we can directly access id and name
+    teachers.forEach(teacher => {
+        map.set(teacher.id, teacher.name);
+    });
     return map;
   }, [teachers]);
 

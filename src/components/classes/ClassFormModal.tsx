@@ -26,9 +26,9 @@ export function ClassFormModal({ initialData, classId, onSubmit, onClose, loadin
   const isEditing = !!initialData?.id;
 
   // Fetch teachers for the dropdown (always needed)
-  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery<Teacher[]>({ 
+  const { data: teachers = [], isLoading: isLoadingTeachers, error: teachersError } = useQuery<Teacher[], Error>({ 
     queryKey: ['teachers'],
-    queryFn: fetchTeachers, 
+    queryFn: () => fetchTeachers() as Promise<Teacher[]>, // Assert Promise<Teacher[]>
   });
 
   // Fetch students for the president dropdown *only if editing*

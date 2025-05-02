@@ -4,16 +4,17 @@ import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Modal from '@/components/Modal';
-import { TeacherFormSchema, TeacherFormValues, teacherRoles, teacherRoleLabels, TeacherRole, Teacher } from '@/types/teachers';
+import { TeacherFormSchema, TeacherFormValues, teacherRoles, teacherRoleLabels, TeacherRole, Teacher, Branch } from '@/types/teachers';
 
 interface AreaTeacherFormModalProps {
-  initialData?: Teacher | TeacherFormValues;
+  initialData?: TeacherFormValues;
   onSubmit: (data: TeacherFormValues) => void;
   onClose: () => void;
   loading?: boolean;
+  branches: Branch[];
 }
 
-export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading = false }: AreaTeacherFormModalProps) {
+export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading = false, branches }: AreaTeacherFormModalProps) {
   const isEditing = !!(initialData && 'id' in initialData && initialData.id);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<TeacherFormValues>({
@@ -107,6 +108,32 @@ export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading =
                )}
             />
              {errors.role && <p className="text-red-600 text-sm">{errors.role.message}</p>}
+          </div>
+
+          {/* Branch Dropdown */}
+          <div>
+            <label htmlFor="branchId" className="block text-sm font-medium text-gray-700">Branş</label>
+            <Controller
+               name="branchId" // Corresponds to the field in TeacherFormValues
+               control={control}
+               render={({ field }) => (
+                 <select
+                   id="branchId"
+                   {...field}
+                   value={field.value ?? ''} // Handle null value for select
+                   onChange={(e) => field.onChange(e.target.value || null)} // Send null if empty option selected
+                   className={`mt-1 block w-full rounded p-2 border ${errors.branchId ? 'border-red-500' : 'border-gray-300'}`}
+                 >
+                    <option value="">-- Branş Seçiniz --</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                 </select>
+               )}
+            />
+            {errors.branchId && <p className="text-red-600 text-sm">{errors.branchId.message}</p>}
           </div>
 
         </fieldset>

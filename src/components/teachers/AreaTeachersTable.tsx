@@ -5,10 +5,15 @@ import { Teacher, teacherRoleLabels } from '@/types/teachers'; // Import Teacher
 import { PencilSquareIcon, TrashIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
+// Define a type for the teacher data including the resolved branch name
+interface TeacherWithBranchName extends Teacher {
+  branchName: string | null; // Add branchName explicitly
+}
+
 interface AreaTeachersTableProps {
-  teachers: Teacher[];
-  onEdit: (teacher: Teacher) => void;
-  onDelete: (teacherId: string) => void;
+  teachers: TeacherWithBranchName[]; // Expect enriched teacher objects
+  onEdit: (teacher: TeacherWithBranchName) => void; // Use enriched type for editing callback
+  onDelete: (id: string) => void;
 }
 
 export function AreaTeachersTable({ teachers, onEdit, onDelete }: AreaTeachersTableProps) {
@@ -25,6 +30,7 @@ export function AreaTeachersTable({ teachers, onEdit, onDelete }: AreaTeachersTa
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doğum Tarihi</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cep Telefonu</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görevi</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branş</th>
             <th scope="col" className="relative px-6 py-3">
               <span className="sr-only">Eylemler</span>
             </th>
@@ -37,6 +43,7 @@ export function AreaTeachersTable({ teachers, onEdit, onDelete }: AreaTeachersTa
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.birthDate || '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.phone || '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.role ? teacherRoleLabels[teacher.role] : '-'}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.branchName || '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                 <Link href={`/dashboard/area-teachers/${teacher.id}/schedule`} className="text-green-600 hover:text-green-900 inline-block" title="Ders Programı">
                    <CalendarDaysIcon className="h-5 w-5" />

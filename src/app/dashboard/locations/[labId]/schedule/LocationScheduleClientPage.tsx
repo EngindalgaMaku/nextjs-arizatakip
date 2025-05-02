@@ -43,7 +43,7 @@ interface DersDropdownOption {
 interface EditorOptions {
   dersOptions: DersDropdownOption[]; 
   classes: Class[];
-  teachers: Teacher[];
+  teachers: Partial<Teacher>[]; // Expect Partial<Teacher> array
 }
 
 // Structure for modal data state

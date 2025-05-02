@@ -34,7 +34,7 @@ interface LocationScheduleFormModalProps {
   editorOptions: {
       dersOptions: DersDropdownOption[]; // Use updated type
       classes: Class[];
-      teachers: Teacher[];
+      teachers: Partial<Teacher>[]; // Expect Partial<Teacher>
   };
   onSubmit: (data: LocationScheduleEntryPayload) => void;
   onClose: () => void;
@@ -113,15 +113,16 @@ export function LocationScheduleFormModal({
 
           {/* Teacher Selection Dropdown */}
           <div>
-            <label htmlFor="teacher_id" className="block text-sm font-medium text-gray-700">Öğretmen (İsteğe Bağlı)</label>
+            <label htmlFor="teacher_id" className="block text-sm font-medium text-gray-700">Öğretmen</label>
              <select
                 id="teacher_id"
                 {...register('teacher_id')}
                  className={`mt-1 block w-full rounded p-2 border ${errors.teacher_id ? 'border-red-500' : 'border-gray-300'}`}
             >
                 <option value="">-- Öğretmen Seçiniz --</option>
-                {editorOptions.teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id || ''}>{teacher.name}</option>
+                {/* Filter out teachers without id/name and render options */}
+                {editorOptions.teachers.filter(teacher => teacher.id && teacher.name).map((teacher) => (
+                    <option key={teacher.id} value={teacher.id!}>{teacher.name}</option> // Use non-null assertion after filter
                 ))}
             </select>
             {errors.teacher_id && <p className="text-red-600 text-sm">{errors.teacher_id.message}</p>}

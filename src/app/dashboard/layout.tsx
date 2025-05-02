@@ -233,7 +233,7 @@ export default function DashboardLayout({
                   }`}
                 >
                   <AcademicCapIcon className="mr-3 h-5 w-5" />
-                  Alan Öğretmenleri
+                  Öğretmenler
                 </Link>
                 
                 {/* Dal Yönetimi Link */}

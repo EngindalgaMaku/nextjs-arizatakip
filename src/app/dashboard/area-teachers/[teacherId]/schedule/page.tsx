@@ -141,10 +141,10 @@ export default function TeacherSchedulePage() {
         <h1 className="text-2xl font-semibold text-gray-800">{pageTitle}</h1>
         <Link
            href="/dashboard/area-teachers"
-           className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+           className="text-sm text-gray-600 hover:text-gray-800 inline-flex items-center mb-1"
         >
-          <ArrowLeftIcon className="h-5 w-5 mr-2" />
-          Alan Öğretmenleri Listesine Dön
+          <ArrowLeftIcon className="h-4 w-4 mr-1" />
+          Öğretmenler Listesine Dön
         </Link>
       </div>
 
