@@ -14,7 +14,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Hüsniye Özdilek Ticaret M.T.A.L. - Arıza Takip Sistemi (ATSİS)",
+  title: "Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS",
   description: "Hüsniye Özdilek Ticaret M.T.A.L. Arıza Takip Sistemi (ATSİS)",
   manifest: "/manifest.json",
   appleWebApp: {
