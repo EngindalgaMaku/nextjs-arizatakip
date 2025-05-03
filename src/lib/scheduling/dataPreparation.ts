@@ -50,8 +50,8 @@ function mapUnavailabilityToTimeSlots(unavailabilities: TeacherUnavailability[])
 
 /** Helper to fetch all teacher assignments */
 async function fetchAllTeacherAssignments(): Promise<TeacherAssignment[]> {
-     const { data, error } = await supabase
-        .from('teacher_assignments')
+    const { data, error } = await supabase
+        .from('teacher_course_assignments')
         .select('*');
     if (error) throw new Error(`Öğretmen atamaları çekilirken hata: ${error.message}`);
     return data || [];
@@ -146,36 +146,51 @@ async function prepareLessonsData(
     if (lessonError) throw new Error(`Ders verileri çekilirken hata: ${lessonError.message}`);
     if (!lessons) return [];
 
-    // Group assignments by lesson_id for faster lookup
-    const assignmentsByLesson: Record<string, string[]> = {};
+    // Group assignments by lesson_id for faster lookup, and store the assignment type
+    const assignmentsByType: Record<string, { required: string[]; excluded: string[] }> = {};
     allAssignments.forEach(a => {
-        if (!assignmentsByLesson[a.dal_ders_id]) {
-            assignmentsByLesson[a.dal_ders_id] = [];
+        if (!a.dal_ders_id || !a.teacher_id) return; // Skip if IDs are missing
+
+        if (!assignmentsByType[a.dal_ders_id]) {
+            assignmentsByType[a.dal_ders_id] = { required: [], excluded: [] };
         }
-        // Ensure teacher_id is not null/undefined before pushing
-        if (a.teacher_id) { 
-             assignmentsByLesson[a.dal_ders_id].push(a.teacher_id);
+        if (a.assignment === 'required') {
+             assignmentsByType[a.dal_ders_id].required.push(a.teacher_id);
+        } else if (a.assignment === 'excluded') {
+             assignmentsByType[a.dal_ders_id].excluded.push(a.teacher_id);
         }
     });
 
     return lessons.map(lesson => {
          const labTypes = Array.isArray(lesson.dal_ders_lab_types) ? lesson.dal_ders_lab_types : [];
          let potentialTeacherIds: string[] = [];
+         const lessonAssignments = assignmentsByType[lesson.id] || { required: [], excluded: [] };
 
-         // 1. Check for specific assignments first
-         const specificAssignments = assignmentsByLesson[lesson.id];
-         if (specificAssignments && specificAssignments.length > 0) {
-             console.log(`[Scheduler DataPrep] Found specific assignments for ${lesson.ders_adi}: Teachers ${specificAssignments.join(',')}`);
-             potentialTeacherIds = specificAssignments;
+         // 1. 'required' atamaları varsa, sadece onları kullan
+         if (lessonAssignments.required.length > 0) {
+             console.log(`[Scheduler DataPrep] Found REQUIRED assignments for ${lesson.ders_adi}: Teachers ${lessonAssignments.required.join(',')}`);
+             potentialTeacherIds = lessonAssignments.required;
          } else {
-             // 2. If no specific assignment, fall back to branch match
+             // 2. 'required' yoksa, branş öğretmenlerini al ve 'excluded' olanları çıkar
              const lessonBranchId = dalToBranchMap.get(lesson.dal_id);
              if (lessonBranchId) {
                  const branchTeachers = teachers.filter(t => t.branchId === lessonBranchId);
-                 potentialTeacherIds = branchTeachers.map(t => t.id);
-                 // console.log(`[Scheduler DataPrep] No specific assignment for ${lesson.ders_adi}, using branch match: ${potentialTeacherIds.join(',')}`); // Optional log
-             } else {
-                 console.warn(`[Scheduler DataPrep] Could not find branch_id for dal_id: ${lesson.dal_id} (Lesson: ${lesson.ders_adi}) and no specific assignment found. No teachers will be assigned.`);
+                 const branchTeacherIds = branchTeachers.map(t => t.id);
+                 
+                 // Excluded öğretmenleri filtrele
+                 potentialTeacherIds = branchTeacherIds.filter(id => !lessonAssignments.excluded.includes(id));
+                 
+                 if (branchTeacherIds.length !== potentialTeacherIds.length) {
+                      console.log(`[Scheduler DataPrep] For ${lesson.ders_adi} (Branch ${lessonBranchId}): Started with ${branchTeacherIds.length} branch teachers, excluded ${lessonAssignments.excluded.join(',')}, remaining potentials: ${potentialTeacherIds.join(',')}`);
+                 } else if (potentialTeacherIds.length > 0) {
+                    // console.log(`[Scheduler DataPrep] No required/excluded assignments for ${lesson.ders_adi}, using branch match: ${potentialTeacherIds.join(',')}`); // Optional log
+                 }
+
+             } 
+             
+             if (potentialTeacherIds.length === 0) {
+                 // Bu durumda ya branşta öğretmen yok, ya hepsi excluded, ya da dal'ın branch'i bulunamadı.
+                 console.warn(`[Scheduler DataPrep] No potential teachers found for lesson ${lesson.ders_adi} (ID: ${lesson.id}, DalID: ${lesson.dal_id}, BranchID: ${dalToBranchMap.get(lesson.dal_id)}). Required: ${lessonAssignments.required.join(',') || 'None'}, Excluded: ${lessonAssignments.excluded.join(',') || 'None'}`);
              }
          }
 

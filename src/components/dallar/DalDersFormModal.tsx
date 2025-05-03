@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod'; // Import Zod
@@ -31,13 +31,14 @@ export function DalDersFormModal({
 
   // Log initial data received by the modal
   console.log('[DalDersFormModal] Received initialData:', initialData);
+  console.log('[DalDersFormModal] Received initialLabTypeIds prop:', initialLabTypeIds); // Log the prop
 
-  const isEditing = !!initialData; // Check based on presence of initialData structure
+  const isEditing = !!initialData?.dersAdi; // Check if dersAdi exists in initialData for editing status
   const modalTitle = isEditing
     ? `${sinifSeviyesi}. Sınıf Dersi Düzenle`
     : `${sinifSeviyesi}. Sınıfa Yeni Ders Ekle`;
 
-  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<DalDersFormValues & { suitableLabTypeIds?: string[] }>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<DalDersFormValues & { suitableLabTypeIds?: string[] }>({
     // Extend the schema directly for form usage
     resolver: zodResolver(DalDersFormSchema.extend({
         suitableLabTypeIds: z.array(z.string().uuid()).optional(),
@@ -46,23 +47,34 @@ export function DalDersFormModal({
       sinifSeviyesi: initialData?.sinifSeviyesi ?? sinifSeviyesi,
       dersAdi: initialData?.dersAdi ?? '',
       haftalikSaat: initialData?.haftalikSaat ?? 0,
-      suitableLabTypeIds: initialLabTypeIds, // Set initial selected lab types
       bolunebilir_mi: initialData?.bolunebilir_mi ?? true,
-      cizelgeye_dahil_et: initialData?.cizelgeye_dahil_et ?? true, // Default to true for schedule inclusion
-      requires_multiple_resources: initialData?.requires_multiple_resources ?? false, // Default to false
+      cizelgeye_dahil_et: initialData?.cizelgeye_dahil_et ?? true, 
+      requires_multiple_resources: initialData?.requires_multiple_resources ?? false, 
+      suitableLabTypeIds: initialLabTypeIds,
     },
   });
 
-  // Log the actual default values being set
-  console.log('[DalDersFormModal] Setting defaultValues:', {
-      sinifSeviyesi: initialData?.sinifSeviyesi ?? sinifSeviyesi,
-      dersAdi: initialData?.dersAdi ?? '',
-      haftalikSaat: initialData?.haftalikSaat ?? 0,
-      suitableLabTypeIds: initialLabTypeIds, 
-      bolunebilir_mi: initialData?.bolunebilir_mi ?? true,
-      cizelgeye_dahil_et: initialData?.cizelgeye_dahil_et ?? true, 
-      requires_multiple_resources: initialData?.requires_multiple_resources ?? false,
-  });
+  // Log the actual default values being set initially
+  // console.log('[DalDersFormModal] Initial defaultValues:', { ... }); // Logging defaultValues might be less useful now
+
+  // --- NEW useEffect to reset form when initialLabTypeIds changes ---
+  useEffect(() => {
+      console.log('[DalDersFormModal] useEffect triggered. initialLabTypeIds:', initialLabTypeIds);
+      // Reset the specific field or the relevant part of the form
+      // when the prop holding the fetched IDs changes.
+      reset({ 
+         // Important: Re-spread other initial data to avoid losing it on reset
+         sinifSeviyesi: initialData?.sinifSeviyesi ?? sinifSeviyesi,
+         dersAdi: initialData?.dersAdi ?? '',
+         haftalikSaat: initialData?.haftalikSaat ?? 0,
+         bolunebilir_mi: initialData?.bolunebilir_mi ?? true,
+         cizelgeye_dahil_et: initialData?.cizelgeye_dahil_et ?? true, 
+         requires_multiple_resources: initialData?.requires_multiple_resources ?? false, 
+         // Set the lab types based on the potentially updated prop
+         suitableLabTypeIds: initialLabTypeIds 
+      });
+  }, [initialLabTypeIds, reset, initialData, sinifSeviyesi]); // Add dependencies: initialLabTypeIds is key, reset is needed, others ensure full reset data
+  // --- End of new useEffect ---
 
   const isBusy = loading || isSubmitting;
   console.log('[DalDersFormModal] State:', { isBusy, loading, isSubmitting }); // Add log
@@ -148,27 +160,32 @@ export function DalDersFormModal({
                     <Controller
                         name="suitableLabTypeIds"
                         control={control}
-                        render={({ field }) => (
-                            <select
-                                id="suitableLabTypeIds"
-                                multiple // Enable multiple selections
-                                {...field}
-                                // Handle multiple select value and onChange
-                                value={field.value || []} 
-                                onChange={(e) => {
-                                    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                    field.onChange(selectedOptions);
-                                }}
-                                className={`mt-1 block w-full rounded p-2 border h-32 ${errors.suitableLabTypeIds ? 'border-red-500' : 'border-gray-300'}`}
-                            >
-                                {availableLabTypes.length === 0 && <option disabled>Uygun lab tipi bulunamadı.</option>}
-                                {availableLabTypes.map((labType) => (
-                                    <option key={labType.id} value={labType.id}>
-                                        {labType.name} ({labType.code})
-                                    </option>
-                                ))}
-                            </select>
-                        )}
+                        render={({ field }) => {
+                            // Add a log to see the field value react-hook-form is using
+                            console.log('[DalDersFormModal] Controller field.value for suitableLabTypeIds:', field.value); 
+                            return (
+                                <select
+                                    id="suitableLabTypeIds"
+                                    multiple // Enable multiple selections
+                                    {...field}
+                                    // Handle multiple select value and onChange
+                                    // Ensure field.value is always an array for multi-select
+                                    value={Array.isArray(field.value) ? field.value : []} 
+                                    onChange={(e) => {
+                                        const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                                        field.onChange(selectedOptions);
+                                    }}
+                                    className={`mt-1 block w-full rounded p-2 border h-32 ${errors.suitableLabTypeIds ? 'border-red-500' : 'border-gray-300'}`}
+                                >
+                                    {availableLabTypes.length === 0 && <option disabled>Uygun lab tipi bulunamadı.</option>}
+                                    {availableLabTypes.map((labType) => (
+                                        <option key={labType.id} value={labType.id}>
+                                            {labType.name} ({labType.code})
+                                        </option>
+                                    ))}
+                                </select>
+                            );
+                        }}
                     />
                      <p className="mt-1 text-xs text-gray-500">Birden fazla seçmek için CTRL (veya Mac'te Command) tuşunu basılı tutarak tıklayın.</p>
                     {errors.suitableLabTypeIds && <p className="text-red-600 text-sm">{errors.suitableLabTypeIds.message}</p>}

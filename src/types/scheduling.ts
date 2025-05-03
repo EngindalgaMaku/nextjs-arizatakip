@@ -79,11 +79,19 @@ export interface SchedulerResult {
     logs?: string[]; // Algoritma logları
 }
 
+/** Atanamayan ders bilgilerini client tarafında göstermek için */
+export interface UnassignedLessonInfo {
+  lessonId: string; // Atanamayan dersin ID'si (LessonScheduleData.id)
+  lessonName: string; // Dersin adı
+  remainingHours: number; // Atanamayan saat sayısı
+}
+
 /** SchedulerResult'ın client'a gönderilebilir (serileştirilebilir) versiyonu */
 export interface SerializableSchedulerResult {
     success: boolean;
     schedule?: [string, ScheduledEntry][]; // Map yerine Array of [key, value] tuples
-    unassignedLessons?: LessonScheduleData[];
+    unassignedLessons?: UnassignedLessonInfo[]; // <<< Artık bu tipi kullanıyoruz
+    totalUnassignedHours?: number; // <<< Toplam atanamayan saati de ekleyelim
     error?: string;
     diagnostics?: any;
     logs?: string[]; // Algoritma logları

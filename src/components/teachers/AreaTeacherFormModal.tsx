@@ -88,26 +88,26 @@ export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading =
           <div>
             <label htmlFor="role" className="block text-sm font-medium text-gray-700">Görevi</label>
             <Controller
-               name="role"
-               control={control}
-               render={({ field }) => (
-                 <select
-                   id="role"
-                   {...field}
-                   value={field.value ?? ''} // Handle null value for select
-                   onChange={(e) => field.onChange(e.target.value || null)} // Send null if empty option selected
-                   className={`mt-1 block w-full rounded p-2 border ${errors.role ? 'border-red-500' : 'border-gray-300'}`}
-                 >
-                    <option value="">-- Görev Seçiniz --</option>
-                    {teacherRoles.map((role) => (
-                      <option key={role} value={role}>
-                        {teacherRoleLabels[role]}
-                      </option>
-                    ))}
-                 </select>
-               )}
+              name="role"
+              control={control}
+              render={({ field }) => (
+                <select
+                  id="role"
+                  {...field}
+                  value={field.value ?? ''} // Handle null/undefined value
+                  aria-invalid={errors.role ? 'true' : 'false'}
+                  className={`mt-1 block w-full rounded p-2 border ${errors.role ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="" disabled>-- Görev Seçiniz --</option>
+                  {teacherRoles.options.map((role) => (
+                    <option key={role} value={role}>
+                      {teacherRoleLabels[role]} 
+                    </option>
+                  ))}
+                </select>
+              )}
             />
-             {errors.role && <p className="text-red-600 text-sm">{errors.role.message}</p>}
+            {errors.role && <p className="text-red-600 text-sm">{errors.role.message}</p>}
           </div>
 
           {/* Branch Dropdown */}

@@ -15,6 +15,7 @@ import { DashboardLayout } from '@/layouts/DashboardLayout'; // <<< Import Dashb
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea"; // <<< Textarea importu
 import { Copy } from 'lucide-react'; // <<< YENİ: Copy ikonu
+// import { ScrollArea } from "@/components/ui/scroll-area"; // <<< YENİ IMPORT
 // import { ScheduleTable } from '@/components/scheduling/ScheduleTable'; // <<< Tekrar yorumlandı
 
 // Helper type for grouping schedule by teacher
@@ -73,6 +74,7 @@ export default function SchedulingPage() {
     const [logs, setLogs] = useState<string[]>([]);
     const [totalUnassignedHours, setTotalUnassignedHours] = useState<number>(0);
     const [unassignedLessonsList, setUnassignedLessonsList] = useState<UnassignedLessonInfo[]>([]);
+    const [filteredErrorLogs, setFilteredErrorLogs] = useState<string[]>([]);
 
     // Fetch necessary data for displaying names
     const { data: teachersData, isLoading: isLoadingTeachers } = useQuery<Partial<Teacher>[], Error>({
@@ -99,7 +101,8 @@ export default function SchedulingPage() {
     const generateScheduleMutation = useMutation<SerializableSchedulerResult, Error>({
         mutationFn: async () => {
             console.log("Starting schedule generation mutation...");
-            setLogs(["Çizelge oluşturma başlatılıyor..."]);
+            setLogs([]);
+            setFilteredErrorLogs([]);
             setScheduleData(null);
             setUnassignedLessonsList([]);
             setTotalUnassignedHours(0);
@@ -109,38 +112,57 @@ export default function SchedulingPage() {
         },
         onSuccess: (data) => {
             console.log("Mutation onSuccess, data:", data);
-            setLogs(prev => [...prev, ...(data.logs || [])]);
+            const allLogs = data.logs || [];
+            setLogs(allLogs);
 
-            if (data.success) {
-                const deserializedSchedule = deserializeSchedule(data.schedule);
+            let deserializedSchedule = null;
+            if (data.schedule) {
+                deserializedSchedule = deserializeSchedule(data.schedule);
                 setScheduleData(deserializedSchedule);
-                setUnassignedLessonsList([]);
-                setTotalUnassignedHours(0);
-                toast.success("Çizelge başarıyla oluşturuldu. Tüm dersler atandı!");
-                console.log("Schedule generated successfully with all lessons assigned.");
+            } else {
+                setScheduleData(null);
+            }
+
+            if (data.unassignedLessons && data.unassignedLessons.length > 0) {
+                setUnassignedLessonsList(data.unassignedLessons);
+                setTotalUnassignedHours(data.totalUnassignedHours ?? 0);
+                toast.info("Çizelge oluşturuldu ancak bazı dersler/saatler atanamadı.");
+                console.warn("Schedule generation partially succeeded: Unassigned lessons exist.", data.unassignedLessons);
+
+                // --- YENİ: Spesifik Hata Loglarını Filtrele -> SADECE DERS ID'Sİ ---
+                const targetLessonId = "af315d0b-3d13-4a58-aa7b-f769b1ed431f"; // <<< Ders ID'si ile filtrele
+                // const targetDay = "Cuma"; // <<< Kaldırıldı
+                // const failureKeywords = ["FAIL", "Cannot assign", "unavailable"]; // <<< Kaldırıldı
+
+                console.log(`Filtering logs for lesson ID: '${targetLessonId}'`);
+                const filtered = allLogs.filter(log =>
+                    log.includes(targetLessonId)
+                    // && log.includes(targetDay) // <<< Kaldırıldı
+                    // && failureKeywords.some(keyword => log.includes(keyword)) // <<< Kaldırıldı
+                );
+                console.log("Filtered Logs Result (Lesson ID):", filtered);
+                setFilteredErrorLogs(filtered);
+
+                // <<< YENİ: UI'daki başlığı daha genel yapalım >>>
+                 const targetLessonNameForDisplay = unassignedLessonsList.find(l => l.lessonId === targetLessonId)?.lessonName || targetLessonId;
+                // --- Filtreleme Sonu ---
 
             } else {
-                if (data.error === "Çizelge oluşturuldu ancak bazı saatler atanamadı." && data.schedule) {
-                    const deserializedSchedule = deserializeSchedule(data.schedule);
-                    setScheduleData(deserializedSchedule);
-                    if (data.unassignedLessons && Array.isArray(data.unassignedLessons)) {
-                        setUnassignedLessonsList(data.unassignedLessons);
-                        setTotalUnassignedHours(data.totalUnassignedHours ?? 0);
-                        console.log("Unassigned lessons found:", data.unassignedLessons);
-                    } else {
-                        setUnassignedLessonsList([]);
-                        setTotalUnassignedHours(0);
-                    }
-                    toast.info(data.error);
-                    console.warn("Schedule generation partially succeeded:", data.error);
-
-                } else {
-                    setScheduleData(null);
-                    setUnassignedLessonsList([]);
-                    setTotalUnassignedHours(0);
-                    toast.error(`Çizelge oluşturulamadı: ${data.error || 'Bilinmeyen Hata'}`);
-                    console.error("Schedule generation failed:", data.error);
+                setUnassignedLessonsList([]);
+                setTotalUnassignedHours(0);
+                setFilteredErrorLogs([]);
+                if (deserializedSchedule) {
+                    toast.success("Çizelge başarıyla oluşturuldu. Tüm dersler atandı!");
+                    console.log("Schedule generated successfully with all lessons assigned.");
+                } else if (!data.error) {
+                    toast.info("Çizelge oluşturuldu ancak atanacak ders bulunamadı.");
+                    console.log("Schedule generation returned empty schedule without errors.");
                 }
+            }
+
+            if (data.error) {
+                toast.error(`Çizelge Oluşturma Başarısız: ${data.error}`);
+                console.error("Schedule generation failed (reported by action):", data.error);
             }
         },
         onError: (error) => {
@@ -149,6 +171,7 @@ export default function SchedulingPage() {
             setScheduleData(null);
             setUnassignedLessonsList([]);
             setTotalUnassignedHours(0);
+            setFilteredErrorLogs([]);
             toast.error(`Çizelge oluşturulurken bir hata oluştu: ${error.message}`);
         },
     });
@@ -311,6 +334,15 @@ export default function SchedulingPage() {
     };
     // <<< YENİ BİTİŞ >>>
 
+    // --- YENİ: State'i render sırasında logla ---
+    console.log("FilteredErrorLogs state during render:", filteredErrorLogs);
+    // --- Log Sonu ---
+
+    // <<< YENİ: Değişkeni burada tanımla >>>
+    const targetLessonIdForFilter = "af315d0b-3d13-4a58-aa7b-f769b1ed431f"; // Ayrı bir sabit kullanabiliriz
+    const targetLessonNameForDisplay = 
+        unassignedLessonsList.find(l => l.lessonId === targetLessonIdForFilter)?.lessonName || targetLessonIdForFilter;
+
     return (
         <DashboardLayout>
             <div className="p-4 md:p-6">
@@ -350,47 +382,39 @@ export default function SchedulingPage() {
                  {/* Atanamayan Dersler Listesi */} 
                 {generateScheduleMutation.isSuccess && unassignedLessonsList.length > 0 && (
                     <div className="mt-4 p-4 border rounded bg-amber-50 border-amber-200">
-                    <h3 className="text-lg font-semibold text-amber-800 mb-2">Atanamayan Dersler:</h3>
-                    <ul className="list-disc pl-5 space-y-1 text-sm text-amber-700">
-                        {unassignedLessonsList.map((lesson) => (
-                        <li key={lesson.lessonId}>
-                            <strong>{lesson.lessonName}:</strong> {lesson.remainingHours} saat atanamadı.
-                        </li>
-                        ))}
-                    </ul>
+                        <h3 className="text-lg font-semibold text-amber-800 mb-2">Atanamayan Dersler ({totalUnassignedHours} saat):</h3>
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-amber-700">
+                            {unassignedLessonsList.map((lesson) => (
+                            <li key={lesson.lessonId}>
+                                <strong>{lesson.lessonName}:</strong> {lesson.remainingHours} saat atanamadı.
+                            </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
 
-                {/* Log Alanı */} 
-                {logs.length > 0 && (
-                    <div className="mt-8 p-4 bg-gray-800 text-white rounded-md shadow">
-                        {/* <<< YENİ: Başlık ve Kopyala Butonu >>> */} 
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-lg font-semibold">İşlem Logları:</h3>
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={handleCopyLogs}
-                                className="text-gray-300 hover:text-white hover:bg-gray-700"
-                                disabled={logs.length === 0}
-                            >
-                                <Copy className="mr-2 h-4 w-4" />
-                                Kopyala
-                            </Button>
+                {/* Filtrelenmiş Hata Logları Alanı */} 
+                {filteredErrorLogs.length > 0 && (
+                    <div className="mt-4 p-4 border rounded bg-red-50 border-red-200">
+                        <h4 className="text-md font-semibold text-red-800 mb-2">
+                            '{targetLessonNameForDisplay}' dersi için loglar:
+                        </h4>
+                        <div className="h-40 w-full rounded-md border p-2 bg-white overflow-y-auto">
+                             <pre className="text-xs text-red-700 whitespace-pre-wrap break-words">
+                                {filteredErrorLogs.join('\n')}
+                             </pre>
                         </div>
-                         {/* <<< YENİ BİTİŞ >>> */}
-                        <Textarea
-                            readOnly
-                            value={logs.join('\n')}
-                            className="w-full h-60 text-xs font-mono bg-gray-100 text-gray-900"
-                        />
                     </div>
                 )}
+                {/* Alan Sonu */} 
+
+                {/* Log Alanı --- GEÇİCİ OLARAK YORUM SATIRINA ALINDI --- */}
                 
-                {/* Başarılı ve dolu çizelge gösterimi */} 
-                {generateScheduleMutation.isSuccess && scheduleData && (
+                {/* Başarılı ve dolu çizelge gösterimi -> DEĞİŞTİRİLDİ: scheduleData varsa göster */}
+                {scheduleData && (
                     <div className="mt-6">
                         <h2 className="text-xl font-semibold mb-3">Oluşturulan Çizelge</h2>
+                        {/* Atanamayan ders uyarısı zaten totalUnassignedHours > 0 kontrolü ile gösteriliyor */}
                         {totalUnassignedHours > 0 && (
                             <p className="mb-2 text-orange-600 text-sm">
                                 Uyarı: Çizelge oluşturuldu ancak bazı dersler/saatler atanamadı.
@@ -399,8 +423,8 @@ export default function SchedulingPage() {
                          {renderScheduleByTeacher(scheduleData, teachersData, lessonsData, locationsData)}
                     </div>
                 )}
-                 {/* Başarılı ama boş çizelge durumu */} 
-                 {generateScheduleMutation.isSuccess && !scheduleData && (
+                 {/* Başarılı ama boş çizelge durumu -> DEĞİŞTİRİLDİ: Hata YOKSA ve scheduleData YOKSA göster */}
+                 {!generateScheduleMutation.isError && generateScheduleMutation.isSuccess && !scheduleData && (
                     <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
                        Çizelge başarıyla oluşturuldu ancak gösterilecek atama bulunamadı.
                     </div>

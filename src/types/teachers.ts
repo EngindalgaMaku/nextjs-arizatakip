@@ -1,38 +1,45 @@
 import { z } from 'zod';
 
-// Define allowed roles
-const TeacherRoleEnum = z.enum(['alan_sefi', 'atolye_sefi', 'ogretmen']);
+// Define allowed roles using literal types
+export const teacherRoles = z.enum(['MUDUR', 'MUDUR_YARDIMCISI', 'OGRETMEN', 'REHBER', 'ATOLYE_SEFI', 'ALAN_SEFI']);
+export type TeacherRole = z.infer<typeof teacherRoles>;
 
-// Basic schema for a teacher - represents the core teacher data
+// Labels for roles (can be used in UI)
+export const teacherRoleLabels: Record<TeacherRole, string> = {
+    MUDUR: 'Müdür',
+    MUDUR_YARDIMCISI: 'Müdür Yardımcısı',
+    OGRETMEN: 'Öğretmen',
+    REHBER: 'Rehber Öğretmen',
+    ATOLYE_SEFI: 'Atölye Şefi',
+    ALAN_SEFI: 'Alan Şefi'
+};
+
+// Base schema for a Teacher, matching Supabase table columns
 export const TeacherSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1, 'Öğretmen adı zorunlu'),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD formatında').optional().or(z.literal('')).nullable(), // Optional date string, allow null
-  role: TeacherRoleEnum.optional().nullable(), // Optional role, allow null
-  phone: z.string().optional().or(z.literal('')).nullable(), // Add optional phone
-  branchId: z.string().uuid().optional().nullable(), // Keep branchId (camelCase)
-  // email: z.string().email().optional(),
-  // other fields...
+  name: z.string().min(1, 'Öğretmen adı zorunludur.'),
+  birthDate: z.string().nullable().optional(), // Store as ISO string or similar
+  role: teacherRoles.nullable().optional(),
+  phone: z.string().nullable().optional(),
+  branchId: z.string().uuid().nullable().optional(),
+  createdAt: z.string().optional(), // Let DB handle this
+  updatedAt: z.string().optional(), // Let DB handle this
+  is_active: z.boolean().default(true) // Add is_active field
 });
 
-// Schema for validating form input - includes branchId
-export const TeacherFormSchema = TeacherSchema.omit({ id: true });
+// Schema for validating form data (omitting DB-generated fields)
+export const TeacherFormSchema = TeacherSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  is_active: true // Don't include is_active in the standard add/edit form
+});
 
-// Type for the core teacher object (without branchName)
+// Type for the full Teacher object
 export type Teacher = z.infer<typeof TeacherSchema>;
 
-// Form values include branchId
-export type TeacherFormValues = z.input<typeof TeacherFormSchema>;
-
-// Define role type for dropdown options etc.
-export type TeacherRole = z.infer<typeof TeacherRoleEnum>;
-export const teacherRoles: TeacherRole[] = ['alan_sefi', 'atolye_sefi', 'ogretmen']; // Export roles for UI
-// Map roles to display names
-export const teacherRoleLabels: Record<TeacherRole, string> = {
-  alan_sefi: 'Alan Şefi',
-  atolye_sefi: 'Atölye Şefi',
-  ogretmen: 'Öğretmen',
-};
+// Type for form values
+export type TeacherFormValues = z.infer<typeof TeacherFormSchema>;
 
 // Interface for Branch data (used in Teacher form)
 export interface Branch {

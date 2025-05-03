@@ -72,14 +72,30 @@ function isClassAvailable(dalId: string, sinifSeviyesi: number, slot: TimeSlot, 
         if (entry.timeSlot.day === slot.day && entry.timeSlot.hour === slot.hour) {
             // Sonra bu entry'nin dersini bul
             const scheduledLesson = lessonsMap.get(entry.lessonId);
-            // Eğer ders bulunduysa ve dal+seviye eşleşiyorsa, sınıf meşgul demektir
-            if (scheduledLesson && scheduledLesson.dalId === dalId && scheduledLesson.sinifSeviyesi === sinifSeviyesi) {
-                 // console.log(`[Scheduler Check] Class (Dal: ${dalId}, Seviye: ${sinifSeviyesi}) unavailable due to assignment to ${entry.lessonName} at ${slot.day}-${slot.hour}`);
-                 return false;
+            // Eğer ders bulunduysa, seviyeye göre kontrol yap
+            if (scheduledLesson) {
+                // --- 9. SINIF ÖZEL KONTROLÜ ---
+                if (sinifSeviyesi === 9) {
+                    // Eğer atanmaya çalışılan ders 9. sınıf ise,
+                    // o saatte başka bir 9. sınıf dersi var mı diye bak (dalId önemsiz).
+                    if (scheduledLesson.sinifSeviyesi === 9) {
+                         // debugLogs.push(`[Scheduler Check Class 9] Class (Seviye: 9) unavailable due to assignment to ${entry.lessonName} at ${slot.day}-${slot.hour}`);
+                         return false; // Bu saatte başka bir 9. sınıf dersi var.
+                    }
+                } else {
+                    // --- 9. SINIF DIŞINDAKİ SINIFLAR İÇİN MEVCUT KONTROL ---
+                    // Eğer atanmaya çalışılan ders 9. sınıf değilse,
+                    // hem dalId hem de sinifSeviyesi eşleşiyor mu diye bak.
+                    if (scheduledLesson.dalId === dalId && scheduledLesson.sinifSeviyesi === sinifSeviyesi) {
+                         // debugLogs.push(`[Scheduler Check Class >9] Class (Dal: ${dalId}, Seviye: ${sinifSeviyesi}) unavailable due to assignment to ${entry.lessonName} at ${slot.day}-${slot.hour}`);
+                         return false; // Bu saatte aynı dal ve seviyedeki sınıfın başka dersi var.
+                    }
+                }
             }
         }
     }
-    return true;
+    // Döngü bitti ve çakışma bulunamadı.
+    return true; // Sınıf bu saatte müsait.
 }
 
 /** Konumun ders için uygun olup olmadığını kontrol eder (Lab Tipi) */
@@ -744,35 +760,55 @@ export async function generateSchedule(input: SchedulerInput): Promise<Scheduler
     debugLogs.push(`Duration: ${duration} seconds`);
 
     // --- Prepare and Return Result ---
-    const finalSchedule = success ? currentSchedule : new Map(); // Başarısızsa boş map döndür
+    const finalSchedule = success ? currentSchedule : new Map();
 
-    // (Optional) Final check: Verify remaining hours
+    // --- DÜZELTME: allHoursAssigned'ı burada hesapla --- 
     let allHoursAssigned = true;
-    let unassignedLessons: string[] = [];
+    let unassignedLessonNames: string[] = []; // Sadece isimleri tutalım (hata mesajı için)
     remainingHours.forEach((hoursLeft, lessonId) => {
         const lesson = lessonsDataMap.get(lessonId);
         // Sadece çizelgeye dahil edilmesi gerekenleri kontrol et
         if (lesson?.needsScheduling && hoursLeft > 0) {
             allHoursAssigned = false;
-            unassignedLessons.push(`${lesson.name} (${hoursLeft}h missing)`);
+            unassignedLessonNames.push(`${lesson.name} (${hoursLeft}h missing)`);
         }
     });
+    // --- Hesaplama sonu ---
 
-    if (success && !allHoursAssigned) {
-         debugLogs.push(`[WARNING] Algorithm reported success, but some required hours are unassigned: ${unassignedLessons.join(', ')}`);
-         // İsteğe bağlı: Başarıyı false yapabiliriz.
-         // success = false;
-         // finalSchedule = new Map();
-    } else if (!success && allHoursAssigned) {
-         // Bu durum beklenmez, ama loglamak iyi olabilir.
-         debugLogs.push(`[WARNING] Algorithm reported failure, but all required hours seem assigned.`);
+    // --- YENİ: Atanamayan ders listesini oluştur --- 
+    let finalUnassignedLessons: LessonScheduleData[] = [];
+    // --- DÜZELTME: Hesaplanan allHoursAssigned'ı kullan --- 
+    if (!success || !allHoursAssigned) { // Algoritma başarısızsa VEYA başarılı ama atanmamış saat varsa
+        remainingHours.forEach((hoursLeft, lessonId) => {
+            const lesson = lessonsDataMap.get(lessonId);
+            // Sadece çizelgeye dahil edilmesi gereken ve kalan saati olanları ekle
+            if (lesson?.needsScheduling && hoursLeft > 0) {
+                finalUnassignedLessons.push(lesson);
+            }
+        });
+        // Eğer algoritma başarılıydı ama atanmamış saat vardıysa, logla
+        if (success && !allHoursAssigned) {
+             // --- DÜZELTME: unassignedLessonNames'i kullan --- 
+             debugLogs.push(`[WARNING] Algorithm reported success, but some required hours are unassigned: ${unassignedLessonNames.join(', ')}`);
+        }        
     }
+    // --- Atanamayan ders listesi sonu ---
 
+    // Başarıyı yeniden değerlendir: Algoritma başarılı OLMALI VE tüm saatler atanmış OLMALI
+    // --- DÜZELTME: Hesaplanan allHoursAssigned'ı kullan --- 
+    const finalSuccess = success && allHoursAssigned;
 
     return {
-        success: success && allHoursAssigned, // Başarı için hem algoritma başarılı olmalı hem de tüm saatler atanmış olmalı
+        success: finalSuccess, 
         schedule: finalSchedule,
+        unassignedLessons: finalUnassignedLessons, // <<< Oluşturulan listeyi döndür
         logs: debugLogs,
-        error: success ? undefined : "Çizelge oluşturulamadı. Tüm dersler uygun zaman dilimlerine yerleştirilemedi.",
+        // Hata mesajını biraz daha bilgilendirici yapalım
+        error: finalSuccess 
+            ? undefined 
+             // --- DÜZELTME: unassignedLessonNames'i kullan --- 
+            : (unassignedLessonNames.length > 0 
+                ? `Çizelge oluşturulamadı. Atanamayan dersler: ${unassignedLessonNames.join(', ')}` 
+                : "Çizelge oluşturulamadı. Bilinmeyen bir kısıtlama nedeniyle dersler yerleştirilemedi."),
     };
 }

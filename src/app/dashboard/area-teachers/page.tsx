@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchTeachers, createTeacher, updateTeacher, deleteTeacher, fetchBranches, Branch, createBranch } from '@/actions/teacherActions';
+import { fetchTeachers, createTeacher, updateTeacher, deleteTeacher, fetchBranches, Branch, createBranch, updateTeacherActiveStatus } from '@/actions/teacherActions';
 import { AreaTeachersTable } from '@/components/teachers/AreaTeachersTable';
 import { AreaTeacherFormModal } from '@/components/teachers/AreaTeacherFormModal';
 import { BranchFormModal } from '@/components/branches/BranchFormModal';
@@ -101,14 +101,17 @@ export default function AreaTeachersPage() {
   const paginatedTeachersWithBranchName: TeacherWithBranchName[] = useMemo(() => 
       paginatedPartialTeachers.map(teacher => ({
         ...teacher,
-        id: teacher.id ?? '', // Ensure ID is always string (should exist here)
-        name: teacher.name ?? '', // Ensure name is string
+        id: teacher.id ?? '', // Should always have an ID here
+        name: teacher.name ?? '', 
         birthDate: teacher.birthDate ?? null,
         role: teacher.role ?? null,
         phone: teacher.phone ?? null,
         branchId: teacher.branchId ?? null,
-        branchName: teacher.branchId ? branchesMap.get(teacher.branchId) ?? null : null, // Lookup branch name
-      })),
+        branchName: teacher.branchId ? branchesMap.get(teacher.branchId) ?? null : null,
+        is_active: teacher.is_active ?? true, // Default to true if undefined
+        createdAt: teacher.createdAt,
+        updatedAt: teacher.updatedAt,
+      } as TeacherWithBranchName)), // Explicit type assertion can help clarity
     [paginatedPartialTeachers, branchesMap]);
   // --- Pagination Logic --- End
 
@@ -195,6 +198,29 @@ export default function AreaTeachersPage() {
   });
   // --- Branch Mutation --- End
 
+  // --- NEW: Status Update Mutation --- 
+  const updateStatusMutation = useMutation({
+    mutationFn: (variables: { teacherId: string; isActive: boolean }) => 
+      updateTeacherActiveStatus(variables.teacherId, variables.isActive),
+    onSuccess: (data, variables) => {
+      if (data.success) {
+        // Invalidate teachers query to refetch updated data
+        queryClient.invalidateQueries({ queryKey: ['teachers'] });
+        toast.success('Öğretmen durumu güncellendi!');
+      } else {
+        toast.error(`Durum güncellenemedi: ${data.error}`);
+        // Optionally re-fetch to revert optimistic UI if needed, but invalidation is usually enough
+        // queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      }
+    },
+    onError: (err, variables) => {
+      toast.error(`Durum güncellenirken hata: ${err instanceof Error ? err.message : String(err)}`);
+      // Optionally re-fetch to revert optimistic UI
+      // queryClient.invalidateQueries({ queryKey: ['teachers'] }); 
+    },
+  });
+  // --- END: Status Update Mutation ---
+
   // Handlers
   const handleAddTeacher = () => {
     setEditingTeacher(null);
@@ -242,7 +268,15 @@ export default function AreaTeachersPage() {
   };
   // --- Branch Handlers --- End
 
-  const teacherMutationLoading = createTeacherMutation.isPending || updateTeacherMutation.isPending || deleteTeacherMutation.isPending;
+  // --- NEW: Status Toggle Handler ---
+  const handleToggleActiveStatus = (teacherId: string, currentStatus: boolean) => {
+    console.log(`Toggling status for ${teacherId}, current: ${currentStatus}`);
+    // Call the mutation with the *new* desired status (opposite of current)
+    updateStatusMutation.mutate({ teacherId, isActive: !currentStatus });
+  };
+  // --- END: Status Toggle Handler ---
+
+  const teacherMutationLoading = createTeacherMutation.isPending || updateTeacherMutation.isPending || deleteTeacherMutation.isPending || updateStatusMutation.isPending;
   const branchMutationLoading = createBranchMutation.isPending;
 
   return (
@@ -290,17 +324,19 @@ export default function AreaTeachersPage() {
 
       {!isLoading && !error && (
         <>
+          {console.log('[AreaTeachersPage] Rendering AreaTeachersTable, typeof handleToggleActiveStatus:', typeof handleToggleActiveStatus)}
           <AreaTeachersTable 
-            teachers={paginatedTeachersWithBranchName} // Pass the correctly typed array
+            teachers={paginatedTeachersWithBranchName} 
             onEdit={handleEditTeacher} 
             onDelete={handleDeleteTeacher} 
+            onToggleActiveStatus={handleToggleActiveStatus}
           />
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-between items-center mt-4">
               <button
                 onClick={handlePreviousPage}
-                disabled={safeCurrentPage === 1 || teacherMutationLoading || branchMutationLoading}
+                disabled={safeCurrentPage === 1 || teacherMutationLoading || branchMutationLoading || updateStatusMutation.isPending}
                 className="flex items-center px-4 py-2 border rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeftIcon className="h-4 w-4 mr-1" />
@@ -311,7 +347,7 @@ export default function AreaTeachersPage() {
               </span>
               <button
                 onClick={handleNextPage}
-                disabled={safeCurrentPage === totalPages || teacherMutationLoading || branchMutationLoading}
+                disabled={safeCurrentPage === totalPages || teacherMutationLoading || branchMutationLoading || updateStatusMutation.isPending}
                 className="flex items-center px-4 py-2 border rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Sonraki

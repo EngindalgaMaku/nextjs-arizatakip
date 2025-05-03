@@ -2,12 +2,18 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchDallar, createDal, updateDal, deleteDal } from '@/actions/dalActions';
+import { fetchDallar, createDal, updateDal, deleteDal, fetchBranchesForSelect } from '@/actions/dalActions';
 import { DallarTable } from '@/components/dallar/DallarTable';
 import { DalFormModal } from '@/components/dallar/DalFormModal';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { Dal, DalFormValues } from '@/types/dallar';
+
+// Simple type matching the one expected by the modal
+interface BranchSelectItem {
+  id: string;
+  name: string;
+}
 
 export default function DallarPage() {
   const queryClient = useQueryClient();
@@ -15,10 +21,17 @@ export default function DallarPage() {
   const [editingDal, setEditingDal] = useState<Dal | null>(null);
 
   // Fetch Dallar
-  const { data: dallar = [], isLoading, error } = useQuery<Dal[], Error>({ 
+  const { data: dallar = [], isLoading: isLoadingDallar, error: errorDallar } = useQuery<Dal[], Error>({
     queryKey: ['dallar'],
     queryFn: fetchDallar,
   });
+
+  // --- Fetch Branches for Select --- 
+  const { data: availableBranches = [], isLoading: isLoadingBranches, error: errorBranches } = useQuery<BranchSelectItem[], Error>({
+    queryKey: ['branchesForSelect'], // Unique query key
+    queryFn: fetchBranchesForSelect,
+  });
+  // --- End Fetch Branches ---
 
   // Mutations
   const createMutation = useMutation({
@@ -98,6 +111,14 @@ export default function DallarPage() {
     }
   };
 
+  // Combined loading state
+  const isLoading = isLoadingDallar || isLoadingBranches;
+  // Combined error state (display the first error encountered)
+  const error = errorDallar || errorBranches;
+  
+  // Determine if the add button should be disabled
+  const isAddDisabled = isLoading || availableBranches.length === 0; // Disable if loading or no branches fetched
+  
   const mutationLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
@@ -106,24 +127,32 @@ export default function DallarPage() {
         <h1 className="text-2xl font-semibold text-gray-800">Dal Yönetimi</h1>
         <button
           onClick={handleAdd}
-          disabled={isLoading} // Disable button while loading initial data
-          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+          disabled={isAddDisabled} // Use combined disable logic
+          title={availableBranches.length === 0 ? 'Yeni dal eklemek için önce ana dal bulunmalıdır.' : 'Yeni Dal Ekle'} // Add a title explaining why it might be disabled
+          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Yeni Dal Ekle
         </button>
       </div>
 
-      {isLoading && <p>Dallar yükleniyor...</p>}
-      {error && <p className="text-red-600">Dallar yüklenirken bir hata oluştu: {error.message}</p>}
+      {isLoading && <p>Veriler yükleniyor...</p>} {/* Updated loading message */}
+      {error && <p className="text-red-600">Veriler yüklenirken bir hata oluştu: {error.message}</p>} {/* Updated error message */}
+      {!isLoading && !error && availableBranches.length === 0 && (
+        <p className="text-orange-600">Henüz ana dal (branch) tanımlanmamış. Yeni dal ekleyebilmek için önce ana dal eklemelisiniz.</p>
+      )}
 
-      {!isLoading && !error && (
+      {!isLoading && !error && dallar.length > 0 && (
         <DallarTable dallar={dallar} onEdit={handleEdit} onDelete={handleDelete} />
+      )}
+      {!isLoading && !error && dallar.length === 0 && availableBranches.length > 0 && (
+         <p>Henüz dal tanımlanmamış.</p>
       )}
 
       {isModalOpen && (
         <DalFormModal
           initialData={editingDal ?? undefined}
+          availableBranches={availableBranches} // <<< Pass fetched branches
           onSubmit={handleFormSubmit}
           onClose={() => {
               setIsModalOpen(false);

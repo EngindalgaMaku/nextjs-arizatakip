@@ -2,7 +2,7 @@
 
 import { prepareSchedulerInput } from '@/lib/scheduling/dataPreparation';
 import { generateSchedule } from '@/lib/scheduling/scheduler';
-import { SchedulerResult, ScheduledEntry, SerializableSchedulerResult } from '@/types/scheduling';
+import { SchedulerResult, ScheduledEntry, SerializableSchedulerResult, UnassignedLessonInfo } from '@/types/scheduling';
 
 /**
  * Veriyi hazırlar, çizelgeleme algoritmasını çalıştırır ve sonucu döndürür.
@@ -26,11 +26,31 @@ export async function runSchedulerAction(): Promise<SerializableSchedulerResult>
             scheduleArray = Array.from(result.schedule.entries());
         }
 
+        // --- YENİ: UnassignedLessons'ı UnassignedLessonInfo formatına map et ---
+        let unassignedInfoArray: UnassignedLessonInfo[] | undefined = undefined;
+        let calculatedTotalUnassignedHours = 0;
+        if (result.unassignedLessons && Array.isArray(result.unassignedLessons)) {
+            unassignedInfoArray = result.unassignedLessons.map(lesson => {
+                // Varsayım: Atanamayan saat sayısı, dersin haftalık saati kadardır.
+                // Eğer algoritma kısmi atama yapıp kalan saati döndürüyorsa,
+                // `result.unassignedLessons` yapısını veya bu mapping'i güncellemek gerekir.
+                const remainingHours = lesson.weeklyHours; 
+                calculatedTotalUnassignedHours += remainingHours; // Toplamı hesapla
+                return {
+                    lessonId: lesson.id,
+                    lessonName: lesson.name, // LessonScheduleData'dan ders adını al
+                    remainingHours: remainingHours,
+                };
+            });
+        }
+        // --- MAP ETME SONU ---
+
         // Construct serializable result including logs
         const serializableResult: SerializableSchedulerResult = {
             success: result.success,
             schedule: scheduleArray,
-            unassignedLessons: result.unassignedLessons,
+            unassignedLessons: unassignedInfoArray, // <<< Mapped array'i kullan
+            totalUnassignedHours: calculatedTotalUnassignedHours, // <<< Hesaplanan toplamı ekle
             error: result.error,
             diagnostics: result.diagnostics, // Pass through diagnostics if any
             logs: result.logs // <<< YENİ: logları ekle

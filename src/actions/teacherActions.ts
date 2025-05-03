@@ -1,26 +1,20 @@
 'use server';
 
 import { supabase } from '@/lib/supabase';
-import { Teacher, TeacherFormValues, TeacherFormSchema } from '@/types/teachers';
+import { Teacher, TeacherFormValues, TeacherFormSchema, TeacherRole } from '@/types/teachers';
 import { z } from 'zod';
 import { BranchFormSchema, BranchFormValues } from '@/types/branches';
 import { revalidatePath } from 'next/cache';
 import { TeacherSchema } from '@/types/teachers';
 
 /**
- * Fetch all teachers, including their branch ID.
+ * Fetch all teachers.
  */
 export async function fetchTeachers(): Promise<Partial<Teacher>[]> {
   const { data, error } = await supabase
     .from('teachers')
-    .select(`
-      id, 
-      name, 
-      birth_date, 
-      role, 
-      phone,
-      branch_id
-    `)
+    // Use snake_case matching the database columns
+    .select('id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active') 
     .order('name', { ascending: true });
 
   if (error) {
@@ -28,16 +22,37 @@ export async function fetchTeachers(): Promise<Partial<Teacher>[]> {
     throw error;
   }
   
-  const mappedData = data?.map(teacher => ({
-      id: teacher.id,
-      name: teacher.name,
-      birthDate: teacher.birth_date,
-      role: teacher.role,
-      phone: teacher.phone,
-      branchId: teacher.branch_id,
-  })) || [];
+  // Map snake_case from DB to camelCase expected by TeacherSchema/Teacher type
+  const mappedData = data?.map(teacher => {
+      // Convert role to uppercase if it exists
+      const mappedRole = typeof teacher.role === 'string' ? teacher.role.toUpperCase() as TeacherRole : null;
+      
+      return {
+          id: teacher.id,
+          name: teacher.name,
+          birthDate: teacher.birth_date, 
+          role: mappedRole, // Use the potentially uppercase role
+          phone: teacher.phone,
+          branchId: teacher.branch_id,   
+          createdAt: teacher.created_at,
+          updatedAt: teacher.updated_at,
+          is_active: teacher.is_active   
+      };
+  }) || [];
   
-  return mappedData;
+  // Validate the mapped (camelCase) data against the schema
+  const validatedData = mappedData.map(teacher => {
+      // Make sure to handle potential null/undefined from mapping before parsing
+      if (!teacher) return null;
+      const parseResult = TeacherSchema.partial().safeParse(teacher);
+      if (!parseResult.success) {
+          console.warn(`Fetched teacher data validation failed for teacher ID ${teacher.id}:`, parseResult.error);
+          return null; 
+      }
+      return parseResult.data; 
+  }).filter(Boolean) as Partial<Teacher>[] | undefined;
+
+  return validatedData || [];
 }
 
 /**
@@ -167,34 +182,57 @@ export async function fetchTeacherById(id: string): Promise<Teacher | null> {
    if (!id) return null;
    const { data, error } = await supabase
     .from('teachers')
-    .select(`id, name, birth_date, role, phone, branch_id`)
+    // Select ALL fields defined in TeacherSchema (using snake_case)
+    .select(`id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active`)
     .eq('id', id)
     .single();
 
     if (error) {
-      console.error(`Error fetching teacher ${id}:`, error);
-      if (error.code === 'PGRST116') return null;
+      console.error(`[fetchTeacherById] Error fetching teacher ${id}:`, error);
+      // If Supabase returns error indicating 0 rows found, return null
+      if (error.code === 'PGRST116') { 
+          console.log(`[fetchTeacherById] Teacher ${id} not found (PGRST116).`);
+          return null; 
+      }
+      // For other errors, you might throw or return null depending on desired handling
+      // Throwing might be better to indicate a real DB issue
       throw error;
     }
     
-    if (!data) return null;
-    // Map to Teacher type (camelCase)
+    // If data is null/undefined even without an error (shouldn't happen with .single() unless RLS hides it)
+    if (!data) { 
+        console.warn(`[fetchTeacherById] No data returned for teacher ${id} despite no error.`);
+        return null;
+    }
+    
+    // Map ALL fields from snake_case to camelCase
+    const mappedRole = typeof data.role === 'string' ? data.role.toUpperCase() as TeacherRole : null;
     const teacherData = {
         id: data.id,
         name: data.name,
         birthDate: data.birth_date,
-        role: data.role,
+        role: mappedRole, // Use mapped role
         phone: data.phone,
-        branchId: data.branch_id, // Map branch_id
+        branchId: data.branch_id, 
+        createdAt: data.created_at, // Add createdAt
+        updatedAt: data.updated_at, // Add updatedAt
+        is_active: data.is_active   // Add is_active
     };
     
-    // Validate against the full TeacherSchema
+    // Validate the complete mapped object against the full TeacherSchema
+    console.log(`[fetchTeacherById] Validating mapped data for teacher ${id}:`, teacherData);
     const parseResult = TeacherSchema.safeParse(teacherData);
+    
     if (!parseResult.success) {
-        console.error(`Validation failed for fetched teacher ${id}:`, parseResult.error.flatten());
+        // Log detailed validation errors
+        console.error(`[fetchTeacherById] Validation failed for fetched teacher ${id}:`, JSON.stringify(parseResult.error.flatten(), null, 2));
+        // Return null if validation fails, as the data doesn't match the expected type
         return null;
     }
-    return parseResult.data; // This is of type Teacher
+    
+    console.log(`[fetchTeacherById] Successfully fetched and validated teacher ${id}.`);
+    // Return the validated data which conforms to the Teacher type
+    return parseResult.data; 
 }
 
 // Add other teacher actions (create, update, delete) here if needed later 
@@ -275,4 +313,35 @@ export async function createBranch(payload: BranchFormValues): Promise<{ success
     console.error('createBranch error:', err);
     return { success: false, error: err instanceof Error ? err.message : 'Bilinmeyen bir hata oluştu.' };
   }
-} 
+}
+
+// --- NEW ACTION TO UPDATE ACTIVE STATUS ---
+export async function updateTeacherActiveStatus(teacherId: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+  if (!teacherId) {
+    return { success: false, error: 'Öğretmen IDsi belirtilmedi.' };
+  }
+
+  console.log(`[TeacherAction] Updating active status for ${teacherId} to ${isActive}`);
+
+  try {
+    const { error } = await supabase
+      .from('teachers')
+      .update({ is_active: isActive, updated_at: new Date().toISOString() }) // Update is_active and timestamp
+      .eq('id', teacherId);
+
+    if (error) {
+      console.error(`[TeacherAction] Error updating active status for ${teacherId}:`, error);
+      return { success: false, error: error.message };
+    }
+
+    // Revalidate the teachers list page
+    revalidatePath('/dashboard/area-teachers'); 
+    console.log(`[TeacherAction] Active status updated successfully for ${teacherId}`);
+    return { success: true };
+
+  } catch (err: any) {
+    console.error(`[TeacherAction] Uncaught error updating status for ${teacherId}:`, err);
+    return { success: false, error: err?.message || 'Durum güncellenirken bilinmeyen bir hata oluştu.' };
+  }
+}
+// --- END NEW ACTION --- 

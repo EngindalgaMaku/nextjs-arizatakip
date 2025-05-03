@@ -30,13 +30,19 @@ export async function fetchDallar(): Promise<Dal[]> {
 export async function createDal(payload: DalFormValues): Promise<{ success: boolean; dal?: Dal; error?: string }> {
   const parse = DalFormSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    // Aggregate multiple error messages if necessary
+    const errorMessages = parse.error.errors.map(e => `(${e.path.join('.') || 'field'}): ${e.message}`).join(', ');
+    console.error('[createDal] Validation failed:', errorMessages, 'Payload:', payload); // Log validation errors
+    return { success: false, error: errorMessages };
   }
 
   const dalData = {
     name: parse.data.name,
     description: parse.data.description || null,
+    branch_id: parse.data.branch_id // <<< Added branch_id
   };
+
+  console.log('[createDal] Inserting data:', dalData); // Log data before insert
 
   try {
     const { data, error } = await supabase
@@ -46,17 +52,23 @@ export async function createDal(payload: DalFormValues): Promise<{ success: bool
       .single();
 
     if (error || !data) {
-      console.error('Error creating dal:', error?.message);
+      console.error('[createDal] Error creating dal:', error?.message, 'Details:', error); // Log full error
       if (error?.code === '23505') { // Handle unique constraint violation for name
           return { success: false, error: 'Bu dal adı zaten mevcut.' };
       }
+      // Handle foreign key violation for branch_id if needed (though validation should catch invalid UUIDs)
+      if (error?.code === '23503') { 
+          console.error('[createDal] Foreign key violation likely on branch_id:', error.message);
+          return { success: false, error: 'Seçilen ana dal geçerli değil veya bulunamadı.' };
+      }
       return { success: false, error: error?.message || 'Dal oluşturulamadı.' };
     }
+    console.log('[createDal] Dal created successfully:', data.id); // Log success
     revalidatePath(DALLAR_PATH);
     return { success: true, dal: data as Dal };
-  } catch (err) {
-    console.error('createDal error:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  } catch (err: any) { // Catch any error
+    console.error('[createDal] Uncaught error:', err); // Log uncaught errors
+    return { success: false, error: err?.message || 'Bilinmeyen bir hata oluştu.' };
   }
 }
 
@@ -137,4 +149,29 @@ export async function fetchDalById(id: string): Promise<Dal | null> {
       throw error;
     }
     return data as Dal | null;
-} 
+}
+
+// --- NEW ACTION --- 
+interface BranchSelectItem {
+  id: string;
+  name: string;
+}
+
+/**
+ * Fetch branches for use in a select dropdown.
+ */
+export async function fetchBranchesForSelect(): Promise<BranchSelectItem[]> {
+  const { data, error } = await supabase
+    .from('branches') // <<< Use 'branches' table
+    .select('id, name')
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching branches for select:', error);
+    // Depending on requirements, you might throw or return empty array
+    // throw error;
+    return [];
+  }
+  return data || [];
+}
+// --- END NEW ACTION --- 

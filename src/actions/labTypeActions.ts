@@ -56,8 +56,11 @@ export async function fetchDalDersLabTypes(dalDersId: string): Promise<string[]>
  */
 export async function setDalDersLabTypes(dalDersId: string, labTypeIds: string[]): Promise<{ success: boolean; error?: string }> {
   if (!dalDersId) {
+    console.error('[setDalDersLabTypes] Missing dalDersId');
     return { success: false, error: 'Dal Ders IDsi belirtilmedi.' };
   }
+
+  console.log(`[setDalDersLabTypes] Attempting update for dalDersId: ${dalDersId} with labTypeIds:`, labTypeIds);
 
   try {
     // Start a transaction (optional but recommended for multi-step operations)
@@ -65,15 +68,17 @@ export async function setDalDersLabTypes(dalDersId: string, labTypeIds: string[]
     // We perform operations sequentially.
 
     // 1. Delete existing associations for this lesson
+    console.log(`[setDalDersLabTypes] Deleting existing associations for ${dalDersId}...`);
     const { error: deleteError } = await supabase
       .from('dal_ders_lab_types')
       .delete()
       .eq('dal_ders_id', dalDersId);
 
     if (deleteError) {
-      console.error(`Error deleting existing lab types for dal_ders ${dalDersId}:`, deleteError);
+      console.error(`[setDalDersLabTypes] Error deleting existing lab types for dal_ders ${dalDersId}:`, deleteError);
       return { success: false, error: 'Mevcut laboratuvar tipi ilişkileri silinirken hata oluştu.' };
     }
+    console.log(`[setDalDersLabTypes] Deletion successful for ${dalDersId}.`);
 
     // 2. Insert new associations if any are provided
     if (labTypeIds && labTypeIds.length > 0) {
@@ -82,25 +87,30 @@ export async function setDalDersLabTypes(dalDersId: string, labTypeIds: string[]
         lab_type_id: labTypeId,
       }));
 
+      console.log(`[setDalDersLabTypes] Inserting new associations for ${dalDersId}:`, newAssociations);
       const { error: insertError } = await supabase
         .from('dal_ders_lab_types')
         .insert(newAssociations);
 
       if (insertError) {
-        console.error(`Error inserting new lab types for dal_ders ${dalDersId}:`, insertError);
+        console.error(`[setDalDersLabTypes] Error inserting new lab types for dal_ders ${dalDersId}:`, insertError);
          // Potential issue: Deletion succeeded but insertion failed.
          // Consider how to handle this state if necessary.
         return { success: false, error: 'Yeni laboratuvar tipi ilişkileri kaydedilirken hata oluştu.' };
       }
+      console.log(`[setDalDersLabTypes] Insertion successful for ${dalDersId}.`);
+    } else {
+        console.log(`[setDalDersLabTypes] No new labTypeIds provided for ${dalDersId}, skipping insertion.`);
     }
     
     // Consider if revalidation is needed for any related paths
     // e.g., revalidatePath(`/dashboard/dallar/.../dersler/${dalDersId}`); // If there's a specific lesson detail page
 
+    console.log(`[setDalDersLabTypes] Successfully updated lab types for ${dalDersId}.`);
     return { success: true };
 
   } catch (err) {
-    console.error('setDalDersLabTypes error:', err);
+    console.error('[setDalDersLabTypes] General error:', err);
     return { success: false, error: err instanceof Error ? err.message : 'Laboratuvar tipleri ayarlanırken bilinmeyen bir hata oluştu.' };
   }
 }
