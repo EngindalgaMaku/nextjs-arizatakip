@@ -83,13 +83,18 @@ async function fetchDallarWithBranchId(): Promise<Map<string, string | null>> {
 async function prepareTeachersData(): Promise<TeacherScheduleData[]> {
     const { data: teachers, error: teacherError } = await supabase
         .from('teachers')
-        // Select branch_id, remove assignments for now
-        .select('id, name, branch_id, teacher_unavailability(*)'); 
+        // Select branch_id and is_active, remove assignments for now
+        .select('id, name, branch_id, is_active, teacher_unavailability(*)'); // <<< YENİ: is_active eklendi
 
     if (teacherError) throw new Error(`Öğretmen verileri çekilirken hata: ${teacherError.message}`);
     if (!teachers) return [];
 
-    return teachers.map(teacher => {
+    // <<< YENİ: Aktif olmayan öğretmenleri filtrele >>>
+    const activeTeachers = teachers.filter(teacher => teacher.is_active === true);
+    console.log(`[Scheduler DataPrep] Total teachers fetched: ${teachers.length}, Active teachers: ${activeTeachers.length}`);
+
+    // Sadece aktif öğretmenleri işle
+    return activeTeachers.map(teacher => {
         const unavailabilities = Array.isArray(teacher.teacher_unavailability) ? teacher.teacher_unavailability : [];
         // Remove assignment logic
         // const assignments = Array.isArray(teacher.teacher_assignments) ? teacher.teacher_assignments : [];

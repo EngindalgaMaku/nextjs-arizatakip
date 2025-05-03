@@ -85,6 +85,22 @@ export default function TeacherAssignmentsPage() {
         return map;
     }, [assignments]);
 
+    // Merge with all lessons options as fallback for missing nested data
+    const mergedDersMap = useMemo(() => {
+        const map = new Map<string, { dersAdi?: string; sinifSeviyesi?: number }>();
+        // add all options as fallback
+        allDersOptions.forEach(opt => {
+            map.set(opt.id, { dersAdi: opt.dersAdi, sinifSeviyesi: opt.sinifSeviyesi });
+        });
+        // override with nested dal_ders data when available
+        assignments.forEach(assignment => {
+            if (assignment.dal_ders_id && assignment.dal_ders) {
+                map.set(assignment.dal_ders_id, { dersAdi: assignment.dal_ders.dersAdi, sinifSeviyesi: assignment.dal_ders.sinifSeviyesi });
+            }
+        });
+        return map;
+    }, [allDersOptions, assignments]);
+
     // Filter out dersler that are already assigned to this teacher for the Add modal dropdown
     const availableDersOptions = useMemo(() => {
         const assignedDersIds = new Set(assignments.map(a => a.dal_ders_id));
@@ -227,7 +243,7 @@ export default function TeacherAssignmentsPage() {
             {!isLoading && (
                 <TeacherAssignmentsList
                     assignments={assignments}
-                    dalDersMap={assignmentDersDetailsMap}
+                    dalDersMap={mergedDersMap}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                 />

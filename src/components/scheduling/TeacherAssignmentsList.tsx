@@ -55,14 +55,16 @@ export function TeacherAssignmentsList({ assignments, dalDersMap, onEdit, onDele
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {assignments.map((assignment) => {
-            // Use the correct map and key (snake_case from DB)
-            const ders = dalDersMap.get(assignment.dal_ders_id);
+            // Prefer nested `dal_ders` if available, otherwise fallback to the map
+            const ders = assignment.dal_ders
+              ? { dersAdi: assignment.dal_ders.dersAdi, sinifSeviyesi: assignment.dal_ders.sinifSeviyesi }
+              : dalDersMap.get(assignment.dal_ders_id);
             // Log the specific assignment being used (property is 'assignment')
             console.log(`[TeacherAssignmentsList] Mapping assignment ID: ${assignment.id}, assignment:`, assignment.assignment);
             return (
               <tr key={assignment.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {ders?.dersAdi || 'Ders Bulunamadı'}
+                  {ders?.dersAdi ?? assignment.dal_ders_id ?? 'Ders Bulunamadı'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {/* Use optional chaining and nullish coalescing */}

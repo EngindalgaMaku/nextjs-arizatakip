@@ -274,10 +274,10 @@ export async function fetchAllDersOptions(): Promise<{ id: string; dersAdi: stri
     .from('dal_dersleri')
     // Select related dal name as well
     .select(`
-      id, 
-      ders_adi, 
+      id,
+      ders_adi,
       sinif_seviyesi,
-      dal:dallar ( name )
+      dal:dallar(name)
     `)
     .order('dal(name)') // Order by branch name first
     .order('ders_adi'); // Then by lesson name
