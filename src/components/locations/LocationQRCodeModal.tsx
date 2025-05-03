@@ -15,13 +15,13 @@ interface LocationQRCodeModalProps {
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export default function LocationQRCodeModal({ location, onClose }: LocationQRCodeModalProps) {
-  if (!location || !location.barcode_value) {
+  if (!location || !location.code) {
     // Should not happen if button is disabled correctly, but good practice
     return null;
   }
 
   // Construct the full URL for the public location page
-  const locationUrl = `${APP_BASE_URL}/konum/${location.barcode_value}`;
+  const locationUrl = `${APP_BASE_URL}/konum/${location.code}`;
 
   const handlePrint = () => {
     const printContents = document.getElementById('qr-code-printable-area')?.innerHTML;

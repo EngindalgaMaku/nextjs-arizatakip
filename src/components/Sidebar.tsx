@@ -10,7 +10,8 @@ import {
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   BookOpenIcon,
-  AcademicCapIcon
+  AcademicCapIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 
 interface NavItemProps {
@@ -96,6 +97,13 @@ export default function Sidebar() {
           icon={<BookOpenIcon />} 
           label="Kullanım Kılavuzu"
           active={pathname === '/dashboard/guide'} 
+        />
+
+        <NavItem 
+          href="/dashboard/scheduling" 
+          icon={<CalendarDaysIcon />} 
+          label="Otomatik Çizelgeleme"
+          active={pathname === '/dashboard/scheduling'} 
         />
       </nav>
       

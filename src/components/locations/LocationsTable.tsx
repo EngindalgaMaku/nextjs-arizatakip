@@ -1,161 +1,86 @@
 'use client';
 
 import React from 'react';
-import { Location } from '@/types/locations';
-import { PencilIcon, TrashIcon, QrCodeIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
-import { formatDate } from '@/lib/helpers'; // Assuming you have a date formatter
-
-// Departman değerlerini etiketlerine dönüştüren yardımcı fonksiyon
-const getDepartmentLabel = (departmentValue: string | null): string => {
-  const departmentMap: Record<string, string> = {
-    'bilisim': 'Bilişim Teknolojileri',
-    // 'elektronik': 'Elektrik-Elektronik',
-    // 'makine': 'Makine',
-    // 'tekstil': 'Tekstil',
-    'muhasebe': 'Muhasebe',
-    'halkla_iliskiler': 'Halkla İlişkiler',
-    'gazetecilik': 'Gazetecilik',
-    'radyo_tv': 'Radyo ve Televizyon',
-    'plastik_sanatlar': 'Plastik Sanatlar',
-    'idare': 'İdare',
-    'diger': 'Diğer'
-  };
-  
-  return departmentValue ? departmentMap[departmentValue] || departmentValue : '-';
-};
+import { LocationWithLabType } from '@/types/locations';
+// Button importunu tekrar deneyelim, doğru yolu bulana kadar yorumda kalabilir
+// import { Button } from '@/components/ui/button'; // Re-commented the import
+import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface LocationsTableProps {
-  locations: Location[];
-  onEdit: (location: Location) => void;
-  onDelete: (locationId: string) => void;
-  onViewQrCode: (location: Location) => void;
-  onViewProperties?: (location: Location) => void;
-  onViewSchedule?: (location: Location) => void;
-  onMove?: (locationId: string, direction: 'up' | 'down') => void;
-  isLoading?: boolean; // Optional loading state for delete/actions
+  locations: LocationWithLabType[];
+  onEdit: (location: LocationWithLabType) => void;
+  onDelete: (id: string) => void;
+  isLoading?: boolean; // Make loading optional
 }
+
+// Re-added temporary Button definition
+const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => (
+  <button {...props} className={`px-2 py-1 border rounded text-sm ${props.disabled ? 'opacity-50 cursor-not-allowed' : ''} ${props.variant === 'destructive' ? 'text-red-600 border-red-300 hover:bg-red-50' : 'text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+    {children}
+  </button>
+);
 
 export default function LocationsTable({
   locations,
   onEdit,
   onDelete,
-  onViewQrCode,
-  onViewProperties,
-  onViewSchedule,
-  onMove,
-  isLoading = false,
+  isLoading = false
 }: LocationsTableProps) {
-  if (!locations || locations.length === 0) {
-    return (
-      <div className="text-center py-10">
-        <p className="text-gray-500">Henüz konum eklenmemiş.</p>
-        {/* Optionally add a button here to trigger the create modal */}
-      </div>
-    );
-  }
 
   return (
-    <div className="overflow-x-auto shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-      <table className="min-w-full divide-y divide-gray-300">
+    <div className="overflow-x-auto shadow border-b border-gray-200 sm:rounded-lg">
+      <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-              Adı
-            </th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Departman
-            </th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Tipi
-            </th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Özellikler
-            </th>
-            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-              <span className="sr-only">Eylemler</span>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konum Adı</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kod</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Laboratuvar Tipi</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kapasite</th>
+            <th scope="col" className="relative px-6 py-3">
+              <span className="sr-only">İşlemler</span>
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
-          {locations.map((location, index) => (
+        <tbody className="bg-white divide-y divide-gray-200">
+          {locations.map((location) => (
             <tr key={location.id}>
-              <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                <div className="inline-flex flex-col mr-2 align-middle">
-                   <button
-                      type="button"
-                      onClick={() => onMove && onMove(location.id, 'up')}
-                      disabled={index === 0 || isLoading || location.sort_order === null}
-                      className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                      title="Yukarı Taşı"
-                    >
-                      <ArrowUpIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onMove && onMove(location.id, 'down')}
-                      disabled={index === locations.length - 1 || isLoading || location.sort_order === null}
-                      className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                      title="Aşağı Taşı"
-                    >
-                      <ArrowDownIcon className="h-4 w-4" />
-                    </button>
-                </div>
-                {location.name}
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{location.name}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.code ?? '-'}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {location.labType ? `${location.labType.name} (${location.labType.code})` : 'Belirtilmemiş'}
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                {getDepartmentLabel(location.department)}
-              </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                {location.type || '-'}
-              </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <button
-                  onClick={() => onViewProperties?.(location)}
-                  disabled={isLoading || !location.properties || Object.keys(location.properties).length === 0}
-                  title="Özellikleri Görüntüle"
-                  className="text-gray-600 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed"
-                >
-                  <EyeIcon className="h-5 w-5" aria-hidden="true" />
-                </button>
-              </td>
-              <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
-                <button
-                  onClick={() => onViewSchedule?.(location)}
-                  disabled={isLoading}
-                  title="Ders Programı"
-                  className="text-teal-600 hover:text-teal-800 disabled:text-gray-300"
-                >
-                  <CalendarDaysIcon className="h-5 w-5" aria-hidden="true" />
-                </button>
-                <button
-                  onClick={() => onViewQrCode(location)}
-                  disabled={isLoading || !location.barcode_value}
-                  title="Barkodu Görüntüle"
-                  className="text-indigo-600 hover:text-indigo-900 disabled:text-gray-300 disabled:cursor-not-allowed"
-                >
-                  <QrCodeIcon className="h-5 w-5" aria-hidden="true" />
-                </button>
-                <button
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.capacity ?? '-'}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => onEdit(location)}
                   disabled={isLoading}
-                  title="Düzenle"
-                  className="text-blue-600 hover:text-blue-900 disabled:text-gray-300 disabled:cursor-not-allowed"
+                  aria-label={`Düzenle ${location.name}`}
                 >
-                  <PencilIcon className="h-5 w-5" aria-hidden="true" />
-                </button>
-                <button
+                   <PencilIcon className="h-4 w-4 inline mr-1" /> Düzenle
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
                   onClick={() => onDelete(location.id)}
                   disabled={isLoading}
-                  title="Sil"
-                  className="text-red-600 hover:text-red-900 disabled:text-gray-300 disabled:cursor-not-allowed"
+                  aria-label={`Sil ${location.name}`}
                 >
-                  <TrashIcon className="h-5 w-5" aria-hidden="true" />
-                </button>
+                  <TrashIcon className="h-4 w-4 inline mr-1" /> Sil
+                </Button>
               </td>
             </tr>
           ))}
+          {locations.length === 0 && (
+             <tr>
+                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                    Gösterilecek konum bulunamadı.
+                </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
-} 
+}

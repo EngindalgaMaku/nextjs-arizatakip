@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Teacher, teacherRoleLabels } from '@/types/teachers'; // Import Teacher type and role labels
-import { PencilSquareIcon, TrashIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, CalendarDaysIcon, ClipboardDocumentListIcon, PencilIcon, EyeIcon, CalendarIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 // Define a type for the teacher data including the resolved branch name
@@ -30,9 +30,9 @@ export function AreaTeachersTable({ teachers, onEdit, onDelete }: AreaTeachersTa
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doğum Tarihi</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cep Telefonu</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görevi</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branş</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Branş</th>
             <th scope="col" className="relative px-6 py-3">
-              <span className="sr-only">Eylemler</span>
+              <span className="sr-only">İşlemler</span>
             </th>
           </tr>
         </thead>
@@ -43,17 +43,38 @@ export function AreaTeachersTable({ teachers, onEdit, onDelete }: AreaTeachersTa
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.birthDate || '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.phone || '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.role ? teacherRoleLabels[teacher.role] : '-'}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.branchName || '-'}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                <Link href={`/dashboard/area-teachers/${teacher.id}/schedule`} className="text-green-600 hover:text-green-900 inline-block" title="Ders Programı">
-                   <CalendarDaysIcon className="h-5 w-5" />
-                </Link>
-                <button onClick={() => onEdit(teacher)} className="text-indigo-600 hover:text-indigo-900" title="Düzenle">
-                   <PencilSquareIcon className="h-5 w-5" />
-                </button>
-                <button onClick={() => onDelete(teacher.id)} className="text-red-600 hover:text-red-900" title="Sil">
-                   <TrashIcon className="h-5 w-5" />
-                </button>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.branchName ?? '-'}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                <div className="flex justify-end space-x-2">
+                  <Link
+                    href={`/dashboard/area-teachers/${teacher.id}/schedule`}
+                    className="text-indigo-600 hover:text-indigo-900"
+                    title="Programı Görüntüle"
+                  >
+                    <CalendarIcon className="h-5 w-5" />
+                  </Link>
+                  <Link
+                    href={`/dashboard/area-teachers/${teacher.id}/assignments`}
+                    className="text-green-600 hover:text-green-900"
+                    title="Ders Atamalarını Yönet"
+                  >
+                    <ClipboardDocumentCheckIcon className="h-5 w-5" />
+                  </Link>
+                  <button 
+                    onClick={() => onEdit(teacher)}
+                    className="text-indigo-600 hover:text-indigo-900"
+                    title="Düzenle"
+                  >
+                    <PencilIcon className="h-5 w-5" />
+                  </button>
+                  <button 
+                    onClick={() => onDelete(teacher.id)}
+                    className="text-red-600 hover:text-red-900"
+                    title="Sil"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

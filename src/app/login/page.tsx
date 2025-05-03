@@ -14,7 +14,6 @@ import {
 import supabase from '@/lib/supabase-browser';
 import { getSiteSettings } from '@/lib/site-settings';
 import { COOKIE_NAME } from '@/constants';
-import { requestFCMPermission } from '@/lib/firebase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');

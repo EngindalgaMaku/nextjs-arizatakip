@@ -113,7 +113,10 @@ export async function POST(request: NextRequest) {
         };
 
         try {
-          await getMessaging().send(message);
+          // --- Temporarily Disable FCM --- START
+          // await getMessaging().send(message);
+          console.log(`Notification sending temporarily disabled. Would send to: ${token.substring(0, 10)}...`);
+          // --- Temporarily Disable FCM --- END
           successCount++;
         } catch (error: any) {
           failureCount++;

@@ -8,8 +8,12 @@ import { Toaster } from "react-hot-toast";
 
 // Import the new provider
 import { QueryProvider } from "@/providers/QueryProvider"; 
-import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+// Import Sidebar component with the correct path
+import Sidebar from "@/components/Sidebar"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -50,10 +54,17 @@ export default function RootLayout({
       <body className={inter.className}>
          {/* Remove QueryProvider wrapper */}
         <AuthProvider>
-          <NotificationProvider>
-            {children}
-            <Toaster position="bottom-right" />
-          </NotificationProvider>
+          {/* Remove the NotificationProvider wrapper */}
+          {/* <NotificationProvider> */}
+            <div className="flex h-screen bg-gray-100">
+              {/* <Sidebar /> */}
+              {/* Remove the QueryProvider wrapper */}
+              {/* <QueryProvider> */}
+                {children}
+                <Toaster position="bottom-right" />
+              {/* </QueryProvider> */}
+            </div>
+          {/* </NotificationProvider> */}
         </AuthProvider>
       </body>
     </html>

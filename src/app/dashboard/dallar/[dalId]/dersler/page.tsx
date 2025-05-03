@@ -1,17 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchDalById } from '@/actions/dalActions'; // We need this to get the Dal name
 import { fetchDalDersleri, createDalDers, updateDalDers, deleteDalDers } from '@/actions/dalDersActions';
+import { fetchLabTypes, fetchDalDersLabTypes, setDalDersLabTypes } from '@/actions/labTypeActions'; // Import Lab Type actions
 import { DalDersleriYonetim } from '@/components/dallar/DalDersleriYonetim';
 import { DalDersFormModal } from '@/components/dallar/DalDersFormModal';
 import { DalDers, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
 import { Dal } from '@/types/dallar';
+import { LabType } from '@/types/labTypes'; // Import LabType
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
+import * as z from 'zod';
 
 export default function DalDersleriPage() {
   const params = useParams();
@@ -22,6 +25,7 @@ export default function DalDersleriPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDers, setEditingDers] = useState<DalDers | null>(null);
   const [selectedSinif, setSelectedSinif] = useState<SinifSeviyesi | null>(null);
+  const [selectedLabTypeIds, setSelectedLabTypeIds] = useState<string[]>([]); // State for selected lab types in modal
 
   // Fetch Dal details for title
   const { data: dal, isLoading: isLoadingDal } = useQuery<Dal | null, Error>({
@@ -37,16 +41,37 @@ export default function DalDersleriPage() {
     enabled: !!dalId,
   });
 
+  // Fetch all available Lab Types for the modal dropdown
+  const { data: labTypes = [], isLoading: isLoadingLabTypes } = useQuery<LabType[], Error>({
+    queryKey: ['labTypes'],
+    queryFn: fetchLabTypes,
+  });
+
+  // Fetch associated lab types when editing a lesson
+  useEffect(() => {
+    if (isModalOpen && editingDers?.id) {
+      fetchDalDersLabTypes(editingDers.id).then(ids => {
+        setSelectedLabTypeIds(ids);
+      });
+    } else {
+      setSelectedLabTypeIds([]); // Reset when opening for add or closing
+    }
+  }, [isModalOpen, editingDers]);
+
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (payload: DalDersFormValues) => createDalDers(dalId, payload),
+    mutationFn: (vars: { payload: DalDersFormValues; labTypeIds: string[] }) => createDalDers(dalId, vars.payload, vars.labTypeIds),
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ['dalDersleri', dalId] });
         toast.success('Ders başarıyla eklendi!');
+        if (data.partialError) {
+            toast.warn(data.partialError);
+        }
         setIsModalOpen(false);
       } else {
-        toast.error(`Ders eklenemedi: ${data.error}`);
+        const errorMessage = typeof data.error === 'string' ? data.error : (data.error as z.ZodIssue[]).map(e => e.message).join(', ');
+        toast.error(`Ders eklenemedi: ${errorMessage}`);
       }
     },
     onError: (err) => {
@@ -55,15 +80,19 @@ export default function DalDersleriPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (vars: { dersId: string; payload: DalDersFormValues }) => updateDalDers(vars.dersId, vars.payload),
+    mutationFn: (vars: { dersId: string; payload: DalDersFormValues; labTypeIds: string[] }) => updateDalDers(vars.dersId, vars.payload, vars.labTypeIds),
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ['dalDersleri', dalId] });
         toast.success('Ders başarıyla güncellendi!');
+        if (data.partialError) {
+            toast.warn(data.partialError);
+        }
         setIsModalOpen(false);
         setEditingDers(null);
       } else {
-        toast.error(`Ders güncellenemedi: ${data.error}`);
+        const errorMessage = typeof data.error === 'string' ? data.error : (data.error as z.ZodIssue[]).map(e => e.message).join(', ');
+        toast.error(`Ders güncellenemedi: ${errorMessage}`);
       }
     },
     onError: (err) => {
@@ -105,15 +134,34 @@ export default function DalDersleriPage() {
     }
   };
 
-  const handleFormSubmit = (data: DalDersFormValues) => {
+  const handleFormSubmit = (data: DalDersFormValues & { suitableLabTypeIds?: string[] }) => {
+    // Log the full data received from the modal
+    console.log('[DalDersleriPage] handleFormSubmit called with data:', data);
+    
+    const payload = { 
+        dersAdi: data.dersAdi,
+        haftalikSaat: data.haftalikSaat,
+        sinifSeviyesi: data.sinifSeviyesi,
+        bolunebilir_mi: data.bolunebilir_mi, // Ensure this is included
+        cizelgeye_dahil_et: data.cizelgeye_dahil_et, // Ensure this is included
+        requires_multiple_resources: data.requires_multiple_resources, // Ensure this is included
+    };
+    const labTypeIdsToSave = data.suitableLabTypeIds || []; 
+    
+    console.log("[DalDersleriPage] Prepared Payload:", payload);
+    console.log("[DalDersleriPage] requires_multiple_resources value in payload:", payload.requires_multiple_resources);
+    console.log("[DalDersleriPage] Lab Types to Save:", labTypeIdsToSave);
+
     if (editingDers?.id) {
-      updateMutation.mutate({ dersId: editingDers.id, payload: data });
+      console.log('[DalDersleriPage] Calling updateMutation...');
+      updateMutation.mutate({ dersId: editingDers.id, payload, labTypeIds: labTypeIdsToSave });
     } else {
-      createMutation.mutate(data);
+      console.log('[DalDersleriPage] Calling createMutation...');
+      createMutation.mutate({ payload, labTypeIds: labTypeIdsToSave });
     }
   };
 
-  const isLoading = isLoadingDal || isLoadingDersler;
+  const isLoading = isLoadingDal || isLoadingDersler || isLoadingLabTypes;
   const mutationLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
   const pageTitle = isLoadingDal ? 'Dal Yükleniyor...' : dal ? `${dal.name} - Ders Yönetimi` : 'Dal Bulunamadı';
 
@@ -144,8 +192,21 @@ export default function DalDersleriPage() {
 
       {isModalOpen && selectedSinif && (
         <DalDersFormModal
-          // Pass only dersAdi and haftalikSaat for editing
-          initialData={editingDers ? { sinifSeviyesi: editingDers.sinifSeviyesi, dersAdi: editingDers.dersAdi, haftalikSaat: editingDers.haftalikSaat } : { sinifSeviyesi: selectedSinif, dersAdi: '', haftalikSaat: 0 }}
+          initialData={editingDers ? { 
+              sinifSeviyesi: editingDers.sinifSeviyesi, 
+              dersAdi: editingDers.dersAdi, 
+              haftalikSaat: editingDers.haftalikSaat,
+              bolunebilir_mi: editingDers.bolunebilir_mi,
+              cizelgeye_dahil_et: editingDers.cizelgeye_dahil_et,
+              requires_multiple_resources: editingDers.requires_multiple_resources,
+           } : { 
+              sinifSeviyesi: selectedSinif, 
+              dersAdi: '', 
+              haftalikSaat: 0,
+              bolunebilir_mi: true,
+              cizelgeye_dahil_et: true,
+              requires_multiple_resources: false,
+           }}
           sinifSeviyesi={selectedSinif}
           onSubmit={handleFormSubmit}
           onClose={() => {
@@ -154,6 +215,8 @@ export default function DalDersleriPage() {
               setSelectedSinif(null);
           }}
           loading={mutationLoading}
+          availableLabTypes={labTypes}
+          initialLabTypeIds={selectedLabTypeIds}
         />
       )}
     </div>

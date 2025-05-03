@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { Device, DeviceFormData, DeviceSchema, deviceTypes } from '@/types/devices';
-import { Location, PropertyField } from '@/types/locations'; // Need Location for dropdown type
+import { Device, DeviceFormData, DeviceSchema, deviceTypes, DeviceProperty } from '@/types/devices';
+import { Location } from '@/types/locations'; // Need Location for dropdown type
 import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
 // Type for the location dropdown items
@@ -67,7 +67,7 @@ export default function DeviceForm({
       name: initialData?.name || '',
       type: initialData?.type || '',
       serial_number: initialData?.serial_number || '',
-      department: initialData?.location?.department || '',
+      department: initialData?.department || '',
       location_id: initialData?.location_id || '',
       properties: initialData?.properties || [],
       purchase_date: formatDateForInput(initialData?.purchase_date),
@@ -76,27 +76,6 @@ export default function DeviceForm({
       notes: initialData?.notes || '',
     },
   });
-
-  // Department selection state for filtering locations
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(() => {
-    // Derive initial department from initialData.location or empty
-    return initialData?.location?.department || '';
-  });
-
-  // Filter locations based on selected department
-  const filteredLocations = React.useMemo(() => {
-    if (!selectedDepartment) {
-      return availableLocations;
-    }
-    return availableLocations.filter(loc => loc.department === selectedDepartment);
-  }, [selectedDepartment, availableLocations]);
-
-  // Handle department change
-  const handleDepartmentChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedDepartment(event.target.value);
-    // Reset location selection when department changes
-    setValue('location_id', '');
-  };
 
   const { fields, append, remove, move } = useFieldArray<DeviceFormData, "properties", "id">({
     control,
@@ -111,7 +90,7 @@ export default function DeviceForm({
         name: initialData?.name || '',
         type: initialData?.type || '',
         serial_number: initialData?.serial_number || '',
-        department: availableLocations.find(loc => loc.id === initialData?.location_id)?.department || '',
+        department: initialData?.department || '',
         location_id: initialData?.location_id || '',
         properties: initialData?.properties || [],
         purchase_date: formatDateForInput(initialData?.purchase_date),
@@ -120,16 +99,13 @@ export default function DeviceForm({
         notes: initialData?.notes || '',
      };
     reset(resetData);
-    // Set department based on resetData location
-    const initDept = availableLocations.find(loc => loc.id === resetData.location_id)?.department || '';
-    setSelectedDepartment(initDept);
   }, [initialData, reset, availableLocations, setValue]);
 
   const handleFormSubmit = async (data: DeviceFormData) => {
      // Ensure empty strings become null for optional fields if needed by backend/schema
      const processedData: DeviceFormData = {
          ...data,
-         department: selectedDepartment,
+         department: data.department,
          location_id: data.location_id,
          serial_number: data.serial_number === '' ? null : data.serial_number,
          purchase_date: data.purchase_date === '' ? null : data.purchase_date,
@@ -219,9 +195,8 @@ export default function DeviceForm({
             </label>
             <select
               id="department"
-              value={selectedDepartment}
-              onChange={handleDepartmentChange}
-              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${!selectedDepartment ? 'border-red-500' : ''}`}
+              {...register('department')}
+              className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.department ? 'border-red-500' : ''}`}
             >
               <option value="">-- Departman Seçin --</option>
               {availableDepartments.map((dept) => (
@@ -230,7 +205,7 @@ export default function DeviceForm({
                 </option>
               ))}
             </select>
-            {!selectedDepartment && <p className="mt-1 text-sm text-red-600">Departman seçilmelidir.</p>}
+            {errors.department && <p className="mt-1 text-sm text-red-600">{errors.department.message}</p>}
           </div>
 
           {/* Location Select */}
@@ -244,7 +219,7 @@ export default function DeviceForm({
               className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.location_id ? 'border-red-500' : ''}`}
             >
               <option value="">-- Konum Seçin --</option>
-              {filteredLocations.map((loc) => (
+              {availableLocations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name}
                 </option>

@@ -38,6 +38,27 @@ export default function AreaTeachersPage() {
     queryFn: fetchBranches,
   });
 
+  // Effect to set the default branch selection once branches load
+  useEffect(() => {
+    // Check if branches are loaded, not loading, and default hasn't been set
+    if (!isLoadingBranches && branches.length > 0 && selectedBranch === '') {
+      const defaultBranch = branches.find(branch => branch.name === 'Bilişim Teknolojileri');
+      if (defaultBranch) {
+        setSelectedBranch(defaultBranch.id); // Set state to the ID
+      }
+    }
+    // We only want this effect to potentially run when branches load,
+    // and only *set* the default if selectedBranch is still initial.
+    // Including selectedBranch in deps prevents resetting user selection.
+  }, [branches, isLoadingBranches, selectedBranch]);
+
+  // Log the branches order as received by the component
+  useEffect(() => {
+    if (!isLoadingBranches && branches.length > 0) {
+      console.log('Branches received by component:', JSON.stringify(branches.map(b => b.name)));
+    }
+  }, [branches, isLoadingBranches]);
+
   // Create a map for branch names
   const branchesMap = useMemo(() => {
     const map = new Map<string, string>();

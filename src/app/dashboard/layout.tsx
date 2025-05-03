@@ -13,7 +13,11 @@ import {
   Cog6ToothIcon,
   MapPinIcon,
   AcademicCapIcon,
-  BookOpenIcon
+  BookOpenIcon,
+  BeakerIcon,
+  BuildingLibraryIcon,
+  ComputerDesktopIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 import { signOut, loadUserData } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -131,7 +135,6 @@ export default function DashboardLayout({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen bg-gray-100">
         {/* Mobil Overlay - sidebar açıkken arka planı karartır */}
         {isSidebarOpen && windowWidth < 768 && (
           <div 
@@ -264,25 +267,39 @@ export default function DashboardLayout({
                 <Link
                   href="/dashboard/locations"
                   className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                    pathname.includes("/locations")
+                    pathname.startsWith("/dashboard/locations") 
                       ? "bg-blue-700 text-white"
                       : "text-gray-100 hover:bg-blue-700 hover:text-white"
                   }`}
                 >
-                  <MapPinIcon className="mr-3 h-5 w-5" />
+                  <BuildingLibraryIcon className="mr-3 h-5 w-5" />
                   Lab./Sınıf/Odalar
                 </Link>
 
+                {/* Remove the actual Lab Types link */}
+                {/* 
                 <Link
-                  href="/dashboard/devices" 
+                  href="/dashboard/lab-types"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                    pathname.includes("/lab-types")
+                      ? "bg-blue-700 text-white"
+                      : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                  }`}
+                >
+                  <BeakerIcon className="mr-3 h-5 w-5" />
+                  Laboratuvar Tipleri
+                </Link>
+                */}
+
+                <Link
+                  href="/dashboard/devices"
                   className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
                     pathname.includes("/devices")
                       ? "bg-blue-700 text-white"
                       : "text-gray-100 hover:bg-blue-700 hover:text-white"
                   }`}
                 >
-                   {/* TODO: İkon seçimi yapılabilir, şimdilik Cog6ToothIcon kullanılıyor */}
-                  <Cog6ToothIcon className="mr-3 h-5 w-5" /> 
+                   <Cog6ToothIcon className="mr-3 h-5 w-5" /> 
                   Cihazlar
                 </Link>
 
@@ -369,6 +386,19 @@ export default function DashboardLayout({
                 > 
                   <BookOpenIcon className="mr-3 h-5 w-5" />
                   Kullanım Kılavuzu
+                </Link>
+
+                {/* Otomatik Ders Programı TestMode Link */}
+                <Link
+                  href="/dashboard/scheduling"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                    pathname === '/dashboard/scheduling'
+                      ? "bg-blue-700 text-white"
+                      : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                  }`}
+                >
+                  <ClockIcon className="mr-3 h-5 w-5" /> {/* Replace ClockIcon if needed */}
+                  Otomatik Ders Programı TestMode 
                 </Link>
               </nav>
               
@@ -470,7 +500,6 @@ export default function DashboardLayout({
             {children}
           </main>
         </div>
-      </div>
     </QueryClientProvider>
   );
 } 

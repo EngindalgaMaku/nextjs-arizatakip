@@ -1,0 +1,90 @@
+/** Haftanın günlerini temsil eder */
+export const DAYS_OF_WEEK = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'] as const;
+export type DayOfWeek = typeof DAYS_OF_WEEK[number];
+
+/** Gün içindeki bir ders saatini temsil eder (Örn: 1. saat, 2. saat) */
+export type HourOfDay = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12; // Okulun günlük ders saatine göre ayarlanabilir
+
+/** Belirli bir zaman dilimini temsil eder (Örn: Pazartesi 3. Saat) */
+export interface TimeSlot {
+  day: DayOfWeek;
+  hour: HourOfDay;
+}
+
+/** Çizelgeleme algoritması için basitleştirilmiş öğretmen verisi */
+export interface TeacherScheduleData {
+  id: string;
+  name: string; // Debugging için
+  branchId: string; // Branch ID for matching teachers to lessons
+  unavailableSlots: TimeSlot[]; // Öğretmenin ders veremeyeceği zamanlar
+  assignableLessonIds: string[]; // Verebileceği derslerin ID'leri (dal_dersleri ID)
+}
+
+/** Çizelgeleme algoritması için basitleştirilmiş ders verisi */
+export interface LessonScheduleData {
+  id: string; // Genellikle dal_dersleri.id olacak
+  name: string; // Debugging için
+  dalId: string; // Ait olduğu dalın ID'si (sınıf çakışmaları için)
+  sinifSeviyesi: number; // Ait olduğu sınıf seviyesi (sınıf çakışmaları için)
+  weeklyHours: number; // Haftalık toplam ders saati
+  canSplit: boolean; // Ders bölünebilir mi? (bolunebilir_mi)
+  requiresMultipleResources: boolean; // Aynı anda birden fazla kaynak gerekir mi?
+  needsScheduling: boolean; // Çizelgeye dahil edilecek mi? (cizelgeye_dahil_et)
+  suitableLabTypeIds: string[]; // Uygun lab tipi ID'leri (boşsa normal sınıf)
+  possibleTeacherIds: string[]; // Bu dersi verebilecek öğretmen ID'leri
+  // Duration'ı şimdilik çıkardım, algoritma içinde haftalık saate ve bölünebilirliğe göre karar verilecek.
+}
+
+/** Çizelgeleme algoritması için basitleştirilmiş konum verisi */
+export interface LocationScheduleData {
+  id: string;
+  name: string; // Debugging için
+  labTypeId: string | null; // Konumun lab tipi ID'si (varsa)
+  capacity: number | null; // Konumun kapasitesi (ileride kullanılabilir)
+}
+
+/** Çizelgedeki tek bir ders atamasını temsil eder */
+export interface ScheduledEntry {
+  lessonId: string;        // Atanan LessonScheduleData ID'si (dal_dersleri.id)
+  lessonName: string;      // Ders adı (debugging ve UI için)
+  teacherId: string;       // Atanan öğretmenin ID'si
+  teacherName: string;     // Atanan öğretmenin adı
+  locationId: string;      // Atanan konumun ID'si
+  locationName: string;    // Atanan konumun adı
+  timeSlot: TimeSlot;      // Zaman dilimi
+  dalId: string;           // Dersin ait olduğu dal ID'si (çakışma kontrolü için)
+  sinifSeviyesi: number;   // Dersin sınıf seviyesi (çakışma kontrolü için)
+}
+
+/** Oluşturulan tüm çizelgeyi temsil eder (Zaman dilimi -> Atama) */
+// Map kullanmak erişim için daha verimli olabilir: key = "Pazartesi-1" gibi bir string
+export type Schedule = Map<string, ScheduledEntry>; // Key: `${DayOfWeek}-${HourOfDay}`
+
+/** Algoritma girdilerini bir arada tutan yapı */
+export interface SchedulerInput {
+    teachers: TeacherScheduleData[];
+    lessons: LessonScheduleData[];
+    locations: LocationScheduleData[];
+    timeSlots: TimeSlot[]; // Tüm olası zaman dilimleri (örn: Pazartesi 1-12, Salı 1-12 ...)
+    requiredAssignmentsMap: Map<string, Set<string>>; // Hangi öğretmenin hangi dersleri vermesi zorunlu (TeacherID -> Set<LessonID>)
+}
+
+/** Algoritma çıktısı */
+export interface SchedulerResult {
+    success: boolean;
+    schedule?: Schedule;
+    unassignedLessons?: LessonScheduleData[]; // Atanamayan dersler
+    error?: string; // Algoritma hatası
+    diagnostics?: any; // Hata ayıklama bilgileri (opsiyonel)
+    logs?: string[]; // Algoritma logları
+}
+
+/** SchedulerResult'ın client'a gönderilebilir (serileştirilebilir) versiyonu */
+export interface SerializableSchedulerResult {
+    success: boolean;
+    schedule?: [string, ScheduledEntry][]; // Map yerine Array of [key, value] tuples
+    unassignedLessons?: LessonScheduleData[];
+    error?: string;
+    diagnostics?: any;
+    logs?: string[]; // Algoritma logları
+} 

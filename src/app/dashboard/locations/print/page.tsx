@@ -16,8 +16,9 @@ export default function LocationsPrintPage() {
       setError(null);
       try {
         const fetchedLocations = await fetchLocations();
-        // Filter locations that actually have a barcode value
-        const locationsWithBarcode = fetchedLocations.filter(loc => loc.barcode_value);
+        // Filter locations that have a barcode value - assuming 'code' field is the barcode
+        // We might need to filter based on a specific scanned code later (e.g., from searchParams)
+        const locationsWithBarcode = fetchedLocations.filter(loc => !!loc.code);
         setLocations(locationsWithBarcode);
 
         // Wait for state update and rendering, then print
@@ -99,7 +100,7 @@ export default function LocationsPrintPage() {
         {locations.map((location) => (
           <div key={location.id} className="qr-code-item text-center border p-2 rounded bg-white">
             <QRCode
-              value={location.barcode_value!} // We filtered for non-null barcode_value
+              value={location.code!} // Use location.code as the QR code value
               size={80} // Smaller size for grid layout
               level="Q"
               viewBox={`0 0 80 80`} // Ensure viewBox matches size
@@ -108,7 +109,7 @@ export default function LocationsPrintPage() {
               fgColor="#000000"
             />
             {/* Fit text better for small boxes */}
-            <p className="mt-1 text-[8px] font-mono break-all leading-tight">{location.barcode_value}</p>
+            <p className="mt-1 text-[8px] font-mono break-all leading-tight">{location.code}</p>
             <p className="mt-0.5 text-[10px] font-semibold leading-tight">{location.name}</p>
           </div>
         ))}

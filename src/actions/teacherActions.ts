@@ -213,15 +213,33 @@ export async function fetchBranches(): Promise<Branch[]> {
     const { data, error } = await supabase
         .from('branches')
         .select('id, name')
-        .order('name', { ascending: true });
+        // Custom order: Bilişim Teknolojileri first, then alphabetically
+        .order('name', { 
+            ascending: true, 
+            // Treat 'Bilişim Teknolojileri' specially for sorting
+            // This specific syntax might need adjustment based on Supabase client capabilities
+            // A raw query might be needed if this doesn't work directly
+            nullsFirst: false, // Standard behaviour
+            // Attempting a simplified CASE logic hint (actual implementation depends on client)
+            // Ideally: ORDER BY CASE WHEN name = 'Bilişim Teknolojileri' THEN 0 ELSE 1 END, name ASC
+            // Since direct CASE isn't standard in JS client order, we'll sort client-side instead.
+        });
 
     if (error) {
         console.error('Error fetching branches:', error);
         throw error; 
     }
 
-    const validatedData = (data || []).filter(b => b.id && b.name) as Branch[];
-    return validatedData;
+    let branchesData = (data || []).filter(b => b.id && b.name) as Branch[];
+
+    // Client-side sorting to ensure 'Bilişim Teknolojileri' is first
+    branchesData.sort((a, b) => {
+        if (a.name === 'Bilişim Teknolojileri') return -1; // a comes first
+        if (b.name === 'Bilişim Teknolojileri') return 1;  // b comes first
+        return a.name.localeCompare(b.name); // Otherwise, sort alphabetically
+    });
+
+    return branchesData;
 }
 
 /**

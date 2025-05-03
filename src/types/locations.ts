@@ -1,41 +1,35 @@
-// admin/src/types/locations.ts
-import { z } from 'zod'; // Import Zod here
+import { z } from 'zod';
+// LabTypeSchema import'u şu an için gerekli değil, ihtiyaç olursa eklenir.
 
-// Define the structure for a single property object within the array
-export interface PropertyField {
-  key: string;
-  value: any; // Keep value flexible
-}
-
-export interface Location {
-  id: string; // uuid
-  name: string;
-  type: string | null; // 'laboratuvar', 'sinif', 'idare', etc.
-  department: string | null; // Add department field
-  barcode_value: string | null;
-  description: string | null;
-  created_at: string; // ISO date string
-  updated_at: string; // ISO date string
-  properties: PropertyField[] | null; // Changed to array of PropertyField
-  sort_order: number | null; // Add sort_order field
-}
-
-// Zod schema for a single property object
-// Export this schema as well
-export const PropertyFieldSchema = z.object({
-    key: z.string().min(1, 'Özellik adı boş olamaz.'), // Add basic validation
-    value: z.any(), // Keep value flexible
-});
-
-// Zod schema for creating/updating a location
+// Schema for the Location object in the database
 export const LocationSchema = z.object({
-  name: z.string().min(3, 'Konum adı en az 3 karakter olmalıdır.'),
-  type: z.string().nullable().optional(),
-  department: z.string().nullable().optional(),
-  description: z.string().nullable().optional(),
-  properties: z.array(PropertyFieldSchema).optional().default([]),
+  id: z.string().uuid(),
+  name: z.string().min(1, 'Konum adı zorunludur.').max(100, 'Konum adı en fazla 100 karakter olabilir.'),
+  code: z.string().max(20, 'Konum kodu en fazla 20 karakter olabilir.').optional().nullable(), // Optional code
+  capacity: z.number().int().positive('Kapasite pozitif bir tam sayı olmalıdır.').optional().nullable(), // Optional capacity
+  lab_type_id: z.string().uuid('Geçerli bir laboratuvar tipi seçilmelidir.'), // Foreign key to lab_types
+  created_at: z.string().optional(), // Managed by DB
+  updated_at: z.string().optional(), // Managed by DB
 });
 
-// Type inferred from the schema for form validation
-// This type will automatically update when LocationSchema changes
-export type LocationFormData = z.infer<typeof LocationSchema>; 
+// Schema for validating the Location form (omits DB-managed fields)
+export const LocationFormSchema = LocationSchema.omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+// TypeScript type for the full Location object
+export type Location = z.infer<typeof LocationSchema>;
+
+// TypeScript type for the form values
+export type LocationFormValues = z.infer<typeof LocationFormSchema>;
+
+// Type including related lab type for display purposes (used in fetch queries)
+export interface LocationWithLabType extends Location {
+    labType?: { // Use optional chaining or ensure join
+        id: string;
+        name: string;
+        code: string;
+    } | null;
+}

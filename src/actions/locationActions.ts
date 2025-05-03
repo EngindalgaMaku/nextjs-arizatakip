@@ -1,327 +1,169 @@
 'use server';
 
-import { supabase } from '@/lib/supabase'; // Assuming this is your server-side client
-import { Location, LocationFormData, LocationSchema } from '@/types/locations';
+import { supabase } from '@/lib/supabase';
+import { Location, LocationFormValues, LocationFormSchema, LocationWithLabType, LocationSchema } from '@/types/locations';
+// LabType'ı doğrudan kullanmıyoruz ama ilişki için önemli
+// import { LabType } from '@/types/labTypes';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 /**
- * Fetches all locations from the database.
+ * Fetch all locations with their associated lab type information.
  */
-export async function fetchLocations(): Promise<Location[]> {
-  // Order by the new sort_order column. Default ASC usually puts NULLS LAST.
-  const { data, error } = await supabase
-      .from('locations')
-      .select('*')
-      .order('sort_order', { ascending: true });
-
-  if (error) {
-    console.error('Original Supabase Error fetching locations:', error); // Keep logging
-    // Throw the original Supabase error for better debugging
-    throw error; 
-    // throw new Error('Konumlar getirilirken bir hata oluştu.'); // Temporarily disable generic error
-  }
-
-  // Ensure data matches the Location interface, handling potential nulls if needed
-  return data as Location[];
-}
-
-// Fetch only laboratory locations for selection
-export async function fetchLaboratoryLocations(): Promise<{ id: string; name: string }[]> {
+export async function fetchLocations(): Promise<LocationWithLabType[]> {
   const { data, error } = await supabase
     .from('locations')
-    .select('id, name')
-    .eq('type', 'laboratuvar') // Filter by type
+    .select(`
+      *,
+      labType:lab_types ( id, name, code )
+    `)
     .order('name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching laboratory locations:', error);
-    // Depending on desired behavior, you might throw or return empty
-    return []; 
+    console.error('Error fetching locations:', error);
+    throw error;
   }
-  return data || [];
+
+  // Map data to ensure correct structure and type
+  const locations = data.map(loc => ({
+    ...loc,
+    // Cast labType explictly to handle potential null or incorrect types from join
+    labType: loc.labType ? {
+        id: (loc.labType as any).id,
+        name: (loc.labType as any).name,
+        code: (loc.labType as any).code,
+    } : null,
+  })) as LocationWithLabType[];
+
+
+  return locations;
 }
 
 /**
- * Fetches a single location by its ID.
+ * Fetch a single location by its ID.
+ * Used for populating the edit form. Returns only Location data, not LabType.
  */
 export async function fetchLocationById(id: string): Promise<Location | null> {
-  if (!id) {
-    return null;
-  }
+  if (!id) return null;
 
   const { data, error } = await supabase
     .from('locations')
-    .select('*') // Select all columns for details
+    .select('*') // Select only columns from locations table
     .eq('id', id)
     .single();
 
   if (error) {
     console.error(`Error fetching location ${id}:`, error);
-    if (error.code === 'PGRST116') {
-      return null; // Return null if not found
+    if (error.code === 'PGRST116') { // Not Found
+      return null;
     }
-    throw error; // Throw other errors
+    throw error;
   }
 
-  return data as Location | null;
+  // Validate data against the base LocationSchema
+  const parseResult = LocationSchema.safeParse(data);
+  if (!parseResult.success) {
+      console.error('Fetched location data validation failed:', parseResult.error);
+      return null;
+  }
+
+  return parseResult.data;
 }
 
-// --- CRUD Operations --- 
-
 /**
- * Creates a new location.
- * @param formData - Data from the location form.
+ * Create a new location.
  */
-export async function createLocation(formData: LocationFormData): Promise<{ success: boolean; error?: string; location?: Location }> {
-  const validation = LocationSchema.safeParse(formData);
-  if (!validation.success) {
-    console.error('Validation Error:', validation.error.errors);
-    return { success: false, error: validation.error.errors.map(e => e.message).join(', ') };
+export async function createLocation(payload: LocationFormValues): Promise<{ success: boolean; location?: Location; error?: string | z.ZodIssue[] }> {
+  // Use LocationFormSchema for validation
+  const parse = LocationFormSchema.safeParse(payload);
+  if (!parse.success) {
+    return { success: false, error: parse.error.issues };
   }
 
-  // Revert destructuring
-  const { name, type, description, properties, department } = validation.data;
-
   try {
-    // Get the current maximum sort_order
-    const { data: maxOrderData, error: maxOrderError } = await supabase
+    const { data, error } = await supabase
       .from('locations')
-      .select('sort_order')
-      .order('sort_order', { ascending: false, nullsFirst: false })
-      .limit(1)
-      .single();
-
-    if (maxOrderError && maxOrderError.code !== 'PGRST116') { // Ignore error if table is empty
-      console.error("Error fetching max sort_order:", maxOrderError);
-      throw new Error('Sıralama bilgisi alınırken hata oluştu.');
-    }
-
-    const nextOrder = (maxOrderData?.sort_order ?? 0) + 1;
-    
-    // Revert insertData structure
-    const insertData = {
-        name,
-        type: type || null,
-        department: department || null,
-        description: description || null,
-        properties: properties || [],
-        sort_order: nextOrder,
-        // Remove selected_..._id fields
-      };
-
-    // Insert the main location data
-    const { data: newLocationData, error: insertError } = await supabase
-      .from('locations')
-      .insert(insertData)
+      .insert(parse.data) // Insert validated form data
       .select()
       .single();
 
-    if (insertError || !newLocationData) {
-      console.error('Error inserting location:', insertError);
-      throw new Error(insertError?.message || 'Konum eklenirken bir veritabanı hatası oluştu.');
+    if (error || !data) {
+      console.error('Error creating location:', error?.message);
+      if (error?.code === '23505') { // Unique constraint violation
+        return { success: false, error: 'Bu kod veya isim ile başka bir konum zaten mevcut olabilir.' };
+      }
+       if (error?.code === '23503') { // Foreign key violation
+            return { success: false, error: 'Seçilen Laboratuvar Tipi geçersiz veya bulunamadı.' };
+       }
+      return { success: false, error: error?.message || 'Konum oluşturulamadı.' };
     }
 
-    // Update the newly created location to set barcode_value = id
-    const { data: updatedLocation, error: updateError } = await supabase
-      .from('locations')
-      .update({ barcode_value: newLocationData.id })
-      .eq('id', newLocationData.id)
-      .select()
-      .single();
-
-    if (updateError || !updatedLocation) {
-       console.error('Error setting barcode for location:', updateError);
-       // Optionally: attempt to delete the previously inserted row for consistency?
-       // Or just report the error.
-       throw new Error(updateError?.message || 'Konum barkodu ayarlanırken bir hata oluştu.');
-    }
-
-    // Revalidate the path to update the UI
     revalidatePath('/dashboard/locations');
 
-    return { success: true, location: updatedLocation as Location };
+    // Validate the final result against the full LocationSchema
+    const finalParse = LocationSchema.safeParse(data);
+     if (!finalParse.success) {
+        console.error('Created location data validation failed:', finalParse.error);
+        // Return success=true but maybe indicate a data issue? Or handle differently.
+        return { success: true, location: undefined, error: 'Konum oluşturuldu ancak veri doğrulanamadı.' };
+    }
 
-  } catch (error) {
-    console.error('Create Location Error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Konum oluşturulurken bilinmeyen bir hata oluştu.' 
-    };
+    return { success: true, location: finalParse.data };
+  } catch (err) {
+    console.error('createLocation error:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 /**
- * Updates an existing location.
- * @param id - The ID of the location to update.
- * @param formData - Data from the location form.
+ * Update an existing location.
  */
-export async function updateLocation(id: string, formData: LocationFormData): Promise<{ success: boolean; error?: string; location?: Location }> {
-  if (!id) {
-    return { success: false, error: 'Location ID to update not provided.'};
+export async function updateLocation(id: string, payload: LocationFormValues): Promise<{ success: boolean; location?: Location; error?: string | z.ZodIssue[] }> {
+  // Use LocationFormSchema for validation
+  const parse = LocationFormSchema.safeParse(payload);
+  if (!parse.success) {
+    return { success: false, error: parse.error.issues };
   }
-
-  const validation = LocationSchema.safeParse(formData);
-  if (!validation.success) {
-    console.error('Validation Error:', validation.error.errors);
-    return { success: false, error: validation.error.errors.map(e => e.message).join(', ') };
-  }
-
-  // Revert destructuring
-  const { name, type, description, properties, department } = validation.data;
 
   try {
-     // Revert updateData structure
-     const updateData = {
-        name,
-        type: type || null,
-        department: department || null,
-        description: description || null,
-        properties: properties || [], // Ensure properties is an array
-        // Remove selected_..._id fields
-        updated_at: new Date().toISOString(),
-      };
-
-    const { data: updatedLocation, error } = await supabase
+    const { data, error } = await supabase
       .from('locations')
-      .update(updateData)
+      .update(parse.data) // Update with validated form data
       .eq('id', id)
       .select()
       .single();
 
-    if (error || !updatedLocation) {
-      console.error('Error updating location:', error);
-      throw new Error(error?.message || 'Konum güncellenirken bir veritabanı hatası oluştu.');
+    if (error || !data) {
+      console.error(`Error updating location ${id}:`, error?.message);
+      if (error?.code === '23505') { // Unique constraint violation
+        return { success: false, error: 'Bu kod veya isim ile başka bir konum zaten mevcut olabilir.' };
+      }
+      if (error?.code === '23503') { // Foreign key violation
+            return { success: false, error: 'Seçilen Laboratuvar Tipi geçersiz veya bulunamadı.' };
+      }
+      return { success: false, error: error?.message || 'Konum güncellenemedi.' };
     }
 
     revalidatePath('/dashboard/locations');
-    return { success: true, location: updatedLocation as Location };
 
-  } catch (error) {
-    console.error('Update Location Error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Konum güncellenirken bilinmeyen bir hata oluştu.'
-    };
+     // Validate the final result against the full LocationSchema
+    const finalParse = LocationSchema.safeParse(data);
+     if (!finalParse.success) {
+        console.error('Updated location data validation failed:', finalParse.error);
+        return { success: true, location: undefined, error: 'Konum güncellendi ancak veri doğrulanamadı.' };
+    }
+
+    return { success: true, location: finalParse.data };
+  } catch (err) {
+    console.error('updateLocation error:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 /**
- * Moves a location up or down in the manual sort order.
- * @param locationId The ID of the location to move.
- * @param direction 'up' or 'down'.
- */
-export async function moveLocation(locationId: string, direction: 'up' | 'down'): Promise<{ success: boolean; error?: string }> {
-  if (!locationId || !direction) {
-    return { success: false, error: 'Gerekli parametreler eksik.' }; // Missing required parameters
-  }
-
-  try {
-    // --- Step 1: Get the current location's sort_order ---
-    const { data: currentLocation, error: currentError } = await supabase
-      .from('locations')
-      .select('id, sort_order')
-      .eq('id', locationId)
-      .single();
-
-    if (currentError || !currentLocation) {
-      console.error('Error fetching location to move:', currentError);
-      throw new Error('Taşınacak konum bulunamadı veya getirilemedi.');
-    }
-
-    if (currentLocation.sort_order === null || currentLocation.sort_order === undefined) {
-        return { success: false, error: 'Bu konumun manuel bir sırası yok, taşınamaz.' };
-    }
-
-    // --- Step 2: Find the location to swap with ---
-    let query;
-    if (direction === 'up') {
-      // Find the item with the largest sort_order LESS THAN current's sort_order
-      query = supabase
-        .from('locations')
-        .select('id, sort_order')
-        .lt('sort_order', currentLocation.sort_order)
-        .order('sort_order', { ascending: false })
-        .limit(1);
-    } else { // direction === 'down'
-      // Find the item with the smallest sort_order GREATER THAN current's sort_order
-      query = supabase
-        .from('locations')
-        .select('id, sort_order')
-        .gt('sort_order', currentLocation.sort_order)
-        .order('sort_order', { ascending: true })
-        .limit(1);
-    }
-
-    const { data: swapLocations, error: swapError } = await query;
-
-    if (swapError) {
-      console.error('Error finding swap partner:', swapError);
-      throw new Error('Yer değiştirilecek konum bulunurken hata oluştu.');
-    }
-
-    const swapLocation = swapLocations?.[0];
-
-    // --- Step 3: Check if move is possible ---
-    if (!swapLocation || swapLocation.sort_order === null || swapLocation.sort_order === undefined) {
-      return { success: false, error: `Konum zaten en ${direction === 'up' ? 'üstte' : 'altta'}.` };
-    }
-
-    // --- Step 4: Perform the swap (Ideally in a transaction) ---
-
-    // Update 1: Set current location's order to swap location's order
-    const { error: update1Error } = await supabase
-      .from('locations')
-      .update({ sort_order: swapLocation.sort_order })
-      .eq('id', currentLocation.id);
-
-    if (update1Error) {
-      console.error('Error updating current location order:', update1Error);
-      throw new Error('Konum sırası güncellenirken hata oluştu (adım 1).');
-    }
-
-    // Update 2: Set swap location's order to current location's original order
-    const { error: update2Error } = await supabase
-      .from('locations')
-      .update({ sort_order: currentLocation.sort_order })
-      .eq('id', swapLocation.id);
-
-    if (update2Error) {
-      console.error('Error updating swap location order:', update2Error);
-      // Attempt to revert the first update for consistency
-      console.warn(`Attempting to revert sort_order for ${currentLocation.id}`);
-      const { error: revertError } = await supabase
-          .from('locations')
-          .update({ sort_order: currentLocation.sort_order }) // Revert to original
-          .eq('id', currentLocation.id);
-      if (revertError) console.error('Failed to revert update1:', revertError);
-      throw new Error('Konum sırası güncellenirken hata oluştu (adım 2). Değişiklikler geri alınmaya çalışıldı.');
-    }
-
-    // --- Step 5: Revalidate ---
-    revalidatePath('/dashboard/locations');
-    return { success: true };
-
-  } catch (error) {
-    console.error('Move Location Error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Konum taşınırken bilinmeyen bir hata oluştu.'
-    };
-  }
-}
-
-/**
- * Deletes a location.
- * @param id - The ID of the location to delete.
+ * Delete a location by ID.
  */
 export async function deleteLocation(id: string): Promise<{ success: boolean; error?: string }> {
-   // Validate ID
-  if (!id) {
-    // Use a standard English error message to avoid syntax issues
-    return { success: false, error: 'Location ID to delete not provided.'}; 
-  }
-
   try {
     const { error } = await supabase
       .from('locations')
@@ -329,18 +171,18 @@ export async function deleteLocation(id: string): Promise<{ success: boolean; er
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting location:', error);
-      throw new Error(error.message || 'Konum silinirken bir veritabanı hatası oluştu.');
+      console.error(`Error deleting location ${id}:`, error);
+       if (error.code === '23503') { // Foreign key constraint violation
+            return { success: false, error: 'Bu konum başka kayıtlarda (çizelgeler vb.) kullanıldığı için silinemez.' };
+       }
+      return { success: false, error: error.message };
     }
 
     revalidatePath('/dashboard/locations');
-    return { success: true };
 
-  } catch (error) {
-     console.error('Delete Location Error:', error);
-     return { 
-       success: false, 
-       error: error instanceof Error ? error.message : 'Konum silinirken bilinmeyen bir hata oluştu.'
-     };
+    return { success: true };
+  } catch (err) {
+    console.error('deleteLocation error:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
-} 
+}

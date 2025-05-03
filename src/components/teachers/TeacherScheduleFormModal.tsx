@@ -11,7 +11,7 @@ import {
   TIME_SLOTS
 } from '@/types/teacherSchedules';
 import { useQuery } from '@tanstack/react-query';
-import { fetchLaboratoryLocations } from '@/actions/locationActions';
+import { fetchLocations } from '@/actions/locationActions';
 import { fetchDistinctDersAdlari } from '@/actions/dalDersActions';
 import { fetchClasses } from '@/actions/classActions';
 import type { Class } from '@/types/classes';
@@ -37,7 +37,7 @@ export function TeacherScheduleFormModal({
 
   const { data: labLocations = [], isLoading: isLoadingLabs } = useQuery({
       queryKey: ['laboratoryLocations'],
-      queryFn: fetchLaboratoryLocations,
+      queryFn: fetchLocations,
   });
 
   const { data: distinctDersler = [], isLoading: isLoadingDersler } = useQuery<string[]>({ 

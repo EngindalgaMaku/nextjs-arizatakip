@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { DalDers, DalDersFormSchema, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod'; // Assuming zod might be needed or remove if not
-
+import { setDalDersLabTypes } from '@/actions/labTypeActions';
 /**
  * Fetch all lessons for a specific branch (dal).
  */
@@ -31,6 +31,9 @@ export async function fetchDalDersleri(dalId: string): Promise<DalDers[]> {
       sinifSeviyesi: ders.sinif_seviyesi as SinifSeviyesi, // Cast to specific literal type
       dersAdi: ders.ders_adi,
       haftalikSaat: ders.haftalik_saat,
+      requires_multiple_resources: ders.requires_multiple_resources,
+      bolunebilir_mi: ders.bolunebilir_mi,
+      cizelgeye_dahil_et: ders.cizelgeye_dahil_et,
       createdAt: ders.created_at,
       updatedAt: ders.updated_at,
   })) || [];
@@ -39,15 +42,16 @@ export async function fetchDalDersleri(dalId: string): Promise<DalDers[]> {
 }
 
 /**
- * Create a new lesson entry for a branch.
+ * Create a new lesson entry for a branch and set its suitable lab types.
  */
 export async function createDalDers(
   dalId: string,
-  payload: DalDersFormValues
-): Promise<{ success: boolean; ders?: DalDers; error?: string }> {
+  payload: DalDersFormValues,
+  suitableLabTypeIds: string[] = []
+): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string }> {
   const parse = DalDersFormSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    return { success: false, error: parse.error.issues };
   }
 
   const dersData = {
@@ -55,34 +59,57 @@ export async function createDalDers(
     sinif_seviyesi: parse.data.sinifSeviyesi,
     ders_adi: parse.data.dersAdi,
     haftalik_saat: parse.data.haftalikSaat,
+    bolunebilir_mi: parse.data.bolunebilir_mi ?? true,
+    cizelgeye_dahil_et: parse.data.cizelgeye_dahil_et ?? true,
+    requires_multiple_resources: parse.data.requires_multiple_resources ?? false,
   };
 
+  // Log the data being sent to Supabase
+  console.log('[createDalDers] Data to insert:', dersData);
+  console.log('[createDalDers] requires_multiple_resources value being sent:', dersData.requires_multiple_resources);
+
+  let createdDersRecord: any = null;
+
   try {
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from('dal_dersleri')
       .insert(dersData)
       .select()
       .single();
 
-    if (error || !data) {
-      console.error('Error creating dal dersi:', error?.message);
-      if (error?.code === '23505') { // Handle unique constraint violation
+    if (insertError || !data) {
+      console.error('Error creating dal dersi:', insertError?.message);
+      if (insertError?.code === '23505') {
           return { success: false, error: 'Bu sınıfta bu ders zaten mevcut.' };
       }
-      return { success: false, error: error?.message || 'Ders oluşturulamadı.' };
+      return { success: false, error: insertError?.message || 'Ders oluşturulamadı.' };
     }
+    createdDersRecord = data;
+
+    const { success: setTypesSuccess, error: setTypesError } = await setDalDersLabTypes(createdDersRecord.id, suitableLabTypeIds);
+
+    let partialError: string | undefined = undefined;
+    if (!setTypesSuccess) {
+        console.warn(`Dal dersi ${createdDersRecord.id} oluşturuldu ancak lab tipleri ayarlanamadı:`, setTypesError);
+        partialError = `Ders oluşturuldu ancak lab tipleri ayarlanamadı: ${setTypesError}`; 
+    }
+
     revalidatePath(`/dashboard/dallar/${dalId}/dersler`);
-    // Map back to camelCase
-    const createdDers = { 
-        id: data.id,
-        dalId: data.dal_id,
-        sinifSeviyesi: data.sinif_seviyesi as SinifSeviyesi,
-        dersAdi: data.ders_adi,
-        haftalikSaat: data.haftalik_saat,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+
+    const createdDers: DalDers = { 
+        id: createdDersRecord.id,
+        dalId: createdDersRecord.dal_id,
+        sinifSeviyesi: createdDersRecord.sinif_seviyesi as SinifSeviyesi,
+        dersAdi: createdDersRecord.ders_adi,
+        haftalikSaat: createdDersRecord.haftalik_saat,
+        requires_multiple_resources: createdDersRecord.requires_multiple_resources,
+        bolunebilir_mi: createdDersRecord.bolunebilir_mi,
+        cizelgeye_dahil_et: createdDersRecord.cizelgeye_dahil_et,
+        createdAt: createdDersRecord.created_at,
+        updatedAt: createdDersRecord.updated_at,
     };
-    return { success: true, ders: createdDers as DalDers };
+    
+    return { success: true, ders: createdDers, partialError };
   } catch (err) {
     console.error('createDalDers error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -90,25 +117,34 @@ export async function createDalDers(
 }
 
 /**
- * Update an existing branch lesson.
+ * Update an existing branch lesson and its suitable lab types.
  */
 export async function updateDalDers(
-  dersId: string, 
-  payload: DalDersFormValues
-): Promise<{ success: boolean; ders?: DalDers; error?: string }> {
+  dersId: string,
+  payload: DalDersFormValues,
+  suitableLabTypeIds: string[]
+): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string }> {
   const parse = DalDersFormSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    return { success: false, error: parse.error.issues };
   }
 
   const dersData = {
     sinif_seviyesi: parse.data.sinifSeviyesi,
     ders_adi: parse.data.dersAdi,
     haftalik_saat: parse.data.haftalikSaat,
+    bolunebilir_mi: parse.data.bolunebilir_mi ?? true,
+    cizelgeye_dahil_et: parse.data.cizelgeye_dahil_et ?? true,
+    requires_multiple_resources: parse.data.requires_multiple_resources ?? false,
   };
+  
+  // Log the data being sent to Supabase
+  console.log(`[updateDalDers] Data to update for dersId ${dersId}:`, dersData);
+  console.log('[updateDalDers] requires_multiple_resources value being sent:', dersData.requires_multiple_resources);
+
+  let updatedDersRecord: any = null;
 
   try {
-    // We need the dal_id for revalidation, fetch it first (or pass it)
     const { data: existingData, error: fetchError } = await supabase
       .from('dal_dersleri')
       .select('dal_id')
@@ -116,40 +152,51 @@ export async function updateDalDers(
       .single();
 
     if (fetchError || !existingData) {
-       console.error('Error fetching dal_id for revalidation:', fetchError);
-       // Continue update, but log warning about revalidation
+       console.warn('Error fetching dal_id for revalidation:', fetchError?.message);
     }
 
-    const { data, error } = await supabase
+    const { data, error: updateError } = await supabase
       .from('dal_dersleri')
       .update(dersData)
       .eq('id', dersId)
       .select()
       .single();
 
-    if (error || !data) {
-      console.error('Error updating dal dersi:', error?.message);
-      if (error?.code === '23505') { // Handle unique constraint violation
+    if (updateError || !data) {
+      console.error('Error updating dal dersi:', updateError?.message);
+      if (updateError?.code === '23505') {
           return { success: false, error: 'Bu sınıfta bu ders zaten mevcut.' };
       }
-      return { success: false, error: error?.message || 'Ders güncellenemedi.' };
+      return { success: false, error: updateError?.message || 'Ders güncellenemedi.' };
     }
+    updatedDersRecord = data;
+
+    const { success: setTypesSuccess, error: setTypesError } = await setDalDersLabTypes(updatedDersRecord.id, suitableLabTypeIds);
     
+    let partialError: string | undefined = undefined;
+    if (!setTypesSuccess) {
+        console.warn(`Dal dersi ${updatedDersRecord.id} güncellendi ancak lab tipleri ayarlanamadı:`, setTypesError);
+        partialError = `Ders güncellendi ancak lab tipleri ayarlanamadı: ${setTypesError}`; 
+    }
+
     if (existingData?.dal_id) {
         revalidatePath(`/dashboard/dallar/${existingData.dal_id}/dersler`);
     }
-    
-    // Map back to camelCase
-     const updatedDers = { 
-        id: data.id,
-        dalId: data.dal_id,
-        sinifSeviyesi: data.sinif_seviyesi as SinifSeviyesi,
-        dersAdi: data.ders_adi,
-        haftalikSaat: data.haftalik_saat,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+
+    const updatedDers: DalDers = { 
+        id: updatedDersRecord.id,
+        dalId: updatedDersRecord.dal_id,
+        sinifSeviyesi: updatedDersRecord.sinif_seviyesi as SinifSeviyesi,
+        dersAdi: updatedDersRecord.ders_adi,
+        haftalikSaat: updatedDersRecord.haftalik_saat,
+        requires_multiple_resources: updatedDersRecord.requires_multiple_resources,
+        bolunebilir_mi: (updatedDersRecord.bolunebilir_mi as boolean) ?? true,
+        cizelgeye_dahil_et: updatedDersRecord.cizelgeye_dahil_et,
+        createdAt: updatedDersRecord.created_at,
+        updatedAt: updatedDersRecord.updated_at,
     };
-    return { success: true, ders: updatedDers as DalDers };
+
+    return { success: true, ders: updatedDers, partialError };
   } catch (err) {
     console.error('updateDalDers error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -161,15 +208,14 @@ export async function updateDalDers(
  */
 export async function deleteDalDers(dersId: string): Promise<{ success: boolean; error?: string }> {
    try {
-     // We need the dal_id for revalidation, fetch it first
-    const { data: existingData, error: fetchError } = await supabase
+     const { data: existingData, error: fetchError } = await supabase
       .from('dal_dersleri')
       .select('dal_id')
       .eq('id', dersId)
       .single();
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // Ignore if not found already
-       console.error('Error fetching dal_id for revalidation before delete:', fetchError);
+    if (fetchError && fetchError.code !== 'PGRST116') {
+       console.warn('Error fetching dal_id for revalidation before delete:', fetchError?.message);
     }
 
     const { error } = await supabase
@@ -220,18 +266,24 @@ export async function fetchDistinctDersAdlari(): Promise<string[]> {
 
 /**
  * Fetches distinct lessons suitable for select options.
- * Returns an array of { id, dersAdi } objects.
- * Uses the ID of the first occurrence found for each distinct name.
+ * Returns an array of { id, dersAdi, sinifSeviyesi, dalAdi } objects.
+ * Uses the ID and details of the first occurrence found for each distinct name.
  */
-export async function fetchAllDersOptions(): Promise<{ id: string; dersAdi: string }[]> {
-  // Fetch all lessons, selecting only id and ders_adi
+export async function fetchAllDersOptions(): Promise<{ id: string; dersAdi: string; sinifSeviyesi: number; dalAdi: string }[]> {
   const { data, error } = await supabase
     .from('dal_dersleri')
-    .select('id, ders_adi')
-    .order('ders_adi'); // Order to potentially get consistent "first" ID
+    // Select related dal name as well
+    .select(`
+      id, 
+      ders_adi, 
+      sinif_seviyesi,
+      dal:dallar ( name )
+    `)
+    .order('dal(name)') // Order by branch name first
+    .order('ders_adi'); // Then by lesson name
 
   if (error) {
-    console.error('Error fetching all ders options:', error);
+    console.error('Error fetching all ders options with dal:', error);
     return [];
   }
 
@@ -239,16 +291,22 @@ export async function fetchAllDersOptions(): Promise<{ id: string; dersAdi: stri
     return [];
   }
 
-  // Use a Map to keep only the first entry for each distinct ders_adi
-  const distinctDersMap = new Map<string, { id: string; dersAdi: string }>();
-  for (const ders of data) {
-    if (ders.ders_adi && !distinctDersMap.has(ders.ders_adi)) {
-      distinctDersMap.set(ders.ders_adi, { id: ders.id, dersAdi: ders.ders_adi });
-    }
-  }
+  // Map to the desired structure, including dalAdi
+  const options = data.map(ders => {
+    // Cast related dal object to any to bypass strict type checking for name access
+    const relatedDal: any = ders.dal;
+    const dalName = Array.isArray(relatedDal) ? relatedDal[0]?.name : relatedDal?.name;
+    
+    return {
+      id: ders.id,
+      dersAdi: ders.ders_adi,
+      sinifSeviyesi: Number(ders.sinif_seviyesi),
+      dalAdi: dalName || 'Bilinmeyen Dal',
+    };
+  }).filter(ders => !isNaN(ders.sinifSeviyesi));
+  
+  // Note: This fetches all lessons, not distinct by name anymore, which might be intended for this dropdown.
+  // If distinct by name IS required, the Map logic needs to be re-introduced and adapted.
 
-  // Convert Map values back to an array
-  const options = Array.from(distinctDersMap.values());
-
-  return options; // Already sorted by ders_adi due to initial query order
+  return options;
 } 

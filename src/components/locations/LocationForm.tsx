@@ -1,88 +1,63 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { Location, LocationFormData, LocationSchema, PropertyField } from '@/types/locations';
+import { useForm } from 'react-hook-form';
+import { Location, LocationFormValues, LocationFormSchema } from '@/types/locations';
 import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
+// Define LabType for props
+interface LabTypeSelectItem {
+    id: string;
+    name: string;
+}
+
 interface LocationFormProps {
-  onSubmit: (data: LocationFormData) => Promise<void>;
+  onSubmit: (data: LocationFormValues) => Promise<void>;
   onClose: () => void;
   initialData?: Location | null;
   isSubmitting: boolean;
+  availableLabTypes: LabTypeSelectItem[]; // Add prop for lab types
 }
-
-// Basic list of types - consider fetching from DB or constants if more dynamic
-const locationTypes = [
-  { value: 'sinif', label: 'Sınıf' },
-  { value: 'laboratuvar', label: 'Laboratuvar' },
-  { value: 'idare', label: 'İdare' },
-  { value: 'ogretmenler_odasi', label: 'Öğretmenler Odası' },
-  { value: 'atolye', label: 'Atölye' },
-  { value: 'diger', label: 'Diğer' },
-];
-
-// Departman listesi
-const departments = [
-  { value: 'bilisim', label: 'Bilişim Teknolojileri' },
-  { value: 'muhasebe', label: 'Muhasebe' },
-  { value: 'halkla_iliskiler', label: 'Halkla İlişkiler' },
-  { value: 'gazetecilik', label: 'Gazetecilik' },
-  { value: 'radyo_tv', label: 'Radyo ve Televizyon' },
-  { value: 'plastik_sanatlar', label: 'Plastik Sanatlar' },
-  { value: 'idare', label: 'İdare' },
-  { value: 'diger', label: 'Diğer' },
-];
 
 export default function LocationForm({ 
   onSubmit, 
   onClose, 
   initialData,
-  isSubmitting
+  isSubmitting,
+  availableLabTypes // Destructure new prop
 }: LocationFormProps) {
-  const initialPropertiesArray = initialData?.properties || [];
-
   const { 
     register, 
     control,
     handleSubmit, 
     formState: { errors },
     reset,
-  } = useForm<LocationFormData>({
+  } = useForm<LocationFormValues>({
     defaultValues: {
       name: initialData?.name || '',
-      type: initialData?.type || '',
-      department: initialData?.department || '',
-      description: initialData?.description || '',
-      properties: initialPropertiesArray, 
+      code: initialData?.code || '',
+      capacity: initialData?.capacity ?? undefined, // Use undefined for optional number
+      lab_type_id: initialData?.lab_type_id || '',
     },
-  });
-
-  const { fields, append, remove, move } = useFieldArray<LocationFormData, "properties", "id">({
-    control,
-    name: "properties",
   });
 
   useEffect(() => {
      const resetData = {
         name: initialData?.name || '',
-        type: initialData?.type || '',
-        department: initialData?.department || '',
-        description: initialData?.description || '',
-        properties: initialData?.properties || [],
+        code: initialData?.code || '',
+        capacity: initialData?.capacity ?? undefined,
+        lab_type_id: initialData?.lab_type_id || '',
      };
     reset(resetData);
   }, [initialData, reset]);
 
-  const handleFormSubmit = async (data: LocationFormData) => {
-    const validation = LocationSchema.safeParse(data);
+  const handleFormSubmit = async (data: LocationFormValues) => {
+    const validation = LocationFormSchema.safeParse(data);
 
     if (!validation.success) {
         console.error("Zod Validation Error:", validation.error.errors);
-        const propError = validation.error.errors.find(e => e.path.includes('properties'));
         const firstErrorMessage = validation.error.errors[0]?.message || 'Bilinmeyen doğrulama hatası.';
-        const displayMessage = propError ? `Özellik Hatası (${propError.path.join('.')}): ${propError.message}` : `Doğrulama Hatası: ${firstErrorMessage}`;
-        alert(displayMessage);
+        alert(`Doğrulama Hatası: ${firstErrorMessage}`);
         return;
     }
     await onSubmit(validation.data);
@@ -105,136 +80,50 @@ export default function LocationForm({
       </div>
 
       <div>
-        <label htmlFor="type" className="block text-sm font-medium text-gray-700">
-          Konum Tipi
+        <label htmlFor="code" className="block text-sm font-medium text-gray-700">
+          Konum Kodu (Opsiyonel)
         </label>
-        <select
-          id="type"
-          {...register('type')}
-          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.type ? 'border-red-500' : ''}`}
-        >
-          <option value="">-- Tip Seçin --</option>
-          {locationTypes.map((type) => (
-            <option key={type.value} value={type.value}>
-              {type.label}
-            </option>
-          ))}
-        </select>
-        {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>}
-      </div>
-
-      <div>
-        <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-          Departman
-        </label>
-        <select
-          id="department"
-          {...register('department')}
-          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.department ? 'border-red-500' : ''}`}
-        >
-          <option value="">-- Departman Seçin --</option>
-          {departments.map((dept) => (
-            <option key={dept.value} value={dept.value}>
-              {dept.label}
-            </option>
-          ))}
-        </select>
-        {errors.department && <p className="mt-1 text-sm text-red-600">{errors.department.message}</p>}
-      </div>
-
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-          Açıklama
-        </label>
-        <textarea
-          id="description"
-          rows={3}
-          {...register('description')}
-          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.description ? 'border-red-500' : ''}`}
-          placeholder="Konum hakkında ek notlar (opsiyonel)"
+        <input
+          type="text"
+          id="code"
+          {...register('code')}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.code ? 'border-red-500' : ''}`}
+          placeholder="Örn: LAB1, S10A"
         />
-        {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
+        {errors.code && <p className="mt-1 text-sm text-red-600">{errors.code.message}</p>}
       </div>
 
-      {/* Dynamic Properties Section */}
-      <div className="space-y-3 pt-4 border-t border-gray-200">
-         <h3 className="text-sm font-medium text-gray-900">Ek Özellikler</h3>
-         {fields.map((field, index) => (
-           <div key={field.id} className="flex items-center space-x-1.5">
-             {/* Up/Down Buttons */}
-             <div className="flex flex-col">
-                <button
-                    type="button"
-                    onClick={() => move(index, index - 1)}
-                    disabled={index === 0}
-                    className="p-0.5 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-                    title="Yukarı Taşı"
-                >
-                    <ArrowUpIcon className="h-4 w-4" />
-                </button>
-                 <button
-                    type="button"
-                    onClick={() => move(index, index + 1)}
-                    disabled={index === fields.length - 1}
-                    className="p-0.5 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-                    title="Aşağı Taşı"
-                >
-                    <ArrowDownIcon className="h-4 w-4" />
-                </button>
-             </div>
-             {/* Key Input */}
-             <div className="flex-1">
-               <label htmlFor={`properties.${index}.key`} className="sr-only">Özellik Adı</label>
-               <input
-                 type="text"
-                 {...register(`properties.${index}.key` as const)}
-                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                 placeholder="Özellik Adı"
-               />
-                {/* Display key validation errors - ensure message is a string */}
-                {errors.properties?.[index]?.key?.message && (
-                   <p className="mt-1 text-xs text-red-600">
-                     {typeof errors.properties[index]?.key?.message === 'string' ? errors.properties[index]?.key?.message : 'Geçersiz anahtar'}
-                   </p>
-                 )}
-             </div>
-             {/* Value Input */}
-             <div className="flex-1">
-                <label htmlFor={`properties.${index}.value`} className="sr-only">Değer</label>
-                <input
-                  type="text"
-                  {...register(`properties.${index}.value` as const)}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  placeholder="Değer"
-                />
-                {/* Display value validation errors - ensure message is a string */}
-                 {errors.properties?.[index]?.value?.message && (
-                   <p className="mt-1 text-xs text-red-600">
-                      {typeof errors.properties[index]?.value?.message === 'string' ? errors.properties[index]?.value?.message : 'Geçersiz değer'}
-                   </p>
-                 )}
-             </div>
-             {/* Remove Button */}
-             <button
-                type="button"
-                onClick={() => remove(index)}
-                className="p-1 text-red-600 hover:text-red-800"
-                title="Özelliği Kaldır"
-             >
-                <TrashIcon className="h-5 w-5" />
-             </button>
-           </div>
-         ))}
+      <div>
+        <label htmlFor="capacity" className="block text-sm font-medium text-gray-700">
+          Kapasite (Opsiyonel)
+        </label>
+        <input
+          type="number"
+          id="capacity"
+          {...register('capacity', { valueAsNumber: true })}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.capacity ? 'border-red-500' : ''}`}
+          placeholder="Örn: 30"
+        />
+        {errors.capacity && <p className="mt-1 text-sm text-red-600">{errors.capacity.message}</p>}
+      </div>
 
-         {/* Add Property Button */}
-         <button
-            type="button"
-            onClick={() => append({ key: '', value: '' })}
-            className="mt-2 inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-         >
-            <PlusIcon className="-ml-0.5 mr-1 h-4 w-4" aria-hidden="true" />
-            Özellik Ekle
-         </button>
+      <div>
+        <label htmlFor="lab_type_id" className="block text-sm font-medium text-gray-700">
+          Laboratuvar Tipi <span className="text-red-500">*</span>
+        </label>
+        <select
+          id="lab_type_id"
+          {...register('lab_type_id')}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.lab_type_id ? 'border-red-500' : ''}`}
+        >
+          <option value="">-- Laboratuvar Tipi Seçin --</option>
+          {availableLabTypes.map((labType) => (
+            <option key={labType.id} value={labType.id}>
+              {labType.name}
+            </option>
+          ))}
+        </select>
+        {errors.lab_type_id && <p className="mt-1 text-sm text-red-600">{errors.lab_type_id.message}</p>}
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

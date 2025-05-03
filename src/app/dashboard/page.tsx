@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PresentationChartLineIcon, ExclamationCircleIcon, CheckCircleIcon, BellAlertIcon, UsersIcon, DocumentTextIcon, AdjustmentsHorizontalIcon, ComputerDesktopIcon, PrinterIcon, FilmIcon, DeviceTabletIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { getSession, getIssues, getUsers, getAllIssues, supabase } from '@/lib/supabase';
 import { getDeviceTypeName, getStatusName, getStatusColor, formatDate } from '@/lib/helpers';
-import { useNotifications } from '@/contexts/NotificationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { playAlertSound, showBrowserNotification } from '@/lib/notification';
 import Swal from 'sweetalert2';
 import { Metadata } from 'next';
@@ -21,6 +21,7 @@ import { cache } from 'react';
 import DashboardCards from '@/components/dashboard/DashboardCards';
 import { ChartCard } from '@/components/dashboard/ChartCard';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Demo modu sabit değişkeni
 const DEMO_MODE = false;
@@ -33,6 +34,7 @@ interface DashboardCounts {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [counts, setCounts] = useState<DashboardCounts>({
     openIssuesCount: 0,
@@ -42,7 +44,6 @@ export default function DashboardPage() {
   });
   const [recentIssues, setRecentIssues] = useState<any[]>([]);
   const router = useRouter();
-  const { updateDashboardCounts } = useNotifications();
 
   // Yeni bildirim geldiğinde dashboard sayılarını güncelle
   const handleCountUpdate = useCallback((increment: boolean) => {
@@ -54,13 +55,6 @@ export default function DashboardPage() {
       }));
     }
   }, []);
-
-  // Register the counts updater to the notification context
-  useEffect(() => {
-    if (updateDashboardCounts) {
-      updateDashboardCounts(handleCountUpdate as unknown as boolean);
-    }
-  }, [updateDashboardCounts, handleCountUpdate]);
 
   // Dashboard verilerini yükleme fonksiyonu
   const loadDashboardData = async () => {
@@ -266,7 +260,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8">
         <div className="py-6">
           <h1 className="text-3xl font-bold text-gray-900">Yönetim Paneli</h1>
           <p className="mt-1 text-gray-500">
