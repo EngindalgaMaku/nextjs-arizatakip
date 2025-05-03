@@ -13,6 +13,9 @@ import {
     HourOfDay
 } from '@/types/scheduling';
 
+// --- Constants ---
+const DAYS_OF_WEEK: ReadonlyArray<DayOfWeek> = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
+
 // --- Helper Functions ---
 
 // Fisher-Yates (aka Knuth) Shuffle Algorithm
@@ -705,26 +708,46 @@ function solveRecursive(lessonIndex: number, input: SchedulerInput): boolean {
     return false; // Bu ders için çözüm bulunamadı, geri izle
 }
 
-// --- Main Exported Function ---
+// --- NEW: Return type for the best schedule finder ---
+export interface BestSchedulerResult {
+    success: boolean;
+    bestSchedule: Schedule; // The actual best schedule map
+    unassignedLessons: LessonScheduleData[]; // Unassigned lessons from the best attempt
+    logs: string[]; // Logs from the best attempt
+    attemptsMade: number;   // How many attempts were made
+    successfulAttempts: number; // How many produced a valid schedule
+    // Metrics for the best schedule found:
+    minFitnessScore: number; // Lower is better (combined score)
+    bestVariance: number;    // Workload variance of the best schedule
+    bestTotalGaps: number;   // Total daily gaps of the best schedule
+    // Error message if no successful schedule found:
+    error?: string;
+}
 
-export async function generateSchedule(input: SchedulerInput): Promise<SchedulerResult> {
-    // --- Initialize Global State ---
+// --- Main Exported Function --- 
+// Existing generateSchedule renamed to runSingleScheduleAttempt and NOT exported
+async function runSingleScheduleAttempt(input: SchedulerInput): Promise<SchedulerResult> {
+    // --- Initialize Global State for THIS attempt --- 
+    // IMPORTANT: Reset global state for each attempt. 
+    // This relies on generateSchedule's internal logic correctly initializing these.
+    // Consider refactoring generateSchedule to not use globals if issues arise.
     currentSchedule = new Map<string, ScheduledEntry>();
     remainingHours = new Map<string, number>();
     lessonsDataMap = new Map<string, LessonScheduleData>();
     teachersDataMap = new Map<string, TeacherScheduleData>();
     locationsDataMap = new Map<string, LocationScheduleData>();
-    allLessons = [...input.lessons].sort((a, b) => b.weeklyHours - a.weeklyHours); // En çok saatli dersleri başa alalım
-    allTimeSlots = [...input.timeSlots]; // Kopyasını alalım, shuffle edilebilir
-    requiredAssignments = new Map(input.requiredAssignmentsMap); // Kopyasını alalım
-    debugLogs = []; // Logları sıfırla
+    allLessons = [...input.lessons].sort((a, b) => b.weeklyHours - a.weeklyHours);
+    // Shuffle time slots for variety in each attempt
+    allTimeSlots = shuffleArray([...input.timeSlots]); 
+    requiredAssignments = new Map(input.requiredAssignmentsMap); 
+    debugLogs = []; // Reset logs for this attempt
 
     // Initialize remaining hours
     allLessons.forEach(lesson => {
         if (lesson.needsScheduling) {
             remainingHours.set(lesson.id, lesson.weeklyHours);
         } else {
-            remainingHours.set(lesson.id, 0); // Çizelgeye dahil edilmeyecekse 0 saat
+            remainingHours.set(lesson.id, 0);
         }
         lessonsDataMap.set(lesson.id, lesson);
     });
@@ -733,82 +756,276 @@ export async function generateSchedule(input: SchedulerInput): Promise<Scheduler
     input.teachers.forEach(teacher => teachersDataMap.set(teacher.id, teacher));
     input.locations.forEach(location => locationsDataMap.set(location.id, location));
 
-    // --- Start the Recursive Solver ---
-    debugLogs.push("--- Starting Scheduling Algorithm ---");
+    // --- Start the Recursive Solver --- 
+    debugLogs.push(`--- Starting Schedule Attempt ---`);
     debugLogs.push(`Total Lessons to Schedule: ${allLessons.filter(l => l.needsScheduling).length}`);
     debugLogs.push(`Total Time Slots Available: ${allTimeSlots.length}`);
 
     const startTime = performance.now();
     let success = false;
     try {
-        success = solveRecursive(0, input);
+        // Ensure solveRecursive uses the re-initialized global state
+        success = solveRecursive(0, input); 
     } catch (error: any) {
-        console.error("Error during scheduling:", error);
+        console.error("Error during scheduling attempt:", error);
         debugLogs.push(`[FATAL ERROR] ${error.message || 'Unknown error during solveRecursive'}`);
          return {
             success: false,
-            schedule: new Map(), // Hata durumunda boş schedule
+            schedule: new Map(),
             logs: debugLogs,
+            unassignedLessons: input.lessons.filter(l => l.needsScheduling), // Assume all failed
             error: `Algoritma sırasında bir hata oluştu: ${error.message || 'Bilinmeyen hata'}`,
         };
     }
     const endTime = performance.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2); // saniye cinsinden
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-    debugLogs.push(`--- Scheduling Finished ---`);
+    debugLogs.push(`--- Scheduling Attempt Finished ---`);
     debugLogs.push(`Result: ${success ? 'Success' : 'Failed'}`);
     debugLogs.push(`Duration: ${duration} seconds`);
 
-    // --- Prepare and Return Result ---
+    // --- Prepare Result for THIS attempt --- 
     const finalSchedule = success ? currentSchedule : new Map();
 
-    // --- DÜZELTME: allHoursAssigned'ı burada hesapla --- 
     let allHoursAssigned = true;
-    let unassignedLessonNames: string[] = []; // Sadece isimleri tutalım (hata mesajı için)
+    let unassignedLessonNames: string[] = [];
     remainingHours.forEach((hoursLeft, lessonId) => {
         const lesson = lessonsDataMap.get(lessonId);
-        // Sadece çizelgeye dahil edilmesi gerekenleri kontrol et
         if (lesson?.needsScheduling && hoursLeft > 0) {
             allHoursAssigned = false;
             unassignedLessonNames.push(`${lesson.name} (${hoursLeft}h missing)`);
         }
     });
-    // --- Hesaplama sonu ---
 
-    // --- YENİ: Atanamayan ders listesini oluştur --- 
     let finalUnassignedLessons: LessonScheduleData[] = [];
-    // --- DÜZELTME: Hesaplanan allHoursAssigned'ı kullan --- 
-    if (!success || !allHoursAssigned) { // Algoritma başarısızsa VEYA başarılı ama atanmamış saat varsa
+    if (!success || !allHoursAssigned) {
         remainingHours.forEach((hoursLeft, lessonId) => {
             const lesson = lessonsDataMap.get(lessonId);
-            // Sadece çizelgeye dahil edilmesi gereken ve kalan saati olanları ekle
             if (lesson?.needsScheduling && hoursLeft > 0) {
                 finalUnassignedLessons.push(lesson);
             }
         });
-        // Eğer algoritma başarılıydı ama atanmamış saat vardıysa, logla
         if (success && !allHoursAssigned) {
-             // --- DÜZELTME: unassignedLessonNames'i kullan --- 
-             debugLogs.push(`[WARNING] Algorithm reported success, but some required hours are unassigned: ${unassignedLessonNames.join(', ')}`);
+             debugLogs.push(`[WARNING] Attempt successful, but unassigned hours: ${unassignedLessonNames.join(', ')}`);
         }        
     }
-    // --- Atanamayan ders listesi sonu ---
 
-    // Başarıyı yeniden değerlendir: Algoritma başarılı OLMALI VE tüm saatler atanmış OLMALI
-    // --- DÜZELTME: Hesaplanan allHoursAssigned'ı kullan --- 
     const finalSuccess = success && allHoursAssigned;
+    if (!finalSuccess && success) {
+        // If backtracking succeeded but couldn't place all hours
+        debugLogs.push('[INFO] Algorithm found a partial schedule but could not assign all required hours.');
+    }
 
     return {
         success: finalSuccess, 
         schedule: finalSchedule,
-        unassignedLessons: finalUnassignedLessons, // <<< Oluşturulan listeyi döndür
+        unassignedLessons: finalUnassignedLessons, 
         logs: debugLogs,
-        // Hata mesajını biraz daha bilgilendirici yapalım
         error: finalSuccess 
             ? undefined 
-             // --- DÜZELTME: unassignedLessonNames'i kullan --- 
             : (unassignedLessonNames.length > 0 
-                ? `Çizelge oluşturulamadı. Atanamayan dersler: ${unassignedLessonNames.join(', ')}` 
-                : "Çizelge oluşturulamadı. Bilinmeyen bir kısıtlama nedeniyle dersler yerleştirilemedi."),
+                ? `Atanamayan dersler: ${unassignedLessonNames.join(', ')}` 
+                : "Dersler yerleştirilemedi (kısıtlama veya hata)."),
     };
+}
+
+// --- NEW Exported Function to Find Best Schedule --- 
+export async function findBestSchedule(
+    input: SchedulerInput,
+    numberOfAttempts: number = 5, 
+    weightVariance: number = 1.0, 
+    weightGaps: number = 1.0     
+): Promise<BestSchedulerResult> {
+    let bestScheduleResult: SchedulerResult | null = null;
+    let minFitnessScore = Infinity;
+    let bestVariance = Infinity;
+    let bestTotalGaps = Infinity;
+    let successfulAttempts = 0;
+    let validAttempts = 0; // Track attempts that pass the free day check
+
+    console.log(`[Scheduler] Starting search: Attempts=${numberOfAttempts}, W_Variance=${weightVariance}, W_Gaps=${weightGaps}`);
+
+    for (let i = 0; i < numberOfAttempts; i++) {
+        console.log(`[Scheduler] Running attempt ${i + 1}/${numberOfAttempts}...`);
+        const result = await runSingleScheduleAttempt(input);
+
+        if (result.success) {
+            successfulAttempts++;
+            
+            // --- Boş Gün Kontrolü ---
+            if (!hasAllTeachersWithFreeDay(result.schedule, input.teachers)) {
+                console.log(`[Scheduler] Attempt ${i + 1} discarded: Not all teachers have a free day.`);
+                continue; // Skip scoring and comparison for this attempt
+            }
+            // --- Kontrol Sonu ---
+            
+            // This attempt is valid (passed success and free day check)
+            validAttempts++;
+            const variance = calculateTeacherWorkloadVariance(result.schedule, input.teachers);
+            const totalGaps = calculateTotalGaps(result.schedule, input.teachers);
+            const fitnessScore = (weightVariance * variance) + (weightGaps * totalGaps);
+            
+            console.log(`[Scheduler] Attempt ${i + 1} valid & scored. Variance: ${variance.toFixed(4)}, Gaps: ${totalGaps}, Fitness: ${fitnessScore.toFixed(4)}`);
+
+            if (fitnessScore < minFitnessScore) {
+                console.log(`[Scheduler] --> Found new best schedule (Fitness: ${fitnessScore.toFixed(4)} < ${minFitnessScore === Infinity ? 'Infinity' : minFitnessScore.toFixed(4)})`);
+                minFitnessScore = fitnessScore;
+                bestVariance = variance;    
+                bestTotalGaps = totalGaps;
+                bestScheduleResult = result; 
+            }
+        } else {
+            console.log(`[Scheduler] Attempt ${i + 1} failed. Error: ${result.error}`);
+        }
+    }
+
+    console.log(`[Scheduler] Finished ${numberOfAttempts} attempts. Successful: ${successfulAttempts}, Valid (with free days): ${validAttempts}.`);
+
+    if (bestScheduleResult) {
+        console.log(`[Scheduler] Best valid schedule found. Fitness: ${minFitnessScore.toFixed(4)}, Variance: ${bestVariance.toFixed(4)}, Gaps: ${bestTotalGaps}`);
+        return {
+            success: true,
+            bestSchedule: bestScheduleResult.schedule,
+            unassignedLessons: bestScheduleResult.unassignedLessons, 
+            logs: bestScheduleResult.logs, 
+            attemptsMade: numberOfAttempts,
+            successfulAttempts: validAttempts, // Report valid attempts as successful
+            minFitnessScore: minFitnessScore,
+            bestVariance: bestVariance,
+            bestTotalGaps: bestTotalGaps,
+        };
+    } else {
+        console.log(`[Scheduler] No valid schedule (with free days for all teachers) found after ${numberOfAttempts} attempts.`);
+        // Update error message to reflect the new constraint
+        const baseError = `Belirtilen sayıda denemede (${numberOfAttempts}) başarılı bir çizelge oluşturulamadı.`;
+        const reason = successfulAttempts > 0 ? ` (Oluşturulan ${successfulAttempts} programda tüm öğretmenlerin boş günü sağlanamadı).` : ``;
+        return {
+            success: false,
+            bestSchedule: new Map(), 
+            unassignedLessons: input.lessons.filter(l => l.needsScheduling), 
+            logs: [], 
+            attemptsMade: numberOfAttempts,
+            successfulAttempts: 0, // No valid schedule found
+            minFitnessScore: Infinity,
+            bestVariance: Infinity,
+            bestTotalGaps: Infinity,
+            error: baseError + reason,
+        };
+    }
+}
+
+// --- YENİ: Öğretmen Yükü Varyans Hesaplama --- 
+function calculateTeacherWorkloadVariance(
+  schedule: Schedule,
+  teachers: TeacherScheduleData[]
+): number {
+  if (teachers.length === 0) return 0; // Öğretmen yoksa varyans 0
+
+  const teacherHours = new Map<string, number>();
+  teachers.forEach(t => teacherHours.set(t.id, 0)); // Başlangıçta tüm öğretmenlerin saati 0
+
+  // Programdaki her bir ders saatini ilgili öğretmene ekle
+  // Dikkat: schedule Map'inin key'i zaman + LOKASYON içeriyor.
+  // Bu nedenle aynı saatte, aynı ders için birden fazla entry olabilir (multi-resource).
+  // Öğretmene saat eklerken bunu dikkate almalıyız.
+  const processedEntries = new Set<string>(); // İşlenen ders-saat kombinasyonlarını takip et
+
+  for (const entry of schedule.values()) {
+      const entryKey = `${entry.lessonId}-${entry.timeSlot.day}-${entry.timeSlot.hour}`;
+      // Eğer bu ders-saat kombinasyonu daha önce işlenmediyse, ilgili öğretmenin saatini artır
+      if (!processedEntries.has(entryKey)) {
+          const currentHours = teacherHours.get(entry.teacherId) ?? 0;
+          teacherHours.set(entry.teacherId, currentHours + 1);
+          processedEntries.add(entryKey); // Bu kombinasyonu işlendi olarak işaretle
+      }
+  }
+
+  const hoursArray = Array.from(teacherHours.values());
+
+  // Ortalama ders saatini hesapla
+  const totalHours = hoursArray.reduce((sum, hours) => sum + hours, 0);
+  const meanHours = teachers.length > 0 ? totalHours / teachers.length : 0;
+
+  // Varyansı hesapla: (saat - ortalama)^2 toplamı / öğretmen sayısı
+  const variance = teachers.length > 0
+    ? hoursArray.reduce((sum, hours) => sum + Math.pow(hours - meanHours, 2), 0) / teachers.length
+    : 0;
+
+  return variance;
+}
+
+// --- YENİ: Öğretmen Gün İçi Boşluk Hesaplama ---
+function calculateTotalGaps(schedule: Schedule, teachers: TeacherScheduleData[]): number {
+  let totalGapHours = 0;
+
+  for (const teacher of teachers) {
+    // Her gün için öğretmenin ders saatlerini topla
+    const dailySchedules: { [day in DayOfWeek]?: number[] } = {};
+    
+    // Schedule Map'ini kullanarak öğretmenin derslerini günlere ayır
+    for (const entry of schedule.values()) {
+        if (entry.teacherId === teacher.id) {
+            const day = entry.timeSlot.day;
+            const hour = entry.timeSlot.hour;
+            if (!dailySchedules[day]) {
+                dailySchedules[day] = [];
+            }
+            // Aynı saatte birden fazla ders olsa bile saati sadece bir kez ekle
+            if (!dailySchedules[day]!.includes(hour)) {
+                dailySchedules[day]!.push(hour);
+            }
+        }
+    }
+
+    // Her gün için boşlukları hesapla
+    for (const day in dailySchedules) {
+      const hours = dailySchedules[day as DayOfWeek]!;
+      if (hours.length <= 1) {
+        continue; // Tek ders veya hiç ders yoksa o gün boşluk olmaz
+      }
+
+      // Saatleri sırala
+      hours.sort((a, b) => a - b);
+
+      // Sıralı saatler arasındaki boşlukları topla
+      for (let i = 0; i < hours.length - 1; i++) {
+        const difference = hours[i + 1] - hours[i];
+        if (difference > 1) {
+          totalGapHours += difference - 1; // Aradaki boş saat sayısı
+        }
+      }
+    }
+  }
+
+  return totalGapHours;
+}
+
+// --- YENİ: Tüm Öğretmenlerin Boş Günü Var Mı Kontrolü ---
+function hasAllTeachersWithFreeDay(
+  schedule: Schedule,
+  teachers: TeacherScheduleData[]
+): boolean {
+  const daysOfWeekCount = DAYS_OF_WEEK.length; // Now accessible
+
+  for (const teacher of teachers) {
+    const workingDays = new Set<DayOfWeek>();
+
+    // Find all days the teacher has at least one lesson scheduled
+    for (const entry of schedule.values()) {
+      if (entry.teacherId === teacher.id) {
+        workingDays.add(entry.timeSlot.day);
+        // If teacher works on all possible days, no need to check further for this teacher
+        if (workingDays.size === daysOfWeekCount) {
+          // This teacher has no free day, so the schedule is invalid according to the rule.
+          // console.log(`[Scheduler Constraint Check] Teacher ${teacher.name} (${teacher.id}) has no free day. Discarding schedule.`);
+          return false; 
+        }
+      }
+    }
+    // After checking all schedule entries, if the teacher doesn't work on all days, 
+    // they have at least one free day. Continue to the next teacher.
+  }
+
+  // If the loop completes without returning false, it means all teachers have at least one free day.
+  return true;
 }

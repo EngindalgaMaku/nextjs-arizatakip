@@ -72,11 +72,11 @@ export interface SchedulerInput {
 /** Algoritma çıktısı */
 export interface SchedulerResult {
     success: boolean;
-    schedule?: Schedule;
-    unassignedLessons?: LessonScheduleData[]; // Atanamayan dersler
+    schedule: Schedule;
+    unassignedLessons: LessonScheduleData[];
     error?: string; // Algoritma hatası
     diagnostics?: any; // Hata ayıklama bilgileri (opsiyonel)
-    logs?: string[]; // Algoritma logları
+    logs: string[]; // Algoritma logları
 }
 
 /** Atanamayan ders bilgilerini client tarafında göstermek için */

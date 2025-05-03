@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query'; // Import useQuery
 import { runSchedulerAction } from '@/actions/schedulerActions'; // Import the server action
 import { SchedulerResult, Schedule, ScheduledEntry, SerializableSchedulerResult, UnassignedLessonInfo } from '@/types/scheduling';
@@ -75,6 +75,9 @@ export default function SchedulingPage() {
     const [totalUnassignedHours, setTotalUnassignedHours] = useState<number>(0);
     const [unassignedLessonsList, setUnassignedLessonsList] = useState<UnassignedLessonInfo[]>([]);
     const [filteredErrorLogs, setFilteredErrorLogs] = useState<string[]>([]);
+    // --- NEW: State for number of attempts ---
+    const [numAttempts, setNumAttempts] = useState<number>(10); // Default to 10 attempts
+    // ---
 
     // Fetch necessary data for displaying names
     const { data: teachersData, isLoading: isLoadingTeachers } = useQuery<Partial<Teacher>[], Error>({
@@ -100,13 +103,13 @@ export default function SchedulingPage() {
 
     const generateScheduleMutation = useMutation<SerializableSchedulerResult, Error>({
         mutationFn: async () => {
-            console.log("Starting schedule generation mutation...");
+            console.log(`Starting schedule generation mutation with ${numAttempts} attempts...`);
             setLogs([]);
             setFilteredErrorLogs([]);
             setScheduleData(null);
             setUnassignedLessonsList([]);
             setTotalUnassignedHours(0);
-            const result = await runSchedulerAction();
+            const result = await runSchedulerAction(numAttempts);
             console.log("Scheduler action finished, result received:", result);
             return result;
         },
@@ -180,7 +183,12 @@ export default function SchedulingPage() {
     const isLoadingData = isLoadingTeachers || isLoadingLocations || isLoadingLessons;
 
     const handleGenerateClick = () => {
-        generateScheduleMutation.mutate();
+        // Validate numAttempts before mutating
+        if (numAttempts < 1 || !Number.isInteger(numAttempts)) {
+            toast.error("Lütfen geçerli bir pozitif deneme sayısı girin.");
+            return;
+        }
+        generateScheduleMutation.mutate(); // Mutate call doesn't need arguments here
     };
 
     // Helper function to create lookup maps for faster name retrieval
@@ -348,11 +356,35 @@ export default function SchedulingPage() {
             <div className="p-4 md:p-6">
                 <h1 className="text-2xl font-semibold text-gray-800 mb-4">Otomatik Çizelge Oluşturma</h1>
 
+                {/* --- BEGIN: Number of Attempts Input --- */}
+                <div className="mb-4 flex items-center space-x-3 bg-gray-100 p-3 rounded-md border border-gray-200 max-w-md">
+                    <label htmlFor="numAttempts" className="block text-sm font-medium text-gray-700 whitespace-nowrap">
+                        Deneme Sayısı:
+                    </label>
+                    <input
+                        id="numAttempts"
+                        type="number"
+                        value={numAttempts}
+                        onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setNumAttempts(isNaN(val) || val < 1 ? 1 : val); // Ensure positive integer, default to 1
+                        }}
+                        min="1"
+                        step="1"
+                        className="p-2 border border-gray-300 rounded-md w-20 text-center disabled:bg-gray-200 disabled:cursor-not-allowed"
+                        disabled={generateScheduleMutation.isPending}
+                    />
+                     <p className="text-xs text-gray-500">
+                        (Daha yüksek sayı = Daha iyi sonuç potansiyeli, daha uzun sürer)
+                    </p>
+                </div>
+                {/* --- END: Number of Attempts Input --- */}
+
                 <Button
                     onClick={handleGenerateClick}
                     disabled={generateScheduleMutation.isPending || isLoadingData}
                 >
-                    {generateScheduleMutation.isPending ? 'Oluşturuluyor...' : 
+                    {generateScheduleMutation.isPending ? 'Çizelge Oluşturuluyor...' : 
                      isLoadingData ? 'Veri Yükleniyor...' : 'Çizelge Oluştur'} 
                 </Button>
 
