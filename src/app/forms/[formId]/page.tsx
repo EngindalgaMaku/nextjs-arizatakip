@@ -10,8 +10,20 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import { PaperAirplaneIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
+// Define response type for form submission
+interface FormSubmitResponse {
+  success: boolean;
+  error?: string;
+}
+
 // Helper component to render individual fields
-function RenderFormField({ field, register, errors }: { field: FormField, register: any, errors: any }) {
+type RenderFormFieldProps = {
+  field: FormField;
+  register: any;
+  errors: any;
+};
+
+const RenderFormField: React.FC<RenderFormFieldProps> = ({ field, register, errors }) => {
     const fieldId = field.id; // Use ID for registration name
     const label = (
         <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
@@ -108,7 +120,7 @@ function RenderFormField({ field, register, errors }: { field: FormField, regist
     }
 
     return (
-        <div key={field.id}>
+        <div>
             {label}
             {inputElement}
             {errors[fieldId] && <p className="text-red-600 text-sm mt-1">Bu alan zorunludur.</p>}
@@ -148,7 +160,7 @@ function FormContent({ formId }: { formId: string }) {
   // Define the mutation for submitting the form
   const submitMutation = useMutation({
     mutationFn: (data: Record<string, any>) => submitFormResponse(formId, data),
-    onSuccess: (result) => {
+    onSuccess: (result: FormSubmitResponse) => {
       if (result.success) {
         toast.success('Form başarıyla gönderildi!');
         reset(); // Reset the form fields
@@ -215,14 +227,18 @@ function FormContent({ formId }: { formId: string }) {
         <h1 className="text-2xl font-bold mb-2 text-center">{form.title}</h1>
         <p className="text-gray-600 mb-6 text-center">{form.description}</p>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {form.fields.map((field) => (
-            <RenderFormField 
+          {(form.fields || []).length > 0 ? (
+            (form.fields || []).map((field) => (
+              <RenderFormField 
                 key={field.id} 
                 field={field} 
                 register={register} 
                 errors={errors} 
-            />
-          ))}
+              />
+            ))
+          ) : (
+            <p className="text-gray-500 text-center py-4">Bu formda henüz hiç alan bulunmamaktadır.</p>
+          )}
           <button 
             type="submit"
             disabled={submitMutation.isPending}
