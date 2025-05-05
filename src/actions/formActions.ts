@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import {
@@ -14,8 +14,6 @@ import {
   FormFieldValuesSchema,
   FormResponse
 } from '@/types/forms';
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const FORMS_PATH = '/dashboard/forms'; // Path for revalidation
@@ -24,6 +22,7 @@ const FORMS_PATH = '/dashboard/forms'; // Path for revalidation
  * Fetch all forms.
  */
 export async function fetchForms(): Promise<Form[]> {
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('forms')
     .select('*')
@@ -60,10 +59,9 @@ export async function fetchForms(): Promise<Form[]> {
  */
 export async function fetchFormById(
   id: string,
-  supabaseClient?: SupabaseClient // Make client optional
 ): Promise<Form | null> {
   // Use passed client or create a new one if not provided
-  const supabase = supabaseClient || createServerActionClient({ cookies });
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('forms')
@@ -130,6 +128,7 @@ export async function fetchFormById(
  * This is intended for the public-facing form page.
  */
 export async function fetchPublishedFormById(id: string): Promise<Form | null> {
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('forms')
     .select(`
@@ -198,9 +197,13 @@ export async function fetchPublishedFormById(id: string): Promise<Form | null> {
  * Create a new form.
  */
 export async function createForm(payload: FormValues): Promise<{ success: boolean; form?: Form; error?: string }> {
+  const supabase = await createSupabaseServerClient();
   const parse = FormValuesSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    return { 
+      success: false, 
+      error: parse.error?.errors.map((e: { message: string }) => e.message).join(', ') || 'Invalid form data'
+    };
   }
 
   const formData = {
@@ -241,9 +244,13 @@ export async function createForm(payload: FormValues): Promise<{ success: boolea
  * Update an existing form (title, description, status).
  */
 export async function updateForm(id: string, payload: FormValues): Promise<{ success: boolean; form?: Form; error?: string }> {
+  const supabase = await createSupabaseServerClient();
   const parse = FormValuesSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    return { 
+      success: false, 
+      error: parse.error?.errors.map((e: { message: string }) => e.message).join(', ') || 'Invalid form data'
+    };
   }
 
   const formData = {
@@ -287,6 +294,8 @@ export async function updateForm(id: string, payload: FormValues): Promise<{ suc
  * Delete a form by ID.
  */
 export async function deleteForm(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createSupabaseServerClient();
+
   try {
     // Note: ON DELETE CASCADE should handle deleting related fields and submissions
     const { error } = await supabase
@@ -315,9 +324,13 @@ export async function addFormField(
   formId: string,
   payload: FormFieldValues
 ): Promise<{ success: boolean; field?: FormField; error?: string }> {
+  const supabase = await createSupabaseServerClient();
   const parse = FormFieldValuesSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    return { 
+      success: false, 
+      error: parse.error?.errors.map((e: { message: string }) => e.message).join(', ') || 'Invalid field data'
+    };
   }
 
   try {
@@ -390,10 +403,13 @@ export async function updateFormField(
 ): Promise<{ success: boolean; field?: FormField; error?: string }> {
   // Remove destructuring - displayOrder is no longer in FormFieldValues
   // const { displayOrder, ...restPayload } = payload; 
-  const parse = FormFieldValuesSchema.safeParse(payload); // Parse the payload directly
-
+  const supabase = await createSupabaseServerClient();
+  const parse = FormFieldValuesSchema.safeParse(payload);
   if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+    return { 
+      success: false, 
+      error: parse.error?.errors.map((e: { message: string }) => e.message).join(', ') || 'Invalid field data'
+    };
   }
 
   const fieldData = {
@@ -458,6 +474,7 @@ export async function updateFormField(
  * Delete a form field by ID.
  */
 export async function deleteFormField(fieldId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createSupabaseServerClient();
   try {
     // Fetch form_id for revalidation before deleting
     const { data: existingField, error: fetchError } = await supabase
@@ -527,7 +544,7 @@ export async function submitFormResponse(
     // Or configure RLS to allow public inserts without needing service role.
     // For simplicity, let's assume RLS allows public inserts for now.
 
-    const supabase = createServerActionClient({ cookies });
+    const supabase = await createSupabaseServerClient();
 
     // Basic validation
     if (!formId || !responseData || Object.keys(responseData).length === 0) {
@@ -566,10 +583,9 @@ export async function submitFormResponse(
  */
 export async function fetchFormResponses(
   formId: string,
-  supabaseClient?: SupabaseClient // Make client optional
 ): Promise<FormResponse[]> {
-    // Use passed client or create a new one if not provided
-    const supabase = supabaseClient || createServerActionClient({ cookies });
+    // const supabase = supabaseClient || createServerActionClient({ cookies });
+    const supabase = await createSupabaseServerClient();
 
     if (!formId) {
         console.error('fetchFormResponses called without formId');
@@ -606,7 +622,7 @@ export async function fetchFormResponses(
  * @returns An object indicating success or failure.
  */
 export async function deleteFormResponse(responseId: string): Promise<{ success: boolean; error?: string }> {
-    const supabase = createServerActionClient({ cookies });
+    const supabase = await createSupabaseServerClient();
 
     if (!responseId) {
         return { success: false, error: 'Silinecek yanıt IDsi belirtilmedi.' };

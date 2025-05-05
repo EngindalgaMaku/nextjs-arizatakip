@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Modal from '@/components/Modal';
 import { TeacherFormSchema, TeacherFormValues, teacherRoles, teacherRoleLabels, TeacherRole, Teacher, Branch } from '@/types/teachers';
 
 interface AreaTeacherFormModalProps {
-  initialData?: TeacherFormValues;
+  initialData?: Partial<TeacherFormValues>;
   onSubmit: (data: TeacherFormValues) => void;
   onClose: () => void;
   loading?: boolean;
@@ -15,16 +15,38 @@ interface AreaTeacherFormModalProps {
 }
 
 export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading = false, branches }: AreaTeacherFormModalProps) {
-  const isEditing = !!(initialData && 'id' in initialData && initialData.id);
+  const isEditing = !!initialData;
   
-  const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<TeacherFormValues>({
+  const { 
+    register, 
+    handleSubmit, 
+    control, 
+    formState: { errors, isSubmitting }, 
+    reset
+  } = useForm<TeacherFormValues>({
     resolver: zodResolver(TeacherFormSchema),
-    defaultValues: {
-        name: initialData?.name ?? '',
-        birthDate: initialData?.birthDate ?? '',
-        role: initialData?.role ?? null,
+    defaultValues: initialData || { 
+      name: '',
+      birthDate: null,
+      role: null,
+      phone: null,
+      branchId: null,
     }
   });
+
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name ?? '',
+        birthDate: initialData.birthDate || null, 
+        role: initialData.role || null,
+        phone: initialData.phone || null,
+        branchId: initialData.branchId || null,
+      });
+    } else {
+       reset({ name: '', birthDate: null, role: null, phone: null, branchId: null });
+    }
+  }, [initialData, reset]);
 
   const isBusy = loading || isSubmitting;
 
@@ -94,7 +116,7 @@ export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading =
                 <select
                   id="role"
                   {...field}
-                  value={field.value ?? ''} // Handle null/undefined value
+                  value={field.value ?? ''}
                   aria-invalid={errors.role ? 'true' : 'false'}
                   className={`mt-1 block w-full rounded p-2 border ${errors.role ? 'border-red-500' : 'border-gray-300'}`}
                 >
@@ -114,14 +136,14 @@ export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading =
           <div>
             <label htmlFor="branchId" className="block text-sm font-medium text-gray-700">Branş</label>
             <Controller
-               name="branchId" // Corresponds to the field in TeacherFormValues
+               name="branchId"
                control={control}
                render={({ field }) => (
                  <select
                    id="branchId"
                    {...field}
-                   value={field.value ?? ''} // Handle null value for select
-                   onChange={(e) => field.onChange(e.target.value || null)} // Send null if empty option selected
+                   value={field.value ?? ''}
+                   onChange={(e) => field.onChange(e.target.value || null)}
                    className={`mt-1 block w-full rounded p-2 border ${errors.branchId ? 'border-red-500' : 'border-gray-300'}`}
                  >
                     <option value="">-- Branş Seçiniz --</option>

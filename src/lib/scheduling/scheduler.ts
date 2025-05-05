@@ -708,18 +708,56 @@ function solveRecursive(lessonIndex: number, input: SchedulerInput): boolean {
     return false; // Bu ders için çözüm bulunamadı, geri izle
 }
 
+// --- NEW: Calculate Penalty for Short Teaching Days --- 
+function calculateShortDayPenalty(
+    schedule: Schedule,
+    teachers: TeacherScheduleData[] // Use TeacherScheduleData to get teacher IDs
+): number {
+    let totalPenalty = 0;
+    const minLessonsPerDay = 4; // Threshold
+
+    // Group lessons by teacher, then by day
+    const teacherDailyLessons = new Map<string, Map<DayOfWeek, number>>();
+
+    schedule.forEach((entry) => {
+        const teacherId = entry.teacherId;
+        const day = entry.timeSlot.day;
+        
+        if (!teacherDailyLessons.has(teacherId)) {
+            teacherDailyLessons.set(teacherId, new Map<DayOfWeek, number>());
+        }
+        const dailyMap = teacherDailyLessons.get(teacherId)!;
+        dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
+    });
+
+    // Calculate penalty
+    teacherDailyLessons.forEach((dailyMap, teacherId) => {
+        dailyMap.forEach((lessonCount, day) => {
+            if (lessonCount > 0 && lessonCount < minLessonsPerDay) {
+                // Quadratic penalty: the fewer lessons, the higher the penalty
+                const penalty = Math.pow(minLessonsPerDay - lessonCount, 2);
+                totalPenalty += penalty;
+            }
+        });
+    });
+
+    return totalPenalty;
+}
+// --- End Short Day Penalty --- 
+
 // --- NEW: Return type for the best schedule finder ---
 export interface BestSchedulerResult {
     success: boolean;
-    bestSchedule: Schedule; // The actual best schedule map
-    unassignedLessons: LessonScheduleData[]; // Unassigned lessons from the best attempt
-    logs: string[]; // Logs from the best attempt
-    attemptsMade: number;   // How many attempts were made
-    successfulAttempts: number; // How many produced a valid schedule
+    bestSchedule: Schedule; 
+    unassignedLessons: LessonScheduleData[]; 
+    logs: string[]; 
+    attemptsMade: number;   
+    successfulAttempts: number; 
     // Metrics for the best schedule found:
-    minFitnessScore: number; // Lower is better (combined score)
-    bestVariance: number;    // Workload variance of the best schedule
-    bestTotalGaps: number;   // Total daily gaps of the best schedule
+    minFitnessScore: number; 
+    bestVariance: number;    
+    bestTotalGaps: number;   
+    bestShortDayPenalty: number; // <<< NEW: Add penalty metric
     // Error message if no successful schedule found:
     error?: string;
 }
@@ -834,16 +872,18 @@ export async function findBestSchedule(
     input: SchedulerInput,
     numberOfAttempts: number = 5, 
     weightVariance: number = 1.0, 
-    weightGaps: number = 1.0     
+    weightGaps: number = 1.0,
+    weightShortDays: number = 1.0 // <<< NEW: Add weight for short days
 ): Promise<BestSchedulerResult> {
     let bestScheduleResult: SchedulerResult | null = null;
     let minFitnessScore = Infinity;
     let bestVariance = Infinity;
     let bestTotalGaps = Infinity;
+    let bestShortDayPenalty = Infinity; // <<< NEW: Track best penalty score
     let successfulAttempts = 0;
-    let validAttempts = 0; // Track attempts that pass the free day check
+    let validAttempts = 0; 
 
-    console.log(`[Scheduler] Starting search: Attempts=${numberOfAttempts}, W_Variance=${weightVariance}, W_Gaps=${weightGaps}`);
+    console.log(`[Scheduler] Starting search: Attempts=${numberOfAttempts}, W_Variance=${weightVariance}, W_Gaps=${weightGaps}, W_ShortDays=${weightShortDays}`); // Log new weight
 
     for (let i = 0; i < numberOfAttempts; i++) {
         console.log(`[Scheduler] Running attempt ${i + 1}/${numberOfAttempts}...`);
@@ -852,26 +892,31 @@ export async function findBestSchedule(
         if (result.success) {
             successfulAttempts++;
             
-            // --- Boş Gün Kontrolü ---
             if (!hasAllTeachersWithFreeDay(result.schedule, input.teachers)) {
                 console.log(`[Scheduler] Attempt ${i + 1} discarded: Not all teachers have a free day.`);
-                continue; // Skip scoring and comparison for this attempt
+                continue; 
             }
-            // --- Kontrol Sonu ---
             
-            // This attempt is valid (passed success and free day check)
             validAttempts++;
             const variance = calculateTeacherWorkloadVariance(result.schedule, input.teachers);
             const totalGaps = calculateTotalGaps(result.schedule, input.teachers);
-            const fitnessScore = (weightVariance * variance) + (weightGaps * totalGaps);
+            const shortDayPenalty = calculateShortDayPenalty(result.schedule, input.teachers); // <<< NEW: Calculate penalty
             
-            console.log(`[Scheduler] Attempt ${i + 1} valid & scored. Variance: ${variance.toFixed(4)}, Gaps: ${totalGaps}, Fitness: ${fitnessScore.toFixed(4)}`);
+            // <<< NEW: Update fitness score calculation
+            const fitnessScore = (weightVariance * variance) + 
+                                 (weightGaps * totalGaps) + 
+                                 (weightShortDays * shortDayPenalty);
+            
+            // <<< NEW: Update log message
+            console.log(`[Scheduler] Attempt ${i + 1} valid & scored. V: ${variance.toFixed(2)}, G: ${totalGaps}, SD Pen: ${shortDayPenalty.toFixed(2)}, Fit: ${fitnessScore.toFixed(4)}`);
 
             if (fitnessScore < minFitnessScore) {
+                 // <<< NEW: Update log message
                 console.log(`[Scheduler] --> Found new best schedule (Fitness: ${fitnessScore.toFixed(4)} < ${minFitnessScore === Infinity ? 'Infinity' : minFitnessScore.toFixed(4)})`);
                 minFitnessScore = fitnessScore;
                 bestVariance = variance;    
                 bestTotalGaps = totalGaps;
+                bestShortDayPenalty = shortDayPenalty; // <<< NEW: Store best penalty
                 bestScheduleResult = result; 
             }
         } else {
@@ -882,21 +927,22 @@ export async function findBestSchedule(
     console.log(`[Scheduler] Finished ${numberOfAttempts} attempts. Successful: ${successfulAttempts}, Valid (with free days): ${validAttempts}.`);
 
     if (bestScheduleResult) {
-        console.log(`[Scheduler] Best valid schedule found. Fitness: ${minFitnessScore.toFixed(4)}, Variance: ${bestVariance.toFixed(4)}, Gaps: ${bestTotalGaps}`);
+        // <<< NEW: Update log message
+        console.log(`[Scheduler] Best valid schedule found. Fit: ${minFitnessScore.toFixed(4)}, V: ${bestVariance.toFixed(2)}, G: ${bestTotalGaps}, SD Pen: ${bestShortDayPenalty.toFixed(2)}`);
         return {
             success: true,
             bestSchedule: bestScheduleResult.schedule,
             unassignedLessons: bestScheduleResult.unassignedLessons, 
             logs: bestScheduleResult.logs, 
             attemptsMade: numberOfAttempts,
-            successfulAttempts: validAttempts, // Report valid attempts as successful
+            successfulAttempts: validAttempts, 
             minFitnessScore: minFitnessScore,
             bestVariance: bestVariance,
             bestTotalGaps: bestTotalGaps,
+            bestShortDayPenalty: bestShortDayPenalty, // <<< NEW: Return best penalty
         };
     } else {
         console.log(`[Scheduler] No valid schedule (with free days for all teachers) found after ${numberOfAttempts} attempts.`);
-        // Update error message to reflect the new constraint
         const baseError = `Belirtilen sayıda denemede (${numberOfAttempts}) başarılı bir çizelge oluşturulamadı.`;
         const reason = successfulAttempts > 0 ? ` (Oluşturulan ${successfulAttempts} programda tüm öğretmenlerin boş günü sağlanamadı).` : ``;
         return {
@@ -905,10 +951,11 @@ export async function findBestSchedule(
             unassignedLessons: input.lessons.filter(l => l.needsScheduling), 
             logs: [], 
             attemptsMade: numberOfAttempts,
-            successfulAttempts: 0, // No valid schedule found
+            successfulAttempts: 0, 
             minFitnessScore: Infinity,
             bestVariance: Infinity,
             bestTotalGaps: Infinity,
+            bestShortDayPenalty: Infinity, // <<< NEW: Return infinity for penalty
             error: baseError + reason,
         };
     }

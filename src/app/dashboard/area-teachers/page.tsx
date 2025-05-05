@@ -245,16 +245,29 @@ export default function AreaTeachersPage() {
        console.log('[Page] Attempting to update teacher:', editingTeacher.id);
        // Pass only TeacherFormValues fields
        const updatePayload: TeacherFormValues = {
-         name: data.name, 
-         birthDate: data.birthDate,
+         name: data.name,
+         birthDate: data.birthDate, // Ensure form provides Date or null
          role: data.role,
-         phone: data.phone,
-         branchId: data.branchId,
+         phone: data.phone,       // <<< Add phone
+         branchId: data.branchId, // <<< Add branchId
+         // is_active durumu genellikle ayrı bir mekanizma ile (toggle gibi) yönetilir,
+         // bu yüzden form submit'te gönderilmesi gerekmeyebilir.
        };
+       console.log('[Page] Update payload:', updatePayload);
        updateTeacherMutation.mutate({ id: editingTeacher.id, payload: updatePayload });
     } else {
        console.log('[Page] Attempting to create teacher');
-       createTeacherMutation.mutate(data); // data already matches TeacherFormValues
+       // Ensure the data object passed directly matches TeacherFormValues expected by createTeacher
+       const createPayload: TeacherFormValues = {
+         name: data.name,
+         birthDate: data.birthDate,
+         role: data.role,
+         phone: data.phone,        // <<< Add phone
+         branchId: data.branchId,  // <<< Add branchId
+         // is_active? Yeni öğretmen varsayılan olarak aktif mi olmalı?
+       };
+        console.log('[Page] Create payload:', createPayload);
+        createTeacherMutation.mutate(createPayload);
     }
   };
 

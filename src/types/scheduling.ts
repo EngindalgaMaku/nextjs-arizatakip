@@ -95,4 +95,20 @@ export interface SerializableSchedulerResult {
     error?: string;
     diagnostics?: any;
     logs?: string[]; // Algoritma logları
+}
+
+// --- NEW: Result type including fitness metrics ---
+export interface BestSchedulerResult extends Omit<SchedulerResult, 'schedule'> { // Omit base schedule if returning bestSchedule specifically
+    bestSchedule: Schedule; // The actual best schedule map
+    // unassignedLessons: LessonScheduleData[]; // Already in SchedulerResult
+    // logs: string[]; // Already in SchedulerResult
+    attemptsMade: number;   // How many attempts were made
+    successfulAttempts: number; // How many produced a valid schedule passing constraints
+    // Metrics for the best schedule found:
+    minFitnessScore: number; // Lower is better (combined score)
+    bestVariance: number;    // Workload variance of the best schedule
+    bestTotalGaps: number;   // Total daily gaps of the best schedule
+    // error?: string; // Already in SchedulerResult
+    // Optional: Add back penalty if needed
+    // bestShortDayPenalty?: number;
 } 

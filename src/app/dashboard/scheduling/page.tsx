@@ -1,90 +1,32 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query'; // Import useQuery
-import { runSchedulerAction } from '@/actions/schedulerActions'; // Import the server action
-import { SchedulerResult, Schedule, ScheduledEntry, SerializableSchedulerResult, UnassignedLessonInfo } from '@/types/scheduling';
-import { Teacher } from '@/types/teachers'; // Import Teacher type
-import { LocationWithLabType } from '@/types/locations'; // Import Location type
-// import { DalDersOption } from '@/types/dalDersleri'; // Assuming a type for options
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { runSchedulerAction } from '@/actions/schedulerActions';
+import { saveScheduleAction } from '@/actions/savedScheduleActions';
+import { SchedulerResult, Schedule, ScheduledEntry, SerializableSchedulerResult, UnassignedLessonInfo, BestSchedulerResult } from '@/types/scheduling';
+import { Teacher } from '@/types/teachers';
+import { LocationWithLabType } from '@/types/locations';
 import { fetchTeachers } from '@/actions/teacherActions';
 import { fetchLocations } from '@/actions/locationActions';
 import { fetchAllDersOptions } from '@/actions/dalDersActions';
-import { toast } from 'react-toastify'; // Import toast for notifications
-import { DashboardLayout } from '@/layouts/DashboardLayout'; // <<< Import DashboardLayout
+import { toast } from 'react-toastify';
+import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea"; // <<< Textarea importu
-import { Copy } from 'lucide-react'; // <<< YENİ: Copy ikonu
-// import { ScrollArea } from "@/components/ui/scroll-area"; // <<< YENİ IMPORT
-// import { ScheduleTable } from '@/components/scheduling/ScheduleTable'; // <<< Tekrar yorumlandı
-
-// Helper type for grouping schedule by teacher
-interface TeacherScheduleGroup {
-    [teacherName: string]: {
-        [day: string]: {
-            [hour: number]: ScheduledEntry;
-        }
-    }
-}
-
-// Constants for rendering the grid
-const DAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
-const HOURS = Array.from({ length: 10 }, (_, i) => i + 1); // 1 to 10
-
-// --- YENİ: Renk Üretme ve Kontrast Yardımcıları ---
-function stringToHslColor(str: string, s: number, l: number): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const h = hash % 360;
-    return `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-// Basit parlaklık hesaplaması ve kontrast rengi seçimi
-function getContrastColor(hslColor: string): string {
-    // HSL değerlerini ayıkla (basit regex, daha sağlamı gerekebilir)
-    const match = hslColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-    if (match) {
-        const l = parseInt(match[3], 10);
-        // Parlaklık eşiği (deneyerek ayarlanabilir)
-        return l > 55 ? '#000000' : '#FFFFFF'; // Parlaksa siyah, koyuysa beyaz metin
-    }
-    return '#000000'; // Varsayılan siyah
-}
-
-// Renkleri memoize etmek için ders ID'sine göre bir map
-const lessonColorCache = new Map<string, { background: string; text: string }>();
-
-function getLessonColor(lessonId: string): { background: string; text: string } {
-    if (lessonColorCache.has(lessonId)) {
-        return lessonColorCache.get(lessonId)!;
-    }
-    // Pastel tonlar için doygunluğu ve parlaklığı ayarla
-    const backgroundColor = stringToHslColor(lessonId, 70, 80); // %70 doygunluk, %80 parlaklık
-    const textColor = getContrastColor(backgroundColor);
-    const colors = { background: backgroundColor, text: textColor };
-    lessonColorCache.set(lessonId, colors);
-    return colors;
-}
-// --- Renk Yardımcıları Sonu ---
+import Link from 'next/link';
+import { ScheduleGridDisplay } from '@/components/scheduling/ScheduleGridDisplay';
 
 export default function SchedulingPage() {
     const [scheduleData, setScheduleData] = useState<Schedule | null>(null);
-    const [logs, setLogs] = useState<string[]>([]);
-    const [totalUnassignedHours, setTotalUnassignedHours] = useState<number>(0);
-    const [unassignedLessonsList, setUnassignedLessonsList] = useState<UnassignedLessonInfo[]>([]);
-    const [filteredErrorLogs, setFilteredErrorLogs] = useState<string[]>([]);
-    // --- NEW: State for number of attempts ---
-    const [numAttempts, setNumAttempts] = useState<number>(10); // Default to 10 attempts
-    // ---
+    const [unassignedLessonsDisplay, setUnassignedLessonsDisplay] = useState<UnassignedLessonInfo[]>([]);
+    const [totalUnassignedHoursDisplay, setTotalUnassignedHoursDisplay] = useState<number>(0);
+    const [numAttempts, setNumAttempts] = useState<number>(50);
+    const [lastGeneratedResult, setLastGeneratedResult] = useState<BestSchedulerResult | null>(null);
 
-    // Fetch necessary data for displaying names
     const { data: teachersData, isLoading: isLoadingTeachers } = useQuery<Partial<Teacher>[], Error>({
         queryKey: ['teachers'],
         queryFn: fetchTeachers,
-        // Keep data fresh but don't refetch excessively if the view is static
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
 
     const { data: locationsData, isLoading: isLoadingLocations } = useQuery<LocationWithLabType[], Error>({
@@ -93,110 +35,99 @@ export default function SchedulingPage() {
         staleTime: 5 * 60 * 1000,
     });
 
-    // Assuming fetchAllDersOptions returns { id: string; dersAdi: string; ... }[]
-    // Let's define a potential type or use a generic one for now
-    const { data: lessonsData, isLoading: isLoadingLessons } = useQuery<{ id: string; dersAdi: string }[], Error>({
+    const { data: lessonsData, isLoading: isLoadingLessons } = useQuery<{ id: string; dersAdi?: string }[], Error>({
         queryKey: ['allLessonOptions'],
-        queryFn: fetchAllDersOptions as any, // Cast if return type mismatch, adjust later
+        queryFn: fetchAllDersOptions as any,
         staleTime: 5 * 60 * 1000,
     });
 
-    const generateScheduleMutation = useMutation<SerializableSchedulerResult, Error>({
+    const generateScheduleMutation = useMutation<BestSchedulerResult, Error>({
         mutationFn: async () => {
-            console.log(`Starting schedule generation mutation with ${numAttempts} attempts...`);
-            setLogs([]);
-            setFilteredErrorLogs([]);
             setScheduleData(null);
-            setUnassignedLessonsList([]);
-            setTotalUnassignedHours(0);
+            setUnassignedLessonsDisplay([]);
+            setTotalUnassignedHoursDisplay(0);
+            setLastGeneratedResult(null);
             const result = await runSchedulerAction(numAttempts);
-            console.log("Scheduler action finished, result received:", result);
             return result;
         },
         onSuccess: (data) => {
-            console.log("Mutation onSuccess, data:", data);
-            const allLogs = data.logs || [];
-            setLogs(allLogs);
-
-            let deserializedSchedule = null;
-            if (data.schedule) {
-                deserializedSchedule = deserializeSchedule(data.schedule);
-                setScheduleData(deserializedSchedule);
-            } else {
-                setScheduleData(null);
-            }
-
-            if (data.unassignedLessons && data.unassignedLessons.length > 0) {
-                setUnassignedLessonsList(data.unassignedLessons);
-                setTotalUnassignedHours(data.totalUnassignedHours ?? 0);
-                toast.info("Çizelge oluşturuldu ancak bazı dersler/saatler atanamadı.");
-                console.warn("Schedule generation partially succeeded: Unassigned lessons exist.", data.unassignedLessons);
-
-                // --- YENİ: Spesifik Hata Loglarını Filtrele -> SADECE DERS ID'Sİ ---
-                const targetLessonId = "af315d0b-3d13-4a58-aa7b-f769b1ed431f"; // <<< Ders ID'si ile filtrele
-                // const targetDay = "Cuma"; // <<< Kaldırıldı
-                // const failureKeywords = ["FAIL", "Cannot assign", "unavailable"]; // <<< Kaldırıldı
-
-                console.log(`Filtering logs for lesson ID: '${targetLessonId}'`);
-                const filtered = allLogs.filter(log =>
-                    log.includes(targetLessonId)
-                    // && log.includes(targetDay) // <<< Kaldırıldı
-                    // && failureKeywords.some(keyword => log.includes(keyword)) // <<< Kaldırıldı
-                );
-                console.log("Filtered Logs Result (Lesson ID):", filtered);
-                setFilteredErrorLogs(filtered);
-
-                // <<< YENİ: UI'daki başlığı daha genel yapalım >>>
-                 const targetLessonNameForDisplay = unassignedLessonsList.find(l => l.lessonId === targetLessonId)?.lessonName || targetLessonId;
-                // --- Filtreleme Sonu ---
-
-            } else {
-                setUnassignedLessonsList([]);
-                setTotalUnassignedHours(0);
-                setFilteredErrorLogs([]);
-                if (deserializedSchedule) {
-                    toast.success("Çizelge başarıyla oluşturuldu. Tüm dersler atandı!");
-                    console.log("Schedule generated successfully with all lessons assigned.");
-                } else if (!data.error) {
-                    toast.info("Çizelge oluşturuldu ancak atanacak ders bulunamadı.");
-                    console.log("Schedule generation returned empty schedule without errors.");
-                }
-            }
-
-            if (data.error) {
-                toast.error(`Çizelge Oluşturma Başarısız: ${data.error}`);
-                console.error("Schedule generation failed (reported by action):", data.error);
-            }
+            setLastGeneratedResult(data);
+            setScheduleData(data.bestSchedule ?? null);
+            let calculatedTotalUnassignedHours = 0;
+            const unassignedInfoArray: UnassignedLessonInfo[] = (data.unassignedLessons || []).map(lesson => {
+                const remainingHours = lesson.weeklyHours;
+                calculatedTotalUnassignedHours += remainingHours;
+                return { lessonId: lesson.id, lessonName: lesson.name, remainingHours: remainingHours };
+            });
+            setUnassignedLessonsDisplay(unassignedInfoArray);
+            setTotalUnassignedHoursDisplay(calculatedTotalUnassignedHours);
+            if (!data.success && data.error) { toast.error(`Çizelge Oluşturma Başarısız: ${data.error}`); }
+            else if (data.success && unassignedInfoArray.length > 0) { toast.info("Çizelge oluşturuldu ancak bazı dersler atanamadı."); }
+            else if (data.success && data.bestSchedule?.size > 0) { toast.success("Çizelge başarıyla oluşturuldu. Tüm dersler atandı!"); }
+            else if (data.success) { toast.info("Çizelge oluşturuldu ancak atanacak ders bulunamadı veya program boş."); }
         },
         onError: (error) => {
-            console.error("Mutation onError:", error);
-            setLogs(prev => [...prev, `Mutation Error: ${error.message}`]);
             setScheduleData(null);
-            setUnassignedLessonsList([]);
-            setTotalUnassignedHours(0);
-            setFilteredErrorLogs([]);
+            setUnassignedLessonsDisplay([]);
+            setTotalUnassignedHoursDisplay(0);
+            setLastGeneratedResult(null);
             toast.error(`Çizelge oluşturulurken bir hata oluştu: ${error.message}`);
         },
     });
 
-    // Combined loading state
+    const saveScheduleMutation = useMutation<void, Error, { name?: string, description?: string }>({
+        mutationFn: async (variables) => {
+            if (!lastGeneratedResult || !lastGeneratedResult.success || !lastGeneratedResult.bestSchedule) {
+                throw new Error("Kaydedilecek geçerli ve başarılı bir çizelge bulunamadı.");
+            }
+            const scheduleToSave = Array.from(lastGeneratedResult.bestSchedule.entries());
+            const unassignedToSave = lastGeneratedResult.unassignedLessons || [];
+            await saveScheduleAction({
+                schedule_data: scheduleToSave,
+                unassigned_lessons: unassignedToSave,
+                fitnessScore: lastGeneratedResult.minFitnessScore,
+                workloadVariance: lastGeneratedResult.bestVariance,
+                totalGaps: lastGeneratedResult.bestTotalGaps,
+                logs: lastGeneratedResult.logs,
+                name: variables.name,
+                description: variables.description,
+            });
+        },
+        onSuccess: () => {
+            toast.success("Çizelge başarıyla kaydedildi!");
+        },
+        onError: (error) => {
+            toast.error(`Çizelge kaydedilirken hata oluştu: ${error.message}`);
+        },
+    });
+
     const isLoadingData = isLoadingTeachers || isLoadingLocations || isLoadingLessons;
+    const isGenerating = generateScheduleMutation.isPending;
+    const isSaving = saveScheduleMutation.isPending;
+    const canSave = !!lastGeneratedResult && lastGeneratedResult.success;
 
     const handleGenerateClick = () => {
-        // Validate numAttempts before mutating
         if (numAttempts < 1 || !Number.isInteger(numAttempts)) {
             toast.error("Lütfen geçerli bir pozitif deneme sayısı girin.");
             return;
         }
-        generateScheduleMutation.mutate(); // Mutate call doesn't need arguments here
+        generateScheduleMutation.mutate();
     };
 
-    // Helper function to create lookup maps for faster name retrieval
+    const handleSaveClick = () => {
+        const name = prompt("Kaydedilecek Çizelge Adı (isteğe bağlı):", `Çizelge ${new Date().toLocaleDateString()}`);
+        if (name === null) {
+            toast.info("Kaydetme iptal edildi.");
+            return;
+        }
+        saveScheduleMutation.mutate({ name: name || undefined, description: undefined });
+    };
+
     const createLookupMap = <T extends { id: string; name?: string; dersAdi?: string }>(data: T[] | undefined, keyField: 'name' | 'dersAdi' = 'name'): Map<string, string> => {
         const map = new Map<string, string>();
         if (data) {
             data.forEach(item => {
-                const name = item[keyField] || item.name; // Handle both 'name' and 'dersAdi'
+                const name = item[keyField] || item.name;
                 if (item.id && name) {
                     map.set(item.id, name);
                 }
@@ -205,276 +136,52 @@ export default function SchedulingPage() {
         return map;
     };
 
-    // Çizelgeyi öğretmen bazlı grid olarak render etme fonksiyonu
-    const renderScheduleByTeacher = (
-        scheduleMap: Schedule | null, 
-        teachers: Partial<Teacher>[] | undefined,
-        lessons: { id: string; dersAdi: string }[] | undefined,
-        locations: LocationWithLabType[] | undefined
-    ) => {
-        if (isLoadingData) return <p>Çizelge verileri yükleniyor...</p>; 
-        if (!scheduleMap || scheduleMap.size === 0) return <p>Çizelge oluşturulamadı veya boş.</p>;
-
-        const scheduleArray = Array.from(scheduleMap.entries());
-
-        // Filter teachers to ensure 'id' is a string before creating the map
-        const validTeachers = teachers?.filter((t): t is Teacher & { id: string; name?: string } => 
-            typeof t?.id === 'string' && typeof t?.name === 'string'
-        );
-
-        // Create lookup maps using potentially filtered/validated data
-        const teacherMap = createLookupMap(validTeachers); // Use filtered teachers
-        const lessonMap = createLookupMap(lessons, 'dersAdi');
-        const locationMap = createLookupMap(locations);
-
-        // 1. Schedule verisini öğretmen ID'sine göre grupla
-        const groupedSchedule: { [teacherId: string]: { [day: string]: { [hour: number]: ScheduledEntry } } } = {};
-        scheduleArray.forEach(([, entry]) => {
-            // Use teacherId for grouping
-            const teacherId = entry.teacherId;
-            const day = entry.timeSlot.day;
-            const hour = entry.timeSlot.hour;
-
-            if (!groupedSchedule[teacherId]) {
-                groupedSchedule[teacherId] = {};
-            }
-            if (!groupedSchedule[teacherId][day]) {
-                groupedSchedule[teacherId][day] = {};
-            }
-            // Store the original entry
-            groupedSchedule[teacherId][day][hour] = entry;
-        });
-
-        return (
-            <div className="space-y-8">
-                {Object.keys(groupedSchedule).sort((a, b) => (teacherMap.get(a) ?? 'Z').localeCompare(teacherMap.get(b) ?? 'Z')).map(teacherId => {
-                     const teacherName = teacherMap.get(teacherId) || 'Bilinmeyen Öğretmen';
-
-                    // --- YENİ: Öğretmen Toplam Saatini Hesapla ---
-                    let totalTeacherHours = 0;
-                    Object.values(groupedSchedule[teacherId]).forEach(daySchedule => {
-                        totalTeacherHours += Object.keys(daySchedule).length; // Her entry 1 saat varsayılıyor
-                    });
-                    // --- Hesaplama Sonu ---
-
-                     return (
-                        <div key={teacherId} className="overflow-x-auto shadow border border-gray-200 rounded-lg">
-                             {/* --- YENİ: Başlığa Toplam Saati Ekle --- */}
-                            <h4 className="text-lg font-semibold p-3 bg-gray-100 border-b">
-                                {teacherName}
-                                <span className="text-sm font-normal text-gray-600 ml-2">(Toplam: {totalTeacherHours} saat)</span>
-                            </h4>
-                            <table className="min-w-full divide-y divide-gray-200 border-collapse">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border border-gray-300">Saat</th>
-                                        {DAYS.map(day => (
-                                            <th key={day} className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border border-gray-300 w-1/5">
-                                                {day}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {HOURS.map(hour => (
-                                        <tr key={hour}>
-                                            <td className="px-2 py-2 whitespace-nowrap text-xs font-medium text-gray-700 border border-gray-300 w-16 text-center">{`${hour}. Saat`}</td>
-                                            {DAYS.map(day => {
-                                                const entry = groupedSchedule[teacherId]?.[day]?.[hour];
-                                                const lessonName = entry ? lessonMap.get(entry.lessonId) || 'Bilinmeyen Ders' : '';
-                                                const locationName = entry ? locationMap.get(entry.locationId) || 'Bilinmeyen Konum' : '';
-
-                                                const cellStyle = entry
-                                                    ? getLessonColor(entry.lessonId)
-                                                    : { background: 'transparent', text: '#a0aec0' };
-
-                                                return (
-                                                    <td
-                                                        key={`${day}-${hour}`}
-                                                        className="px-2 py-1 border border-gray-300 text-center align-top h-16"
-                                                        style={{ backgroundColor: cellStyle.background, color: cellStyle.text }}
-                                                    >
-                                                        {entry ? (
-                                                            <div className="text-xs">
-                                                                <p className="font-semibold">{lessonName}</p>
-                                                                <p style={{ color: cellStyle.text === '#FFFFFF' ? '#E2E8F0' : '#4A5568' }}>
-                                                                    {locationName}
-                                                                </p>
-                                                                {/* --- YENİ: Sınıf Seviyesini Ekle --- */}
-                                                                <p className="text-[10px] mt-0.5" style={{ color: cellStyle.text === '#FFFFFF' ? '#CBD5E0' : '#718096' }}> {/* Biraz daha soluk */}
-                                                                    Sınıf: {entry.sinifSeviyesi}
-                                                                </p>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-gray-400"></span>
-                                                        )}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    };
-
-    // <<< YENİ: Logları Kopyalama Fonksiyonu >>>
-    const handleCopyLogs = async () => {
-        if (!navigator.clipboard) {
-            toast.error('Panoya kopyalama bu tarayıcıda desteklenmiyor.');
-            return;
-        }
-        if (logs.length === 0) {
-            toast.info('Kopyalanacak log bulunmuyor.');
-            return;
-        }
-        try {
-            await navigator.clipboard.writeText(logs.join('\n'));
-            toast.success('Loglar panoya kopyalandı!');
-        } catch (err) {
-            toast.error('Loglar kopyalanırken bir hata oluştu.');
-            console.error('Failed to copy logs: ', err);
-        }
-    };
-    // <<< YENİ BİTİŞ >>>
-
-    // --- YENİ: State'i render sırasında logla ---
-    console.log("FilteredErrorLogs state during render:", filteredErrorLogs);
-    // --- Log Sonu ---
-
-    // <<< YENİ: Değişkeni burada tanımla >>>
-    const targetLessonIdForFilter = "af315d0b-3d13-4a58-aa7b-f769b1ed431f"; // Ayrı bir sabit kullanabiliriz
-    const targetLessonNameForDisplay = 
-        unassignedLessonsList.find(l => l.lessonId === targetLessonIdForFilter)?.lessonName || targetLessonIdForFilter;
+    const teacherMap = useMemo(() => createLookupMap(teachersData as any[]), [teachersData]);
+    const lessonMap = useMemo(() => createLookupMap(lessonsData, 'dersAdi'), [lessonsData]);
+    const locationMap = useMemo(() => createLookupMap(locationsData as any[]), [locationsData]);
 
     return (
         <DashboardLayout>
-            <div className="p-4 md:p-6">
-                <h1 className="text-2xl font-semibold text-gray-800 mb-4">Otomatik Çizelge Oluşturma</h1>
-
-                {/* --- BEGIN: Number of Attempts Input --- */}
-                <div className="mb-4 flex items-center space-x-3 bg-gray-100 p-3 rounded-md border border-gray-200 max-w-md">
-                    <label htmlFor="numAttempts" className="block text-sm font-medium text-gray-700 whitespace-nowrap">
-                        Deneme Sayısı:
-                    </label>
-                    <input
-                        id="numAttempts"
-                        type="number"
-                        value={numAttempts}
-                        onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            setNumAttempts(isNaN(val) || val < 1 ? 1 : val); // Ensure positive integer, default to 1
-                        }}
-                        min="1"
-                        step="1"
-                        className="p-2 border border-gray-300 rounded-md w-20 text-center disabled:bg-gray-200 disabled:cursor-not-allowed"
-                        disabled={generateScheduleMutation.isPending}
-                    />
-                     <p className="text-xs text-gray-500">
-                        (Daha yüksek sayı = Daha iyi sonuç potansiyeli, daha uzun sürer)
-                    </p>
-                </div>
-                {/* --- END: Number of Attempts Input --- */}
-
-                <Button
-                    onClick={handleGenerateClick}
-                    disabled={generateScheduleMutation.isPending || isLoadingData}
-                >
-                    {generateScheduleMutation.isPending ? 'Çizelge Oluşturuluyor...' : 
-                     isLoadingData ? 'Veri Yükleniyor...' : 'Çizelge Oluştur'} 
-                </Button>
-
-                {/* Toplam Atanamayan Saat Gösterimi */} 
-                {(generateScheduleMutation.isSuccess || generateScheduleMutation.isError) && !generateScheduleMutation.isPending && (
-                     <div className={`mt-2 text-sm font-medium ${totalUnassignedHours > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        Toplam atanamayan ders saati: {totalUnassignedHours}
-                     </div>
-                 )}
-
-                {generateScheduleMutation.isPending && <p className="mt-4 text-blue-600">Çizelge oluşturuluyor, lütfen bekleyin...</p>}
-                {isLoadingData && <p className="mt-4 text-gray-600">Gerekli veriler yükleniyor...</p>}
-
-                {/* Hata Mesajı (Mutation'dan gelen) */} 
-                {generateScheduleMutation.isError && (
-                     <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                        <strong>Hata:</strong> {generateScheduleMutation.error.message}
-                     </div>
-                )}
-                {/* Başarısız Sonuç Mesajı (Action'dan gelen) */} 
-                {generateScheduleMutation.isSuccess && !generateScheduleMutation.data?.success && generateScheduleMutation.data?.error && (
-                    <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                       <strong>Çizelge Oluşturma Başarısız:</strong> {generateScheduleMutation.data.error}
-                    </div>
-                )}
-
-                 {/* Atanamayan Dersler Listesi */} 
-                {generateScheduleMutation.isSuccess && unassignedLessonsList.length > 0 && (
-                    <div className="mt-4 p-4 border rounded bg-amber-50 border-amber-200">
-                        <h3 className="text-lg font-semibold text-amber-800 mb-2">Atanamayan Dersler ({totalUnassignedHours} saat):</h3>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-amber-700">
-                            {unassignedLessonsList.map((lesson) => (
-                            <li key={lesson.lessonId}>
-                                <strong>{lesson.lessonName}:</strong> {lesson.remainingHours} saat atanamadı.
-                            </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-
-                {/* Filtrelenmiş Hata Logları Alanı */} 
-                {filteredErrorLogs.length > 0 && (
-                    <div className="mt-4 p-4 border rounded bg-red-50 border-red-200">
-                        <h4 className="text-md font-semibold text-red-800 mb-2">
-                            '{targetLessonNameForDisplay}' dersi için loglar:
-                        </h4>
-                        <div className="h-40 w-full rounded-md border p-2 bg-white overflow-y-auto">
-                             <pre className="text-xs text-red-700 whitespace-pre-wrap break-words">
-                                {filteredErrorLogs.join('\n')}
-                             </pre>
-                        </div>
-                    </div>
-                )}
-                {/* Alan Sonu */} 
-
-                {/* Log Alanı --- GEÇİCİ OLARAK YORUM SATIRINA ALINDI --- */}
+            <div className="space-y-6 p-4 md:p-6">
                 
-                {/* Başarılı ve dolu çizelge gösterimi -> DEĞİŞTİRİLDİ: scheduleData varsa göster */}
-                {scheduleData && (
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-white shadow rounded-lg">
+                    <div className="flex items-center gap-2">
+                        <label htmlFor="numAttempts" className="text-sm font-medium text-gray-700 whitespace-nowrap">Deneme Sayısı:</label>
+                        <input type="number" id="numAttempts" min="1" max="500" value={numAttempts} onChange={(e) => { const val = parseInt(e.target.value, 10); setNumAttempts(isNaN(val) || val < 1 ? 1 : Math.min(500, val)); }} disabled={isGenerating || isSaving} className="w-20 rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-1.5" />
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button onClick={handleGenerateClick} disabled={isGenerating || isLoadingData || isSaving}>{isGenerating ? 'Oluşturuluyor...' : 'Çizelge Oluştur'}</Button>
+                        <Button onClick={handleSaveClick} disabled={!canSave || isGenerating || isSaving} variant="secondary">{isSaving ? 'Kaydediliyor...' : 'Çizelgeyi Kaydet'}</Button>
+                        <Link href="/dashboard/saved-schedules" passHref><Button variant="outline" disabled={isGenerating || isLoadingData || isSaving}>Kaydedilenler</Button></Link>
+                    </div>
+                </div>
+
+                {isGenerating && <p className="mt-4 text-blue-600">Çizelge oluşturuluyor, lütfen bekleyin... ({numAttempts} deneme)</p>}
+                {isLoadingData && <p className="mt-4 text-gray-600">Gerekli veriler yükleniyor...</p>}
+                {generateScheduleMutation.isError && (<div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded"><strong>Hata:</strong> {generateScheduleMutation.error.message}</div>)}
+                {lastGeneratedResult && !lastGeneratedResult.success && lastGeneratedResult.error && (<div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded"><strong>Çizelge Oluşturma Başarısız:</strong> {lastGeneratedResult.error}</div>)}
+                {!isGenerating && lastGeneratedResult && (<div className={`mt-2 text-sm font-medium ${totalUnassignedHoursDisplay > 0 ? 'text-orange-600' : 'text-green-600'}`}>Toplam atanamayan ders saati: {totalUnassignedHoursDisplay}</div>)}
+
+                {lastGeneratedResult && unassignedLessonsDisplay.length > 0 && (<div className="mt-4 p-4 border rounded bg-amber-50 border-amber-200"><h3 className="text-lg font-semibold text-amber-800 mb-2">Atanamayan Dersler ({totalUnassignedHoursDisplay} saat):</h3><ul className="list-disc pl-5 space-y-1 text-sm text-amber-700">{unassignedLessonsDisplay.map((lesson) => (<li key={lesson.lessonId}><strong>{lesson.lessonName}:</strong> {lesson.remainingHours} saat atanamadı.</li>))}</ul></div>)}
+
+                {scheduleData && scheduleData.size > 0 && (
                     <div className="mt-6">
                         <h2 className="text-xl font-semibold mb-3">Oluşturulan Çizelge</h2>
-                        {/* Atanamayan ders uyarısı zaten totalUnassignedHours > 0 kontrolü ile gösteriliyor */}
-                        {totalUnassignedHours > 0 && (
-                            <p className="mb-2 text-orange-600 text-sm">
-                                Uyarı: Çizelge oluşturuldu ancak bazı dersler/saatler atanamadı.
-                            </p>
-                        )}
-                         {renderScheduleByTeacher(scheduleData, teachersData, lessonsData, locationsData)}
+                        <ScheduleGridDisplay 
+                            scheduleMap={scheduleData} 
+                            teacherMap={teacherMap} 
+                            lessonMap={lessonMap} 
+                            locationMap={locationMap} 
+                        />
                     </div>
                 )}
-                 {/* Başarılı ama boş çizelge durumu -> DEĞİŞTİRİLDİ: Hata YOKSA ve scheduleData YOKSA göster */}
-                 {!generateScheduleMutation.isError && generateScheduleMutation.isSuccess && !scheduleData && (
+                {lastGeneratedResult && lastGeneratedResult.success && (!scheduleData || scheduleData.size === 0) && unassignedLessonsDisplay.length === 0 && (
                     <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                       Çizelge başarıyla oluşturuldu ancak gösterilecek atama bulunamadı.
+                       Çizelge başarıyla oluşturuldu ancak gösterilecek atama bulunamadı (Muhtemelen atanacak ders yoktu).
                     </div>
                 )}
 
             </div>
         </DashboardLayout>
     );
-}
-
-// Helper to deserialize the schedule Map
-function deserializeSchedule(serialized?: [string, any][]): Schedule | null {
-    if (!serialized) return null;
-    try {
-        // Assuming the structure is [key, ScheduledEntry]
-        return new Map<string, any>(serialized);
-    } catch (e) {
-        console.error("Error deserializing schedule:", e);
-        return null;
-    }
 } 

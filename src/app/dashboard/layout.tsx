@@ -388,7 +388,7 @@ export default function DashboardLayout({
                   Kullanım Kılavuzu
                 </Link>
 
-                {/* Otomatik Ders Programı TestMode Link */}
+                {/* Akıllı Ders Dağıtım Link */}
                 <Link
                   href="/dashboard/scheduling"
                   className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -398,7 +398,7 @@ export default function DashboardLayout({
                   }`}
                 >
                   <ClockIcon className="mr-3 h-5 w-5" /> {/* Replace ClockIcon if needed */}
-                  Otomatik Ders Programı TestMode 
+                  Akıllı Ders Dağıtım
                 </Link>
               </nav>
               
