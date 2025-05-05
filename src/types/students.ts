@@ -15,7 +15,7 @@ export const StudentSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, 'Ad zorunlu'),
   email: z.string().email('Geçersiz e-posta').optional().or(z.literal('')),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD formatında').optional().or(z.literal('')),
+  birthDate: z.string().nullable(),
   phone: z.string().min(10, 'Telefon numarası en az 10 hane').regex(/^\+?\d+$/, 'Sadece rakam ve "+" içerebilir').optional().or(z.literal('')),
   gender: z.enum(['male', 'female', 'other']).optional(),
   schoolNumber: z.string().min(1, 'Okul numarası zorunlu'),
