@@ -56,14 +56,8 @@ export default function RootLayout({
         <AuthProvider>
           {/* Remove the NotificationProvider wrapper */}
           {/* <NotificationProvider> */}
-            <div className="flex h-screen bg-gray-100">
-              {/* <Sidebar /> */}
-              {/* Remove the QueryProvider wrapper */}
-              {/* <QueryProvider> */}
-                {children}
-                <Toaster position="bottom-right" />
-              {/* </QueryProvider> */}
-            </div>
+            {children}
+            <Toaster position="bottom-right" />
           {/* </NotificationProvider> */}
         </AuthProvider>
       </body>

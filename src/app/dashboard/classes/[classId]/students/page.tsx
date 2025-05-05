@@ -23,7 +23,8 @@ export default function StudentsPage() {
   const params = useParams();
   const classId = params.classId as string;
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = React.useState('');
+  // REMOVE state for search term, it's now handled in StudentsTable
+  // const [searchTerm, setSearchTerm] = React.useState('');
 
   const { data: students = [], isLoading, error } = useQuery<Student[], Error>({
     queryKey: ['students', classId],
@@ -37,26 +38,18 @@ export default function StudentsPage() {
     enabled: !!classId, // Only run if classId is available
   });
 
-  // Filter students by name - Uncommented
-  const filteredStudents = React.useMemo(
-    () => students.filter(s =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    [students, searchTerm]
-  );
-
-  // --- Uncomment Mutations ---
-  const createMutation = useMutation({ // Uncommented
+  // --- Mutations need classId and queryClient ---
+  const createMutation = useMutation({
     mutationFn: (payload: Student) => createStudent(classId, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students', classId] }),
   });
 
-  const updateMutation = useMutation({ // Uncommented
+  const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Student }) => updateStudent(classId, id, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students', classId] }),
   });
 
-  const deleteMutation = useMutation({ // Uncommented
+  const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteStudent(classId, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['students', classId] }),
   });
@@ -75,7 +68,7 @@ export default function StudentsPage() {
     setFormModalOpen(true);
   };
 
-  const handleEdit = (student: Student) => { // Uncommented
+  const handleEdit = (student: Student) => {
     setEditingStudent(student as StudentFormValues);
     setFormModalOpen(true);
   };
@@ -87,7 +80,7 @@ export default function StudentsPage() {
     }
   };
 
-  const handleFormSubmit = (data: StudentFormValues) => { // Uncommented
+  const handleFormSubmit = (data: StudentFormValues) => {
     const payload = StudentSchema.parse(data); // Ensure validation happens
     
     // --- DEBUG LOG --- 
@@ -140,7 +133,8 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      <div className="mb-4">
+      {/* REMOVE the search input here, it's now inside StudentsTable */}
+      {/* <div className="mb-4">
         <input
           type="search"
           placeholder="Öğrenci Ara..."
@@ -148,13 +142,13 @@ export default function StudentsPage() {
           onChange={e => setSearchTerm(e.target.value)}
           className="w-full sm:w-1/2 p-2 border rounded-md"
         />
-      </div>
+      </div> */}
 
       {isLoading && <div>Yükleniyor...</div>}
       {error && <div className="text-red-600">Hata: {(error as Error).message}</div>}
       {!isLoading && !error && (
         <StudentsTable
-          students={filteredStudents}
+          students={students} // Pass the raw students array
           onEdit={handleEdit}
           onDelete={handleDelete}
           onShowGuardians={handleShowGuardians}

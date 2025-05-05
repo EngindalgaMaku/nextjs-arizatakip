@@ -9,15 +9,37 @@ import { Student, StudentSchema, Guardian } from '@/types/students';
 export async function fetchStudentsByClass(classId: string): Promise<Student[]> {
   const { data, error } = await supabase
     .from('students')
-    .select('*')
+    .select('id, name, email, birth_date, phone, gender, school_number, status, guardians, class_id, created_at, updated_at')
     .eq('class_id', classId)
-    .order('created_at', { ascending: true });
+    .order('name', { ascending: true });
 
   if (error) {
     console.error(`Error fetching students for class ${classId}:`, error);
     throw error;
   }
-  return data as Student[] || [];
+
+  const mappedData = data?.map(student => ({
+    id: student.id,
+    name: student.name,
+    email: student.email,
+    birthDate: student.birth_date,
+    phone: student.phone,
+    gender: student.gender,
+    schoolNumber: student.school_number,
+    status: student.status,
+    guardians: student.guardians,
+  })) || [];
+
+  const validatedData = mappedData.map(studentData => {
+    const parseResult = StudentSchema.safeParse(studentData);
+    if (!parseResult.success) {
+      console.warn(`Fetched student data validation failed for student ID ${studentData.id}:`, parseResult.error);
+      return null;
+    }
+    return parseResult.data;
+  }).filter((s): s is Student => s !== null);
+
+  return validatedData;
 }
 
 /**

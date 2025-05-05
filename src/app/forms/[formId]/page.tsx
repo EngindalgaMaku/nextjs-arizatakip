@@ -196,73 +196,54 @@ function FormContent({ formId }: { formId: string }) {
     );
   }
 
-  // <-- Check if form submitted successfully -->
   if (isSubmittedSuccessfully) {
     return (
-      <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white p-8 shadow-lg rounded-lg text-center">
-           {/* Checkmark Icon */}
-          <svg className="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          <h2 className="mt-4 text-2xl font-semibold text-gray-800">Teşekkür ederiz!</h2>
-          <p className="mt-2 text-gray-600">
-            "{form?.title}" formuna verdiğiniz yanıt başarıyla alınmıştır.
-          </p>
-          {/* Optional: Add a button/link back if needed */}
+      <div className="flex justify-center items-center min-h-screen bg-gray-100">
+        <div className="p-8 bg-white rounded-lg shadow-md text-center">
+          <h2 className="text-2xl font-semibold text-green-600 mb-4">Başarılı!</h2>
+          <p className="text-gray-700">Formunuz başarıyla gönderildi.</p>
+          {/* Optional: Add a button to submit another response or go back */}
         </div>
       </div>
     );
   }
 
-  // <-- Render the form if not submitted -->
+  // Wrap the actual form rendering in the centering container
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto bg-white p-8 shadow-lg rounded-lg">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-4">{form.title}</h1>
-        {form.description && (
-          <p className="text-center text-gray-600 mb-8">{form.description}</p>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {form.fields && form.fields.length > 0 ? (
-            form.fields.map((field) => (
-              <RenderFormField 
-                 key={field.id} 
-                 field={field} 
-                 register={register} 
-                 errors={errors} 
-              />
-            ))
-          ) : (
-            <p className="text-center text-gray-500">Bu formda henüz alan bulunmuyor.</p>
-          )}
-
-          {form.fields && form.fields.length > 0 && (
-             <div className="pt-4">
-                 <button 
-                    type="submit" 
-                    // Use mutation's pending state
-                    disabled={submitMutation.isPending} 
-                    className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                 >
-                    {submitMutation.isPending ? ( // Check pending state
-                       <>
-                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                         </svg>
-                         Gönderiliyor...
-                       </>
-                    ) : (
-                       <>
-                         <PaperAirplaneIcon className="h-5 w-5 mr-2" />
-                         Gönder
-                       </>
-                    )}
-                 </button>
-             </div>
-          )}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4"> {/* Centering container */} 
+      <div className="w-full max-w-2xl p-6 md:p-8 bg-white rounded-lg shadow-md"> {/* Form container */} 
+        <h1 className="text-2xl font-bold mb-2 text-center">{form.title}</h1>
+        <p className="text-gray-600 mb-6 text-center">{form.description}</p>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          {form.fields.map((field) => (
+            <RenderFormField 
+                key={field.id} 
+                field={field} 
+                register={register} 
+                errors={errors} 
+            />
+          ))}
+          <button 
+            type="submit"
+            disabled={submitMutation.isPending}
+            className="w-full flex justify-center items-center px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
+          >
+            {submitMutation.isPending ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Gönderiliyor...
+              </>
+            ) : (
+              <>
+                <PaperAirplaneIcon className="h-5 w-5 mr-2" />
+                Gönder
+              </>
+            )}
+          </button>
         </form>
-
       </div>
     </div>
   );
