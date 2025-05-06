@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchDallar, createDal, updateDal, deleteDal, fetchBranchesForSelect, fetchDallarByBranch } from '@/actions/dalActions';
