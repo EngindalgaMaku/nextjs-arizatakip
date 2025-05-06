@@ -127,7 +127,7 @@ export default function DallarClient() {
       {!isLoading && availableBranches.length === 0 && <div>Ana dal bulunamadı.</div>}
 
       {!isLoading && availableBranches.length > 0 && (
-        <DallarTable dallar={dallar} onEdit={handleEdit} onDelete={handleDelete} isLoading={mutationLoading} />
+        <DallarTable dallar={dallar} onEdit={handleEdit} onDelete={handleDelete} />
       )}
 
       {isModalOpen && (
