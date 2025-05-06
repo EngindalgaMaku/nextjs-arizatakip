@@ -240,18 +240,18 @@ export default function DashboardLayout({
                 <AcademicCapIcon className="mr-3 h-5 w-5" />
                 Öğretmenler
               </Link>
-              
-              {/* Dal Yönetimi Link */}
+
+              {/* YENİ: Branş Yönetimi Linki */}
               <Link
-                href="/dashboard/dallar"
+                href="/dashboard/branches"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/dallar")
+                  pathname.includes("/branches")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <AcademicCapIcon className="mr-3 h-5 w-5" /> {/* Veya farklı bir ikon */} 
-                Dal Yönetimi
+                <BuildingLibraryIcon className="mr-3 h-5 w-5" /> {/* İkonu değiştirebilirsiniz */}
+                Branş/Dal Yönetimi
               </Link>
 
               <Link

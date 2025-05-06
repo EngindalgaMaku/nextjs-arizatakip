@@ -4,6 +4,7 @@ import { z } from 'zod';
 // Schema for the Location object in the database
 export const LocationSchema = z.object({
   id: z.string().uuid(),
+  branch_id: z.string().uuid('Geçerli bir branş seçilmelidir.'), // Foreign key to branches table
   name: z.string().min(1, 'Konum adı zorunludur.').max(100, 'Konum adı en fazla 100 karakter olabilir.'),
   code: z.string().max(20, 'Konum kodu en fazla 20 karakter olabilir.').optional().nullable(), // Optional code
   capacity: z.number().int().positive('Kapasite pozitif bir tam sayı olmalıdır.').optional().nullable(), // Optional capacity
@@ -27,6 +28,7 @@ export type LocationFormValues = z.infer<typeof LocationFormSchema>;
 
 // Type including related lab type for display purposes (used in fetch queries)
 export interface LocationWithLabType extends Location {
+    branch?: { id: string; name: string } | null;
     labType?: { // Use optional chaining or ensure join
         id: string;
         name: string;

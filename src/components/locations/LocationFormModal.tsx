@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Location, LocationFormValues, LocationFormSchema } from '@/types/locations';
 import { LabType } from '@/types/labTypes';
+import { Branch } from '@/types/branches';
 import Modal from '@/components/Modal'; // Assuming a reusable Modal component exists
 // Temporary Button for fallback
 const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => (
@@ -16,6 +17,7 @@ const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
 
 interface LocationFormModalProps {
   initialData?: Location; // Use base Location type for initial data
+  availableBranches: Branch[]; // New prop for branch options
   availableLabTypes: LabType[];
   onSubmit: (data: LocationFormValues) => void;
   onClose: () => void;
@@ -24,6 +26,7 @@ interface LocationFormModalProps {
 
 export function LocationFormModal({
   initialData,
+  availableBranches = [],
   availableLabTypes = [],
   onSubmit,
   onClose,
@@ -36,6 +39,7 @@ export function LocationFormModal({
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LocationFormValues>({
     resolver: zodResolver(LocationFormSchema),
     defaultValues: {
+      branch_id: initialData?.branch_id ?? '',
       name: initialData?.name ?? '',
       code: initialData?.code ?? '',
       capacity: initialData?.capacity ?? undefined, // Default to undefined if null/0 not desired
@@ -49,6 +53,25 @@ export function LocationFormModal({
     <Modal isOpen onClose={onClose} title={modalTitle}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <fieldset disabled={isBusy} className="space-y-4">
+          {/* Branch (Required) */}
+          <div>
+            <label htmlFor="branch_id" className="block text-sm font-medium text-gray-700">Branş *</label>
+            <select
+              key={initialData?.branch_id}
+              id="branch_id"
+              {...register('branch_id')}
+              aria-invalid={errors.branch_id ? 'true' : 'false'}
+              className={`mt-1 block w-full rounded p-2 border ${errors.branch_id ? 'border-red-500' : 'border-gray-300'}`}
+              defaultValue={initialData?.branch_id ?? ''}
+            >
+              <option value="" disabled>-- Seçiniz --</option>
+              {availableBranches.map(branch => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
+            </select>
+            {errors.branch_id && <p className="text-red-600 text-sm mt-1">{errors.branch_id.message}</p>}
+          </div>
+
           {/* Location Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">Konum Adı *</label>

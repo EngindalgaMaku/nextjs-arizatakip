@@ -15,6 +15,7 @@ export async function fetchLocations(): Promise<LocationWithLabType[]> {
     .from('locations')
     .select(`
       *,
+      branch:branches ( id, name ),
       labType:lab_types ( id, name, code )
     `)
     .order('name', { ascending: true });
@@ -24,17 +25,11 @@ export async function fetchLocations(): Promise<LocationWithLabType[]> {
     throw error;
   }
 
-  // Map data to ensure correct structure and type
   const locations = data.map(loc => ({
     ...loc,
-    // Cast labType explictly to handle potential null or incorrect types from join
-    labType: loc.labType ? {
-        id: (loc.labType as any).id,
-        name: (loc.labType as any).name,
-        code: (loc.labType as any).code,
-    } : null,
+    branch: loc.branch ? { id: (loc.branch as any).id, name: (loc.branch as any).name } : null,
+    labType: loc.labType ? { id: (loc.labType as any).id, name: (loc.labType as any).name, code: (loc.labType as any).code } : null,
   })) as LocationWithLabType[];
-
 
   return locations;
 }
@@ -185,4 +180,33 @@ export async function deleteLocation(id: string): Promise<{ success: boolean; er
     console.error('deleteLocation error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Fetch all locations for a specific branch by its ID, including lab type info.
+ */
+export async function fetchLocationsByBranch(branchId: string): Promise<LocationWithLabType[]> {
+  if (!branchId) return [];
+  const { data, error } = await supabase
+    .from('locations')
+    .select(
+      `*,
+      branch:branches ( id, name ),
+      labType:lab_types ( id, name, code )`
+    )
+    .eq('branch_id', branchId)
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error(`Error fetching locations for branch ${branchId}:`, error);
+    throw error;
+  }
+
+  const locations = (data || []).map(loc => ({
+    ...loc,
+    branch: loc.branch ? { id: (loc.branch as any).id, name: (loc.branch as any).name } : null,
+    labType: loc.labType ? { id: (loc.labType as any).id, name: (loc.labType as any).name, code: (loc.labType as any).code } : null,
+  })) as LocationWithLabType[];
+
+  return locations;
 }

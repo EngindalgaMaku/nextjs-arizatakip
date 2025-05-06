@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchLocations, createLocation, updateLocation, deleteLocation, fetchLocationById } from '@/actions/locationActions'; // Import fetchLocationById
+import { fetchLocations, createLocation, updateLocation, deleteLocation, fetchLocationById, fetchLocationsByBranch } from '@/actions/locationActions';
 import { fetchLabTypes } from '@/actions/labTypeActions';
+import { fetchBranches } from '@/actions/branchActions';
 import { LocationWithLabType, LocationFormValues, Location } from '@/types/locations';
 import { LabType } from '@/types/labTypes';
 import LocationsTable from '@/components/locations/LocationsTable'; // Use default import
@@ -13,19 +14,37 @@ import { toast } from 'react-toastify';
 import * as z from 'zod';
 import Link from 'next/link'; // Import Link component
 import { BuildingOffice2Icon } from '@heroicons/react/24/outline'; // Import icon for the button
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Branch } from '@/types/branches';
 
 export default function LocationsPage() {
     const queryClient = useQueryClient();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const branchId = searchParams.get('branchId') || '';
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLocation, setEditingLocation] = useState<Location | null>(null); // Use Location type for editing
 
+    // Fetch branches for filter
+    const { data: branches = [], isLoading: branchesLoading, error: branchesError } = useQuery<Branch[], Error>({
+        queryKey: ['branches'],
+        queryFn: fetchBranches,
+    });
+
+    // Default select "Bilişim Teknolojileri" if no branchId in URL
+    useEffect(() => {
+      if (!branchId && !branchesLoading && branches.length > 0) {
+        const defaultBranch = branches.find(b => b.name === 'Bilişim Teknolojileri');
+        if (defaultBranch) {
+          router.replace(`/dashboard/locations?branchId=${defaultBranch.id}`);
+        }
+      }
+    }, [branchId, branches, branchesLoading, router]);
+
     // Fetch Locations with Lab Type info
-    const { data: locations = [], isLoading: isLoadingLocations, error: locationsError } = useQuery<
-        LocationWithLabType[],
-        Error
-    >({
-        queryKey: ['locations'],
-        queryFn: fetchLocations,
+    const { data: locations = [], isLoading: isLoadingLocations, error: locationsError } = useQuery<LocationWithLabType[], Error>({
+        queryKey: branchId ? ['locations', branchId] : ['locations'],
+        queryFn: branchId ? () => fetchLocationsByBranch(branchId) : fetchLocations,
     });
 
     // Fetch Lab Types for the modal dropdown
@@ -45,7 +64,7 @@ export default function LocationsPage() {
                 queryClient.invalidateQueries({ queryKey: ['locations'] });
                 toast.success('Konum başarıyla eklendi!');
                 setIsModalOpen(false);
-      } else {
+            } else {
                 const errorMessage = typeof data.error === 'string' ? data.error : (data.error as z.ZodIssue[]).map(e => e.message).join(', ');
                 toast.error(`Konum eklenemedi: ${errorMessage}`);
             }
@@ -100,6 +119,7 @@ export default function LocationsPage() {
         // Extract base Location data for the form
         const baseLocation: Location = {
             id: location.id,
+            branch_id: location.branch_id,
             name: location.name,
             code: location.code,
             capacity: location.capacity,
@@ -135,6 +155,28 @@ export default function LocationsPage() {
 
   return (
         <div className="p-4 md:p-6">
+            {/* Branch Filter Dropdown */}
+            <div className="flex items-center space-x-2 mb-4">
+                <label htmlFor="branchFilter" className="font-medium">Branşa Göre Filtrele:</label>
+                {branchesLoading ? (
+                    <span>Yükleniyor...</span>
+                ) : (
+                    <select
+                        id="branchFilter"
+                        value={branchId}
+                        onChange={(e) => {
+                            const id = e.target.value;
+                            router.push(id ? `/dashboard/locations?branchId=${id}` : '/dashboard/locations');
+                        }}
+                        className="border rounded p-1"
+                    >
+                        <option value="">Tümü</option>
+                        {branches.map((branch) => (
+                            <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
+                    </select>
+                )}
+            </div>
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold text-gray-800">Konum Yönetimi</h1>
                 {/* Button Group */}
@@ -176,15 +218,16 @@ export default function LocationsPage() {
             {isModalOpen && (
                 <LocationFormModal
                     initialData={editingLocation ?? undefined}
+                    availableBranches={branches}
                     availableLabTypes={labTypes}
                     onSubmit={handleFormSubmit}
-              onClose={() => {
+                    onClose={() => {
                         setIsModalOpen(false);
-                setEditingLocation(null);
-              }}
+                        setEditingLocation(null);
+                    }}
                     isLoading={mutationLoading}
-        />
-      )}
-    </div>
-  );
+                />
+            )}
+        </div>
+    );
 } 

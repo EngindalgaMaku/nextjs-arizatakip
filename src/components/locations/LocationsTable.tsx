@@ -33,6 +33,7 @@ export default function LocationsTable({
         <thead className="bg-gray-50">
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konum Adı</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branş</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kod</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Laboratuvar Tipi</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kapasite</th>
@@ -45,6 +46,7 @@ export default function LocationsTable({
           {locations.map((location) => (
             <tr key={location.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{location.name}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.branch?.name ?? '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.code ?? '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {location.labType ? `${location.labType.name} (${location.labType.code})` : 'Belirtilmemiş'}
@@ -74,7 +76,7 @@ export default function LocationsTable({
           ))}
           {locations.length === 0 && (
              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
                     Gösterilecek konum bulunamadı.
                 </td>
             </tr>

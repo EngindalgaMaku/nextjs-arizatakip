@@ -175,3 +175,20 @@ export async function fetchBranchesForSelect(): Promise<BranchSelectItem[]> {
   return data || [];
 }
 // --- END NEW ACTION --- 
+
+/**
+ * Fetch all dallar for a specific branch by its ID.
+ */
+export async function fetchDallarByBranch(branchId: string): Promise<Dal[]> {
+  if (!branchId) return [];
+  const { data, error } = await supabase
+    .from('dallar')
+    .select('*')
+    .eq('branch_id', branchId)
+    .order('name', { ascending: true });
+  if (error) {
+    console.error(`Error fetching dallar for branch ${branchId}:`, error);
+    throw new Error('Dallar getirilirken bir hata oluştu.');
+  }
+  return data as Dal[];
+}

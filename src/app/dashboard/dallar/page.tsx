@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchDallar, createDal, updateDal, deleteDal, fetchBranchesForSelect } from '@/actions/dalActions';
+import { fetchDallar, createDal, updateDal, deleteDal, fetchBranchesForSelect, fetchDallarByBranch } from '@/actions/dalActions';
+import { useSearchParams } from 'next/navigation';
 import { DallarTable } from '@/components/dallar/DallarTable';
 import { DalFormModal } from '@/components/dallar/DalFormModal';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -16,14 +17,16 @@ interface BranchSelectItem {
 }
 
 export default function DallarPage() {
+  const searchParams = useSearchParams();
+  const branchId = searchParams.get('branchId') || '';
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDal, setEditingDal] = useState<Dal | null>(null);
 
   // Fetch Dallar
   const { data: dallar = [], isLoading: isLoadingDallar, error: errorDallar } = useQuery<Dal[], Error>({
-    queryKey: ['dallar'],
-    queryFn: fetchDallar,
+    queryKey: branchId ? ['dallar', branchId] : ['dallar'],
+    queryFn: branchId ? () => fetchDallarByBranch(branchId) : fetchDallar,
   });
 
   // --- Fetch Branches for Select --- 
