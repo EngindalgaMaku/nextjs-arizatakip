@@ -17,7 +17,8 @@ import {
   BeakerIcon,
   BuildingLibraryIcon,
   ComputerDesktopIcon,
-  ClockIcon
+  ClockIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 import { signOut, loadUserData } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -241,7 +242,7 @@ export default function DashboardLayout({
                 Öğretmenler
               </Link>
 
-              {/* YENİ: Branş Yönetimi Linki */}
+              {/* Combined Branş/Dal Yönetimi Linki */}
               <Link
                 href="/dashboard/branches"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -250,8 +251,21 @@ export default function DashboardLayout({
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <BuildingLibraryIcon className="mr-3 h-5 w-5" /> {/* İkonu değiştirebilirsiniz */}
+                <BuildingLibraryIcon className="mr-3 h-5 w-5" />
                 Branş/Dal Yönetimi
+              </Link>
+
+              {/* NEW: Sömestr Yönetimi Linki */}
+              <Link
+                href="/dashboard/semesters"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.startsWith("/dashboard/semesters")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <CalendarDaysIcon className="mr-3 h-5 w-5" />
+                Sömestr Yönetimi
               </Link>
 
               <Link
