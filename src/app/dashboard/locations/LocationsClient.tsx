@@ -13,12 +13,14 @@ import { Branch } from '@/types/branches';
 import { LabType } from '@/types/labTypes';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
+import { useSemesterStore } from '@/stores/useSemesterStore';
 
 export default function LocationsClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const branchId = searchParams.get('branchId') || '';
   const queryClient = useQueryClient();
+  const selectedSemesterId = useSemesterStore((state) => state.selectedSemesterId);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
@@ -41,8 +43,13 @@ export default function LocationsClient() {
 
   // Fetch locations
   const { data: locations = [], isLoading: loadingLocations } = useQuery<Location[], Error>({
-    queryKey: branchId ? ['locations', branchId] : ['locations'],
-    queryFn: branchId ? () => fetchLocationsByBranch(branchId) : fetchLocations,
+    queryKey: branchId
+      ? ['locations', branchId, selectedSemesterId]
+      : ['locations', selectedSemesterId],
+    queryFn: () => branchId
+      ? fetchLocationsByBranch(branchId, selectedSemesterId ?? undefined)
+      : fetchLocations(selectedSemesterId ?? undefined),
+    enabled: !!selectedSemesterId,
   });
 
   // Fetch lab types
@@ -116,11 +123,16 @@ export default function LocationsClient() {
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       )}
+      {!selectedSemesterId && !isLoading && (
+        <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
+          Lütfen işlem yapmak için kenar çubuğundan bir sömestr seçin.
+        </div>
+      )}
       {isLoading ? (
         <p>Yükleniyor...</p>
-      ) : (
+      ) : selectedSemesterId ? (
         <LocationsTable locations={locations} onEdit={handleEdit} onDelete={handleDelete} />
-      )}
+      ) : null}
       {isModalOpen && (
         <LocationFormModal
           initialData={editingLocation ?? undefined}

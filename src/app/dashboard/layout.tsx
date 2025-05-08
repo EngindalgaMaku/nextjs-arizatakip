@@ -21,7 +21,10 @@ import {
   CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 import { signOut, loadUserData } from "@/lib/supabase";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { useSemesterStore } from '@/stores/useSemesterStore';
+import { fetchSemesters } from '@/actions/semesterActions';
+import { Semester } from '@/types/semesters';
 
 export default function DashboardLayout({
   children,
@@ -36,10 +39,48 @@ export default function DashboardLayout({
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
-  // Initialize React Query client
   const [queryClient] = useState(() => new QueryClient());
   
-  // Path adını kontrol ederek başlık oluştur
+  const selectedSemesterId = useSemesterStore((state) => state.selectedSemesterId);
+  const setSelectedSemesterId = useSemesterStore((state) => state.setSelectedSemesterId);
+
+  function SemesterSelector() {
+    const { data: semesters = [], isLoading } = useQuery<Semester[], Error>({
+      queryKey: ['semestersForSelect'],
+      queryFn: fetchSemesters,
+      staleTime: 1000 * 60 * 5,
+    });
+
+    useEffect(() => {
+      if (!selectedSemesterId && !isLoading && semesters.length > 0) {
+        const activeSemester = semesters.find(s => s.is_active);
+        if (activeSemester) {
+          setSelectedSemesterId(activeSemester.id);
+        }
+      }
+    }, [selectedSemesterId, semesters, isLoading, setSelectedSemesterId]);
+
+    return (
+      <div className="px-4 pt-4 pb-2">
+        <label htmlFor="semester-select" className="block text-xs font-medium text-blue-300 mb-1">Aktif Sömestr</label>
+        <select
+          id="semester-select"
+          value={selectedSemesterId || ''}
+          onChange={(e) => setSelectedSemesterId(e.target.value || null)}
+          disabled={isLoading}
+          className="w-full p-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-70"
+        >
+          <option value="" disabled={!!selectedSemesterId}>-- Sömestr Seçin --</option>
+          {semesters.map((semester) => (
+            <option key={semester.id} value={semester.id}>
+              {semester.name}{semester.is_active ? ' (Aktif)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
   const getPageTitle = () => {
     if (pathname === "/dashboard") return "Dashboard";
     if (pathname.includes("/issues")) return "Arıza Takip";
@@ -50,7 +91,6 @@ export default function DashboardLayout({
     return "Dashboard";
   };
 
-  // Ekran boyutu değişikliğini izle
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
@@ -62,19 +102,17 @@ export default function DashboardLayout({
     };
 
     window.addEventListener('resize', handleResize);
-    handleResize(); // İlk yükleme için çalıştır
+    handleResize();
     
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Sayfa değiştiğinde mobil menüyü kapat
   useEffect(() => {
     if (windowWidth < 768) {
       setIsSidebarOpen(false);
     }
   }, [pathname, windowWidth]);
 
-  // Profil menüsü dışında bir yere tıklandığında menüyü kapat
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -105,39 +143,32 @@ export default function DashboardLayout({
 
   const handleSignOut = async () => {
     try {
-      // Clear localStorage and cookies
       if (typeof window !== 'undefined') {
         localStorage.removeItem('adminUser');
       }
       
-      // Clear cookies using import
       const { deleteCookie } = await import('cookies-next');
       deleteCookie('admin-session');
       
-      // Call Supabase signOut
       await signOut();
       
-      // Redirect to login page
       router.push("/login");
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
 
-  // Mobil ekranda overlay'e tıklandığında sidebar'ı kapat
   const handleOverlayClick = () => {
     if (windowWidth < 768) {
       setIsSidebarOpen(false);
     }
   };
 
-  // Determine if the current page is the print view
   const isPrintView = pathname === '/dashboard/locations/print' || pathname === '/dashboard/devices/print';
 
   return (
     <QueryClientProvider client={queryClient}>
       <div className="flex h-screen">
-        {/* Mobil Overlay - sidebar açıkken arka planı karartır */}
         {isSidebarOpen && windowWidth < 768 && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-50 z-10" 
@@ -145,14 +176,12 @@ export default function DashboardLayout({
           />
         )}
         
-        {/* Sidebar - No profile section at the bottom */}
         {!isPrintView && (
           <div
             className={`fixed inset-y-0 left-0 w-72 bg-blue-800 shadow-lg transform transition-transform duration-300 ease-in-out z-20 ${
               isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             } md:translate-x-0 md:static md:w-72 flex flex-col`}
           >
-            {/* Top Logo Section */}
             <div className="px-6 py-4 border-b border-blue-700 flex-shrink-0">
               <div className="flex items-center">
                 <Image 
@@ -169,7 +198,8 @@ export default function DashboardLayout({
               </div>
             </div>
             
-            {/* Scrollable Navigation Area */}
+            <SemesterSelector />
+
             <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
               <Link
                 href="/dashboard"
@@ -196,7 +226,6 @@ export default function DashboardLayout({
                 Gösterge Paneli
               </Link>
 
-              {/* Add Header for Okul Şeflik Yönetimi */}
               <div className="pt-4 pb-2 px-3">
                 <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Okul Şeflik Yönetimi</h4>
               </div>
@@ -225,7 +254,6 @@ export default function DashboardLayout({
                 Öğretmen Arıza İstatistikleri
               </Link>
 
-              {/* Header for Alan Şeflik Yönetimi */}
               <div className="pt-4 pb-2 px-3">
                 <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Alan Şeflik Yönetimi</h4>
               </div>
@@ -242,7 +270,6 @@ export default function DashboardLayout({
                 Öğretmenler
               </Link>
 
-              {/* Combined Branş/Dal Yönetimi Linki */}
               <Link
                 href="/dashboard/branches"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -253,19 +280,6 @@ export default function DashboardLayout({
               >
                 <BuildingLibraryIcon className="mr-3 h-5 w-5" />
                 Branş/Dal Yönetimi
-              </Link>
-
-              {/* NEW: Sömestr Yönetimi Linki */}
-              <Link
-                href="/dashboard/semesters"
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.startsWith("/dashboard/semesters")
-                    ? "bg-blue-700 text-white"
-                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
-                }`}
-              >
-                <CalendarDaysIcon className="mr-3 h-5 w-5" />
-                Sömestr Yönetimi
               </Link>
 
               <Link
@@ -292,21 +306,6 @@ export default function DashboardLayout({
                 Lab./Sınıf/Odalar
               </Link>
 
-              {/* Remove the actual Lab Types link */}
-              {/* 
-              <Link
-                href="/dashboard/lab-types"
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/lab-types")
-                    ? "bg-blue-700 text-white"
-                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
-                }`}
-              >
-                <BeakerIcon className="mr-3 h-5 w-5" />
-                Laboratuvar Tipleri
-              </Link>
-              */}
-
               <Link
                 href="/dashboard/devices"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -331,10 +330,21 @@ export default function DashboardLayout({
                 Raporlar
               </Link>
 
-              {/* Header for Yönetimsel İşlemler */}
               <div className="pt-4 pb-2 px-3">
                 <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Yönetimsel İşlemler</h4>
               </div>
+
+              <Link
+                href="/dashboard/semesters"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.startsWith("/dashboard/semesters")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <CalendarDaysIcon className="mr-3 h-5 w-5" />
+                Sömestr Yönetimi
+              </Link>
 
               <Link
                 href="/dashboard/settings"
@@ -379,7 +389,6 @@ export default function DashboardLayout({
                 Kullanıcılar
               </Link>
 
-              {/* Form Yönetimi Link */}
               <Link
                 href="/dashboard/forms"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -404,7 +413,6 @@ export default function DashboardLayout({
                 Kullanım Kılavuzu
               </Link>
 
-              {/* Akıllı Ders Dağıtım Link */}
               <Link
                 href="/dashboard/scheduling"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
@@ -413,16 +421,14 @@ export default function DashboardLayout({
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <ClockIcon className="mr-3 h-5 w-5" /> {/* Replace ClockIcon if needed */}
+                <ClockIcon className="mr-3 h-5 w-5" />
                 Akıllı Ders Dağıtım
               </Link>
             </nav>
           </div>
         )}
 
-        {/* Main Content Area with Header */}
         <div className="flex flex-col flex-1 overflow-y-auto bg-gray-100">
-          {/* Restored Header (Top Bar) */}
           {!isPrintView && (
             <header className="sticky top-0 z-10 flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
               <div className="flex items-center">
@@ -473,7 +479,6 @@ export default function DashboardLayout({
             </header>
           )}
 
-          {/* Page Content */}
           <main className="flex-1 p-4 md:p-6">
             {children}
           </main>

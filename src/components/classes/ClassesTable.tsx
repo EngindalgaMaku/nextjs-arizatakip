@@ -65,7 +65,9 @@ export function ClassesTable({ classes, teachersMap, onEdit, onDelete }: Classes
           <tr>
             <th className="border p-2 w-16 text-center">Sıra</th>
             <th className="border p-2 text-left">Sınıf Adı</th>
-            <th className="border p-2 text-left">Alan/Dal</th>
+            <th className="border p-2 text-left">Seviye</th>
+            <th className="border p-2 text-left">Branş</th>
+            <th className="border p-2 text-left">Dal</th>
             <th className="border p-2 text-left">Sınıf Öğretmeni</th>
             <th className="border p-2 text-left">Sınıf Başkanı</th>
             <th className="border p-2 text-center">İşlemler</th>
@@ -103,7 +105,9 @@ export function ClassesTable({ classes, teachersMap, onEdit, onDelete }: Classes
                  </div>
               </td>
               <td className="border p-2">{cls.name}</td>
-              <td className="border p-2">{cls.department || '-'}</td>
+              <td className="border p-2">{cls.grade_level || '-'}</td>
+              <td className="border p-2">{cls.branch_name || '-'}</td>
+              <td className="border p-2">{cls.dal_name || '-'}</td>
               <td className="border p-2">
                 {cls.teacherName || '-'}
               </td>
@@ -140,7 +144,7 @@ export function ClassesTable({ classes, teachersMap, onEdit, onDelete }: Classes
           ))}
           {classes.length === 0 && (
             <tr>
-              <td colSpan={5} className="text-center p-4 border text-gray-500">
+              <td colSpan={8} className="text-center p-4 border text-gray-500">
                  Kayıtlı sınıf bulunamadı.
               </td>
             </tr>

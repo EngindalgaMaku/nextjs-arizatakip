@@ -37,7 +37,7 @@ export function TeacherScheduleFormModal({
 
   const { data: labLocations = [], isLoading: isLoadingLabs } = useQuery({
       queryKey: ['laboratoryLocations'],
-      queryFn: fetchLocations,
+      queryFn: () => fetchLocations(undefined),
   });
 
   const { data: distinctDersler = [], isLoading: isLoadingDersler } = useQuery<string[]>({ 
@@ -45,9 +45,9 @@ export function TeacherScheduleFormModal({
       queryFn: fetchDistinctDersAdlari,
   });
 
-  const { data: classesList = [], isLoading: isLoadingClasses } = useQuery<Class[]>({ 
+  const { data: classesList = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
       queryKey: ['classes'],
-      queryFn: fetchClasses,
+      queryFn: () => fetchClasses(undefined),
   });
 
   const dayName = DAYS_OF_WEEK.find(d => d.id === dayOfWeek)?.name;

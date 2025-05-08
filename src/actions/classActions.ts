@@ -1,235 +1,331 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
-import { Class, ClassSchema, ClassFormValues } from '@/types/classes'; // Assuming types are here
+import { Class, ClassSchema, ClassFormSchema, ClassFormValues } from '@/types/classes';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
-/**
- * Fetch all classes, including the teacher's name.
- */
-export async function fetchClasses(): Promise<Class[]> {
-  const { data, error } = await supabase
-    .from('classes')
-    .select(`
-      *,
-      teacher:teachers ( name ) 
-    `)
-    .order('display_order', { ascending: true })
-    .order('name', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching classes:', error);
-    throw error;
-  }
-
-  // Map snake_case to camelCase and extract teacher name
-  const mappedData = data?.map(cls => ({
-    id: cls.id,
-    name: cls.name,
-    department: cls.department,
-    classTeacherId: cls.class_teacher_id,
-    classPresidentName: cls.class_president_name,
-    teacherName: cls.teacher ? cls.teacher.name : null, // Get teacher name
-    displayOrder: cls.display_order,
-    createdAt: cls.created_at,
-    updatedAt: cls.updated_at,
-  })) || [];
-
-  // Validate fetched data (optional but recommended)
-  const parseResult = z.array(ClassSchema).safeParse(mappedData);
-   if (!parseResult.success) {
-      console.error('Fetched classes data validation failed:', parseResult.error);
-      // Handle validation error
-      return [];
-  }
-
-  return parseResult.data;
-}
+// Define table name and revalidation path
+const CLASSES_TABLE = 'classes';
+const CLASSES_PATH = '/dashboard/classes'; // Revalidate this path after CUD operations
 
 /**
- * Fetch a single class by ID.
+ * Fetches all classes, optionally filtered by semesterId.
+ * Orders classes by grade_level then by name.
  */
-export async function fetchClassById(id: string): Promise<Class | null> {
-   const { data, error } = await supabase
-    .from('classes')
-    .select('*') // Adjust columns/joins
-    .eq('id', id)
-    .single();
+export async function fetchClasses(semesterId?: string): Promise<Class[]> {
+    const supabase = createSupabaseServerClient();
+    
+    // Sınıfları getir
+    let query = supabase
+        .from(CLASSES_TABLE)
+        .select('*');
+
+    if (semesterId && z.string().uuid().safeParse(semesterId).success) {
+        query = query.eq('semester_id', semesterId);
+    }
+
+    // Default ordering
+    query = query.order('grade_level', { ascending: true }).order('name', { ascending: true });
+
+    const { data, error } = await query;
 
     if (error) {
-      console.error(`Error fetching class ${id}:`, error);
-      if (error.code === 'PGRST116') return null; // Not found is not an error here
-      throw error;
+        console.error('Error fetching classes:', error);
+        // Bu sefer hatayı fırlatma, boş bir array dön
+        console.warn('Returning empty array due to database error');
+        return [];
     }
-    // TODO: Map snake_case to camelCase before returning if needed
-    return data as Class | null;
+
+    // Sınıf listesi boşsa veya yoksa, boş bir dizi dön
+    if (!data || data.length === 0) {
+        return [];
+    }
+
+    try {
+        // Branch ve Dal bilgilerini ayrı ayrı çekelim
+        // Önce tüm benzersiz branch_id'leri toplayalım
+        const branchIds = [...new Set(data.filter(c => c.branch_id).map(c => c.branch_id))];
+        const dalIds = [...new Set(data.filter(c => c.dal_id).map(c => c.dal_id))];
+        
+        // Branch isimleri için sorgu
+        const branchMap: Record<string, string> = {};
+        if (branchIds.length > 0) {
+            const { data: branches } = await supabase
+                .from('branches')
+                .select('id, name')
+                .in('id', branchIds);
+            
+            if (branches) {
+                branches.forEach(branch => {
+                    branchMap[branch.id] = branch.name;
+                });
+            }
+        }
+        
+        // Dal isimleri için sorgu
+        const dalMap: Record<string, string> = {};
+        if (dalIds.length > 0) {
+            const { data: dals } = await supabase
+                .from('dallar')
+                .select('id, name')
+                .in('id', dalIds);
+            
+            if (dals) {
+                dals.forEach(dal => {
+                    dalMap[dal.id] = dal.name;
+                });
+            }
+        }
+
+        // Veritabanından gelen snake_case veriyi camelCase'e dönüştür ve branch/dal isimlerini ekle
+        const formattedData = data.map(classItem => ({
+            ...classItem,
+            classTeacherId: classItem.class_teacher_id,
+            classPresidentName: classItem.class_president_name,
+            branchName: classItem.branch_id ? branchMap[classItem.branch_id] || '-' : '-',
+            dalName: classItem.dal_id ? dalMap[classItem.dal_id] || '-' : '-'
+        }));
+
+        return formattedData;
+    } catch (validationError) {
+        console.error('Fetched class data validation failed:', validationError);
+        // Formatlama da başarısız olursa, raw data'yı dön
+        return data;
+    }
 }
 
 /**
- * Create a new class.
+ * Creates a new class associated with a specific semester.
  */
-export async function createClass(payload: ClassFormValues): Promise<{ success: boolean; class?: Class; error?: string }> {
-  const { displayOrder, ...restPayload } = payload;
-  const parse = ClassSchema.omit({ displayOrder: true }).safeParse(restPayload);
-
-  if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
-  }
-
-  try {
-    const { data: maxOrderData, error: maxOrderError } = await supabase
-      .from('classes')
-      .select('display_order')
-      .order('display_order', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (maxOrderError) {
-      console.error('Error fetching max display_order:', maxOrderError);
-      return { success: false, error: 'Sıra numarası alınırken hata oluştu.' };
+export async function createClass(
+    payload: ClassFormValues,
+    semesterId: string
+): Promise<{ success: boolean; class?: Class; error?: string | z.ZodIssue[] }> {
+    if (!z.string().uuid().safeParse(semesterId).success) {
+        return { success: false, error: 'Geçersiz sömestr ID formatı.' };
     }
 
-    const nextOrder = (maxOrderData?.display_order || 0) + 1;
+    const parseResult = ClassFormSchema.safeParse(payload);
+    if (!parseResult.success) {
+        console.error('Class creation validation failed:', parseResult.error.issues);
+        return { success: false, error: parseResult.error.issues };
+    }
 
-    const classData = {
-      name: parse.data.name,
-      department: parse.data.department || null,
-      class_teacher_id: parse.data.classTeacherId,
-      class_president_name: parse.data.classPresidentName || null,
-      display_order: nextOrder,
+    // Veritabanı sütun adlarına uygun hale getir (camelCase'den snake_case'e)
+    const dbData = {
+        name: parseResult.data.name,
+        grade_level: parseResult.data.grade_level,
+        branch_id: parseResult.data.branch_id,
+        dal_id: parseResult.data.dal_id,
+        class_teacher_id: parseResult.data.classTeacherId,
+        class_president_name: parseResult.data.classPresidentName,
+        semester_id: semesterId
     };
-    
-    console.log('[createClass] Mapped data being sent to DB:', classData);
 
-    const { data, error } = await supabase
-      .from('classes')
-      .insert(classData)
-      .select()
-      .single();
+    console.log('Database insert payload:', dbData);
 
-    if (error || !data) {
-      console.error('Error creating class:', error?.message, error?.details);
-      return { success: false, error: error?.message };
+    const supabase = createSupabaseServerClient();
+    try {
+        const { data: newClass, error } = await supabase
+            .from(CLASSES_TABLE)
+            .insert(dbData)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating class:', error);
+            if (error.code === '23505') { // Unique constraint violation
+                return { success: false, error: 'Bu isimde veya özelliklerde bir sınıf bu sömestr için zaten mevcut.' };
+            }
+            if (error.code === '23503') { // Foreign key violation
+                return { success: false, error: 'Belirtilen sömestr veya diğer ilişkili veriler bulunamadı.' };
+            }
+            return { success: false, error: `Sınıf oluşturulurken bir veritabanı hatası oluştu: ${error.message}` };
+        }
+
+        // Veritabanından gelen snake_case veriyi Zod şema için camelCase'e dönüştür
+        const formattedClass = {
+            ...newClass,
+            classTeacherId: newClass.class_teacher_id,
+            classPresidentName: newClass.class_president_name
+        };
+
+        const finalParse = ClassSchema.safeParse(formattedClass);
+        if (!finalParse.success) {
+            console.error('Created class data validation failed after insert:', finalParse.error);
+            console.log('Formatted class data:', formattedClass);
+            // Zod hatası olsa bile veriyi dönelim
+            return { success: true, class: formattedClass as unknown as Class };
+        }
+
+        revalidatePath(CLASSES_PATH);
+        revalidatePath('/dashboard'); // Also revalidate dashboard if it shows class counts etc.
+        return { success: true, class: finalParse.data };
+
+    } catch (err) {
+        console.error('Unexpected error creating class:', err);
+        return { success: false, error: 'Sınıf oluşturulurken beklenmedik bir sunucu hatası oluştu.' };
     }
-    // TODO: Remap snake_case back to camelCase if needed before returning
-    return { success: true, class: data as Class };
-  } catch (err) {
-    console.error('createClass error:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
 }
 
 /**
- * Update an existing class.
+ * Updates an existing class.
+ * semester_id is typically not updated here; it's part of ClassSchema but omitted in ClassFormSchema.
  */
-export async function updateClass(id: string, payload: ClassFormValues): Promise<{ success: boolean; class?: Class; error?: string }> {
-  // Ensure ID is not part of the update payload itself if it came from the form
-  const { id: payloadId, ...updatePayload } = payload;
-  const parse = ClassSchema.safeParse(updatePayload); // Validate the rest
-
-  if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
-  }
-
-  // Map Zod schema (camelCase) to DB columns (snake_case)
-  const classData = {
-    name: parse.data.name,
-    department: parse.data.department || null,
-    class_teacher_id: parse.data.classTeacherId, // Map camelCase to snake_case
-    class_president_name: parse.data.classPresidentName || null,
-  };
-  // --- DEBUG LOG --- 
-  console.log(`[updateClass] Mapped data being sent to DB for ID: ${id}`, classData);
-  console.log('[updateClass] Mapped president name:', classData.class_president_name);
-  // --- END DEBUG LOG --- 
-
-  try {
-    const { data, error } = await supabase
-      .from('classes')
-      .update(classData)
-      .eq('id', id) // Use the ID passed as argument
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error('Error updating class:', error?.message, error?.details);
-      return { success: false, error: error?.message };
+export async function updateClass(
+    id: string,
+    payload: ClassFormValues
+): Promise<{ success: boolean; class?: Class; error?: string | z.ZodIssue[] }> {
+    if (!z.string().uuid().safeParse(id).success) {
+        return { success: false, error: 'Geçersiz sınıf ID formatı.' };
     }
-     // TODO: Remap snake_case back to camelCase if needed before returning
-    return { success: true, class: data as Class };
-  } catch (err) {
-    console.error('updateClass error:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
+
+    const parseResult = ClassFormSchema.safeParse(payload); // Validates against fields allowed in the form
+    if (!parseResult.success) {
+        console.error('Class update validation failed:', parseResult.error.issues);
+        return { success: false, error: parseResult.error.issues };
+    }
+
+    // Veritabanı sütun adlarına uygun hale getir (camelCase'den snake_case'e)
+    const dbData = {
+        name: parseResult.data.name,
+        grade_level: parseResult.data.grade_level,
+        branch_id: parseResult.data.branch_id,
+        dal_id: parseResult.data.dal_id,
+        class_teacher_id: parseResult.data.classTeacherId,
+        class_president_name: parseResult.data.classPresidentName
+    };
+
+    console.log('Database update payload:', dbData);
+
+    const supabase = createSupabaseServerClient();
+    try {
+        const { data: updatedClass, error } = await supabase
+            .from(CLASSES_TABLE)
+            .update(dbData)
+            .eq('id', id)
+            .select() // Select all fields including semester_id
+            .single();
+
+        if (error) {
+            console.error(`Error updating class ${id}:`, error);
+            if (error.code === '23505') {
+                 return { success: false, error: 'Bu isimde veya özelliklerde bir sınıf zaten mevcut.' };
+            }
+            if (error.code === 'PGRST116') { // Not found
+                return { success: false, error: 'Güncellenecek sınıf bulunamadı.' };
+            }
+            return { success: false, error: `Sınıf güncellenirken bir veritabanı hatası oluştu: ${error.message}` };
+        }
+
+        // Veritabanından gelen snake_case veriyi Zod şema için camelCase'e dönüştür
+        const formattedClass = {
+            ...updatedClass,
+            classTeacherId: updatedClass.class_teacher_id,
+            classPresidentName: updatedClass.class_president_name
+        };
+
+        const finalParse = ClassSchema.safeParse(formattedClass); // Validate full Class structure
+         if (!finalParse.success) {
+            console.error('Updated class data validation failed after update:', finalParse.error);
+            console.log('Formatted class data:', formattedClass);
+            // Zod hatası olsa bile veriyi dönelim
+            return { success: true, class: formattedClass as unknown as Class };
+        }
+
+        revalidatePath(CLASSES_PATH);
+        revalidatePath(`/dashboard/classes/${id}`); // Revalidate specific class page if exists
+        return { success: true, class: finalParse.data };
+
+    } catch (err) {
+        console.error(`Unexpected error updating class ${id}:`, err);
+        return { success: false, error: 'Sınıf güncellenirken beklenmedik bir sunucu hatası oluştu.' };
+    }
 }
 
 /**
- * Delete a class by ID.
+ * Deletes a class by its ID.
  */
 export async function deleteClass(id: string): Promise<{ success: boolean; error?: string }> {
-   try {
-    const { error } = await supabase
-      .from('classes')
-      .delete()
-      .eq('id', id);
-    if (error) {
-      console.error('Error deleting class:', error);
-      return { success: false, error: error.message };
+    if (!z.string().uuid().safeParse(id).success) {
+        return { success: false, error: 'Geçersiz sınıf ID formatı.' };
     }
-    return { success: true };
-  } catch (err) {
-    console.error('deleteClass error:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
+
+    const supabase = createSupabaseServerClient();
+    try {
+        const { error } = await supabase
+            .from(CLASSES_TABLE)
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error(`Error deleting class ${id}:`, error);
+            if (error.code === '23503') { // Foreign key constraint
+                return { success: false, error: 'Bu sınıf başka kayıtlara (örn: öğrenciler, ders programı) bağlı olduğu için silinemez.' };
+            }
+            return { success: false, error: 'Sınıf silinirken bir veritabanı hatası oluştu.' };
+        }
+
+        revalidatePath(CLASSES_PATH);
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (err) {
+        console.error(`Unexpected error deleting class ${id}:`, err);
+        return { success: false, error: 'Sınıf silinirken beklenmedik bir sunucu hatası oluştu.' };
+    }
 }
 
-// You might also need an action to fetch teachers for the form dropdown
-// Assuming it exists in teacherActions.ts or similar:
-// import { fetchTeachers } from './teacherActions';
+/**
+ * Fetches a single class by its ID.
+ */
+export async function fetchClassById(id: string): Promise<Class | null> {
+    if (!id || !z.string().uuid().safeParse(id).success) {
+        console.warn('fetchClassById called with invalid or missing ID.');
+        return null;
+    }
 
-// --- REMOVE OLD ClassGroup CODE --- 
-/*
-// Represents a class group entity
-export interface ClassGroup {
-  id: string;
-  name: string;
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+        .from(CLASSES_TABLE)
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (error) {
+        if (error.code === 'PGRST116') { // Row not found
+            console.log(`Class with ID ${id} not found.`);
+            return null;
+        }
+        console.error(`Error fetching class ${id}:`, error);
+        // Depending on how you want to handle other errors, you might throw or return null
+        // For now, re-throwing to be explicit about the error.
+        throw new Error('Sınıf getirilirken bir veritabanı hatası oluştu.');
+    }
+
+    if (!data) return null; // Should be covered by PGRST116, but good for safety
+
+    // Veritabanından gelen snake_case veriyi Zod şema için camelCase'e dönüştür
+    const formattedClass = {
+        ...data,
+        classTeacherId: data.class_teacher_id,
+        classPresidentName: data.class_president_name
+    };
+
+    const parseResult = ClassSchema.safeParse(formattedClass);
+    if (!parseResult.success) {
+        console.error('Fetched class by ID data validation failed:', parseResult.error);
+        // Zod hatası olsa bile veriyi dönelim
+        return formattedClass as unknown as Class;
+    }
+    return parseResult.data;
 }
-
-export async function fetchClassGroups(): Promise<ClassGroup[]> {
-  const { data, error } = await supabase
-    .from('classes')
-    .select('id, name')
-    .order('name', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching classes:', error);
-    throw error;
-  }
-  return data as ClassGroup[];
-}
-
-export async function createClassGroup(name: string): Promise<ClassGroup> {
-  const { data, error } = await supabase
-    .from('classes')
-    .insert({ name })
-    .select('id, name')
-    .single();
-  if (error || !data) {
-    console.error('Error creating class:', error);
-    throw error ?? new Error('Unknown error creating class');
-  }
-  // Revalidate the classes list page
-  revalidatePath('/dashboard/classes');
-  return data as ClassGroup;
-}
-*/
-// --- END REMOVE --- 
 
 /**
  * Moves a class one position up in the display order.
  */
 export async function moveClassUp(classId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = createSupabaseServerClient();
   try {
     // Get the current class's order and the order of the class above it
     const { data: currentClass, error: fetchError } = await supabase
@@ -302,6 +398,7 @@ export async function moveClassUp(classId: string): Promise<{ success: boolean; 
  * Moves a class one position down in the display order.
  */
 export async function moveClassDown(classId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = createSupabaseServerClient();
    try {
     // Get the current class's order
     const { data: currentClass, error: fetchError } = await supabase

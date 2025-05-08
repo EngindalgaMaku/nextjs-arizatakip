@@ -17,6 +17,7 @@ export const teacherRoleLabels: Record<TeacherRole, string> = {
 // Base schema for a Teacher, matching Supabase table columns
 export const TeacherSchema = z.object({
   id: z.string().uuid(),
+  semester_id: z.string().uuid().nullable(),
   name: z.string().min(1, 'Öğretmen adı zorunludur.'),
   birthDate: z.string().nullable().optional(), // Store as ISO string or similar
   role: teacherRoles.nullable().optional(),
@@ -32,7 +33,8 @@ export const TeacherFormSchema = TeacherSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-  is_active: true // Don't include is_active in the standard add/edit form
+  is_active: true, // Don't include is_active in the standard add/edit form
+  semester_id: true // Semester is managed globally or via specific actions, not this form
 });
 
 // Type for the full Teacher object

@@ -1,6 +1,7 @@
 'use server';
 
 import { supabase } from '@/lib/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Teacher, TeacherFormValues, TeacherFormSchema, TeacherRole } from '@/types/teachers';
 import { z } from 'zod';
 import { BranchFormSchema, BranchFormValues } from '@/types/branches';
@@ -8,149 +9,183 @@ import { revalidatePath } from 'next/cache';
 import { TeacherSchema } from '@/types/teachers';
 
 /**
- * Fetch all teachers.
+ * Fetch all teachers, optionally filtered by semester.
  */
-export async function fetchTeachers(): Promise<Partial<Teacher>[]> {
-  const { data, error } = await supabase
+export async function fetchTeachers(semesterId?: string): Promise<Partial<Teacher>[]> {
+  const supabase = createSupabaseServerClient();
+  let query = supabase
     .from('teachers')
-    // Use snake_case matching the database columns
-    .select('id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active') 
-    .order('name', { ascending: true });
+    .select('id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active, semester_id'); // Include semester_id
+
+  if (semesterId) {
+    query = query.eq('semester_id', semesterId);
+  }
+
+  const { data, error } = await query.order('name', { ascending: true });
 
   if (error) {
     console.error('Error fetching teachers:', error);
     throw error;
   }
-  
-  // Map snake_case from DB to camelCase expected by TeacherSchema/Teacher type
-  const mappedData = data?.map(teacher => {
-      // Convert role to uppercase if it exists
-      const mappedRole = typeof teacher.role === 'string' ? teacher.role.toUpperCase() as TeacherRole : null;
-      
-      return {
-          id: teacher.id,
-          name: teacher.name,
-          birthDate: teacher.birth_date, 
-          role: mappedRole, // Use the potentially uppercase role
-          phone: teacher.phone,
-          branchId: teacher.branch_id,   
-          createdAt: teacher.created_at,
-          updatedAt: teacher.updated_at,
-          is_active: teacher.is_active   
-      };
-  }) || [];
-  
-  // Validate the mapped (camelCase) data against the schema
-  const validatedData = mappedData.map(teacher => {
-      // Make sure to handle potential null/undefined from mapping before parsing
-      if (!teacher) return null;
-      const parseResult = TeacherSchema.partial().safeParse(teacher);
-      if (!parseResult.success) {
-          console.warn(`Fetched teacher data validation failed for teacher ID ${teacher.id}:`, parseResult.error);
-          return null; 
-      }
-      return parseResult.data; 
-  }).filter(Boolean) as Partial<Teacher>[] | undefined;
 
-  return validatedData || [];
+  const mappedData = (data || []).map(teacher => {
+    const mappedRole = typeof teacher.role === 'string' ? teacher.role.toUpperCase() as TeacherRole : null;
+    return {
+      id: teacher.id,
+      semester_id: teacher.semester_id, // Map semester_id
+      name: teacher.name,
+      birthDate: teacher.birth_date,
+      role: mappedRole,
+      phone: teacher.phone,
+      branchId: teacher.branch_id,
+      createdAt: teacher.created_at,
+      updatedAt: teacher.updated_at,
+      is_active: teacher.is_active
+    };
+  });
+
+  // Validate mapped data (ensure partial() allows missing semester_id if schema expects it)
+  const validatedData = mappedData.map(teacher => {
+    const parseResult = TeacherSchema.partial().safeParse(teacher);
+    if (!parseResult.success) {
+      console.warn(`Fetched teacher data validation failed for ID ${teacher.id}:`, parseResult.error);
+      return null;
+    }
+    return parseResult.data;
+  }).filter(Boolean) as Partial<Teacher>[];
+
+  return validatedData;
 }
 
 /**
- * Create a new teacher.
+ * Create a new teacher, associated with the provided semester.
  */
-export async function createTeacher(payload: TeacherFormValues): Promise<{ success: boolean; teacher?: Partial<Teacher>; error?: string }> {
-  const parse = TeacherFormSchema.safeParse(payload);
-  if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+export async function createTeacher(payload: TeacherFormValues, semesterId: string): Promise<{ success: boolean; teacher?: Teacher; error?: string | z.ZodIssue[] }> {
+  if (!z.string().uuid().safeParse(semesterId).success) {
+    return { success: false, error: 'Geçersiz sömestr ID.' };
   }
 
+  const parse = TeacherFormSchema.safeParse(payload);
+  if (!parse.success) {
+    return { success: false, error: parse.error.issues };
+  }
+
+  // Map camelCase form values to snake_case DB columns
   const teacherData = {
     name: parse.data.name,
     birth_date: parse.data.birthDate || null,
-    role: parse.data.role || null,
+    role: parse.data.role ? parse.data.role.toLowerCase() : null,
     phone: parse.data.phone || null,
     branch_id: parse.data.branchId || null,
+    is_active: true, // Directly set to true on creation
+    semester_id: semesterId, // Add semester ID
   };
 
+  const supabase = createSupabaseServerClient();
   try {
-    const { data: createdData, error: insertError } = await supabase
+    const { data: newTeacherData, error } = await supabase
       .from('teachers')
       .insert(teacherData)
-      .select(`id, name, birth_date, role, phone, branch_id`)
+      .select()
       .single();
 
-    if (insertError || !createdData) {
-      console.error('Error creating teacher (insert):', insertError?.message);
-      return { success: false, error: insertError?.message || 'Insert failed' };
+    if (error || !newTeacherData) {
+      console.error('Error creating teacher:', error?.message);
+      // Handle specific DB errors
+      if (error?.code === '23503') return { success: false, error: 'Seçilen branş veya sömestr geçerli değil.' };
+      return { success: false, error: error?.message || 'Öğretmen oluşturulamadı.' };
     }
 
-    const createdTeacher: Partial<Teacher> = {
-        id: createdData.id,
-        name: createdData.name,
-        birthDate: createdData.birth_date,
-        role: createdData.role,
-        phone: createdData.phone,
-        branchId: createdData.branch_id,
+    // Map DB result back to Teacher schema type
+    const mappedResult: Teacher = {
+        id: newTeacherData.id,
+        semester_id: newTeacherData.semester_id,
+        name: newTeacherData.name,
+        birthDate: newTeacherData.birth_date,
+        role: typeof newTeacherData.role === 'string' ? newTeacherData.role.toUpperCase() as TeacherRole : null,
+        phone: newTeacherData.phone,
+        branchId: newTeacherData.branch_id,
+        createdAt: newTeacherData.created_at,
+        updatedAt: newTeacherData.updated_at,
+        is_active: newTeacherData.is_active,
     };
-    return { success: true, teacher: createdTeacher };
+
+    // Final validation of the created object
+    const finalParse = TeacherSchema.safeParse(mappedResult);
+    if (!finalParse.success) {
+      console.error('Created teacher data validation failed:', finalParse.error);
+      return { success: false, error: 'Öğretmen oluşturuldu ancak veri doğrulanamadı.' };
+    }
+
+    revalidatePath('/dashboard/area-teachers');
+    return { success: true, teacher: finalParse.data };
 
   } catch (err) {
-    console.error('createTeacher error:', err);
+    console.error('Create teacher error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 /**
- * Update an existing teacher.
+ * Update an existing teacher. Semester is usually not updated here.
  */
-export async function updateTeacher(id: string, payload: TeacherFormValues): Promise<{ success: boolean; teacher?: Partial<Teacher>; error?: string }> {
-  const parse = TeacherFormSchema.safeParse(payload);
-  if (!parse.success) {
-    return { success: false, error: parse.error.errors.map(e => e.message).join(', ') };
+export async function updateTeacher(id: string, payload: TeacherFormValues): Promise<{ success: boolean; teacher?: Teacher; error?: string | z.ZodIssue[] }> {
+   const parse = TeacherFormSchema.safeParse(payload);
+   if (!parse.success) {
+    return { success: false, error: parse.error.issues };
   }
 
+  // Map form values to DB columns (excluding semester_id)
   const teacherData = {
     name: parse.data.name,
     birth_date: parse.data.birthDate || null,
-    role: parse.data.role || null,
+    role: parse.data.role ? parse.data.role.toLowerCase() : null,
     phone: parse.data.phone || null,
     branch_id: parse.data.branchId || null,
+    // Do not update is_active here, use updateTeacherActiveStatus
   };
 
-  try {
-    const { error: updateError } = await supabase
+  const supabase = createSupabaseServerClient();
+   try {
+    const { data: updatedTeacherData, error } = await supabase
       .from('teachers')
       .update(teacherData)
-      .eq('id', id);
+      .eq('id', id)
+      .select()
+      .single();
 
-    if (updateError) {
-      console.error('Error updating teacher (update):', updateError.message);
-      return { success: false, error: updateError.message };
-    }
+     if (error || !updatedTeacherData) {
+        console.error(`Error updating teacher ${id}:`, error?.message);
+        if (error?.code === '23503') return { success: false, error: 'Seçilen branş geçersiz.' };
+        return { success: false, error: error?.message || 'Öğretmen güncellenemedi.' };
+     }
 
-    const { data: updatedData, error: fetchError } = await supabase
-        .from('teachers')
-        .select(`id, name, birth_date, role, phone, branch_id`)
-        .eq('id', id)
-        .single();
-        
-    if (fetchError || !updatedData) {
-      console.error('Error updating teacher (fetch after update):', fetchError?.message);
-      return { success: false, error: fetchError?.message || 'Fetch after update failed' };
-    }
-
-    const updatedTeacher: Partial<Teacher> = {
-        id: updatedData.id,
-        name: updatedData.name,
-        birthDate: updatedData.birth_date,
-        role: updatedData.role,
-        phone: updatedData.phone,
-        branchId: updatedData.branch_id,
+      // Map DB result back to Teacher type
+     const mappedResult: Teacher = {
+        id: updatedTeacherData.id,
+        semester_id: updatedTeacherData.semester_id, // Include semester_id from DB
+        name: updatedTeacherData.name,
+        birthDate: updatedTeacherData.birth_date,
+        role: typeof updatedTeacherData.role === 'string' ? updatedTeacherData.role.toUpperCase() as TeacherRole : null,
+        phone: updatedTeacherData.phone,
+        branchId: updatedTeacherData.branch_id,
+        createdAt: updatedTeacherData.created_at,
+        updatedAt: updatedTeacherData.updated_at,
+        is_active: updatedTeacherData.is_active,
     };
-    return { success: true, teacher: updatedTeacher };
 
-  } catch (err) {
-    console.error('updateTeacher error:', err);
+     // Validate final object
+     const finalParse = TeacherSchema.safeParse(mappedResult);
+     if (!finalParse.success) {
+        console.error('Updated teacher data validation failed:', finalParse.error);
+        return { success: false, error: 'Öğretmen güncellendi ancak veri doğrulanamadı.' };
+     }
+
+     revalidatePath('/dashboard/area-teachers');
+     return { success: true, teacher: finalParse.data };
+
+   } catch (err) {
+    console.error('Update teacher error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

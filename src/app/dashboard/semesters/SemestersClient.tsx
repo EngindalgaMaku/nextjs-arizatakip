@@ -7,14 +7,17 @@ import { Semester, SemesterFormValues } from '@/types/semesters';
 import { SemestersTable } from '@/components/semesters/SemestersTable';
 import { SemesterFormModal } from '@/components/semesters/SemesterFormModal';
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PlusCircle, Users, BookOpen, MapPin } from 'lucide-react';
 import { toast } from 'react-toastify';
 import * as z from 'zod';
+import { SemesterAssociationManager } from '@/components/semesters/SemesterAssociationManager';
 
 export default function SemestersClient() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string | null>(null);
 
   // Fetch Semesters
   const { data: semesters = [], isLoading, error } = useQuery<Semester[], Error>({
@@ -117,6 +120,10 @@ export default function SemestersClient() {
     }
   };
 
+  const handleSelectSemester = (id: string) => {
+    setSelectedSemesterId(id);
+  };
+
   const mutationLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || setActiveMutation.isPending;
 
   return (
@@ -132,13 +139,79 @@ export default function SemestersClient() {
       {error && <div className="text-red-500 p-4 bg-red-100 border border-red-400 rounded mb-4">Sömestrler yüklenirken hata oluştu: {error.message}</div>}
 
       {!isLoading && !error && (
-        <SemestersTable
-          semesters={semesters}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onSetActive={handleSetActive}
-          isLoading={mutationLoading}
-        />
+        <>
+          <Tabs defaultValue="semesters" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="semesters">Sömestrler</TabsTrigger>
+              <TabsTrigger value="teachers" disabled={!selectedSemesterId}>
+                <Users className="h-4 w-4 mr-2" />
+                Öğretmen Atamaları
+              </TabsTrigger>
+              <TabsTrigger value="classes" disabled={!selectedSemesterId}>
+                <BookOpen className="h-4 w-4 mr-2" />
+                Sınıf Atamaları
+              </TabsTrigger>
+              <TabsTrigger value="locations" disabled={!selectedSemesterId}>
+                <MapPin className="h-4 w-4 mr-2" />
+                Konum Atamaları
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="semesters">
+              <SemestersTable
+                semesters={semesters}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onSetActive={handleSetActive}
+                onSelect={handleSelectSemester}
+                selectedSemesterId={selectedSemesterId}
+                isLoading={mutationLoading}
+              />
+            </TabsContent>
+
+            <TabsContent value="teachers">
+              {selectedSemesterId ? (
+                <SemesterAssociationManager 
+                  semesterId={selectedSemesterId}
+                  type="teachers"
+                  semesterName={semesters.find(s => s.id === selectedSemesterId)?.name || ''}
+                />
+              ) : (
+                <div className="text-center p-6 bg-yellow-50 border border-yellow-300 rounded-md">
+                  Lütfen önce bir sömestr seçin
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="classes">
+              {selectedSemesterId ? (
+                <SemesterAssociationManager 
+                  semesterId={selectedSemesterId}
+                  type="classes"
+                  semesterName={semesters.find(s => s.id === selectedSemesterId)?.name || ''}
+                />
+              ) : (
+                <div className="text-center p-6 bg-yellow-50 border border-yellow-300 rounded-md">
+                  Lütfen önce bir sömestr seçin
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="locations">
+              {selectedSemesterId ? (
+                <SemesterAssociationManager 
+                  semesterId={selectedSemesterId}
+                  type="locations"
+                  semesterName={semesters.find(s => s.id === selectedSemesterId)?.name || ''}
+                />
+              ) : (
+                <div className="text-center p-6 bg-yellow-50 border border-yellow-300 rounded-md">
+                  Lütfen önce bir sömestr seçin
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </>
       )}
 
       {isModalOpen && (

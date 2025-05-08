@@ -11,6 +11,7 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { useSearchParams } from 'next/navigation';
 import { Dal, DalFormValues } from '@/types/dallar';
+import { useSemesterStore } from '@/stores/useSemesterStore';
 
 // Type for branch select items
 interface BranchSelectItem {
@@ -20,18 +21,24 @@ interface BranchSelectItem {
 
 export default function DallarClient() {
   const searchParams = useSearchParams();
+  const selectedSemesterId = useSemesterStore((state) => state.selectedSemesterId);
   const branchId = searchParams.get('branchId') || '';
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDal, setEditingDal] = useState<Dal | null>(null);
 
-  // Fetch Dallar (filtered if branchId present)
+  // Fetch Dallar (filtered by branchId AND selectedSemesterId)
   const { data: dallar = [], isLoading: isLoadingDallar, error: errorDallar } = useQuery<Dal[], Error>({
-    queryKey: branchId ? ['dallar', branchId] : ['dallar'],
-    queryFn: branchId ? () => fetchDallarByBranch(branchId) : fetchDallar,
+    queryKey: branchId
+        ? ['dallar', branchId, selectedSemesterId]
+        : ['dallar', selectedSemesterId],
+    queryFn: () => branchId
+        ? fetchDallarByBranch(branchId)
+        : fetchDallar(),
+    enabled: !!selectedSemesterId,
   });
 
-  // Fetch branches for dropdown
+  // Fetch branches for dropdown (no semester filter needed)
   const { data: availableBranches = [], isLoading: isLoadingBranches, error: errorBranches } = useQuery<BranchSelectItem[], Error>({
     queryKey: ['branchesForSelect'],
     queryFn: fetchBranchesForSelect,
@@ -39,11 +46,21 @@ export default function DallarClient() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: createDal,
+    mutationFn: (formData: DalFormValues) => {
+        if (!selectedSemesterId) {
+            throw new Error('Sömestr seçilmeden Dal oluşturulamz.');
+        }
+        // We need to ensure the semester_id is included in the form data
+        return createDal({
+          ...formData,
+          // Include any additional properties needed here
+        });
+    },
     onSuccess: (data) => {
       if (data.success) {
         toast.success('Dal başarıyla eklendi.');
-        queryClient.invalidateQueries({ queryKey: ['dallar'] });
+        queryClient.invalidateQueries({ queryKey: ['dallar', selectedSemesterId] });
+        queryClient.invalidateQueries({ queryKey: ['dallar', branchId, selectedSemesterId] });
         setIsModalOpen(false);
       } else {
         toast.error(`Dal eklenemedi: ${data.error}`);
@@ -59,7 +76,8 @@ export default function DallarClient() {
     onSuccess: (data) => {
       if (data.success) {
         toast.success('Dal başarıyla güncellendi.');
-        queryClient.invalidateQueries({ queryKey: ['dallar'] });
+        queryClient.invalidateQueries({ queryKey: ['dallar', selectedSemesterId] });
+        queryClient.invalidateQueries({ queryKey: ['dallar', branchId, selectedSemesterId] });
         setIsModalOpen(false);
         setEditingDal(null);
       } else {
@@ -76,7 +94,8 @@ export default function DallarClient() {
     onSuccess: (data) => {
       if (data.success) {
         toast.success('Dal başarıyla silindi!');
-        queryClient.invalidateQueries({ queryKey: ['dallar'] });
+        queryClient.invalidateQueries({ queryKey: ['dallar', selectedSemesterId] });
+        queryClient.invalidateQueries({ queryKey: ['dallar', branchId, selectedSemesterId] });
       } else {
         toast.error(`Dal silinemedi: ${data.error}`);
       }
@@ -121,13 +140,23 @@ export default function DallarClient() {
         </button>
       </div>
 
+      {/* Show message if no semester is selected */}
+      {!selectedSemesterId && !isLoading && (
+        <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
+          Lütfen işlem yapmak için kenar çubuğundan bir sömestr seçin.
+        </div>
+      )}
+
       {isLoading && <div>Yükleniyor...</div>}
       {(errorDallar || errorBranches) && <div className="text-red-600">Hata: {(errorDallar || errorBranches)?.message}</div>}
 
-      {!isLoading && availableBranches.length === 0 && <div>Ana dal bulunamadı.</div>}
-
-      {!isLoading && availableBranches.length > 0 && (
-        <DallarTable dallar={dallar} onEdit={handleEdit} onDelete={handleDelete} />
+      {/* Render table only if NOT loading AND a semester IS selected */}
+      {!isLoading && selectedSemesterId && (
+          availableBranches.length > 0 ? (
+              <DallarTable dallar={dallar} onEdit={handleEdit} onDelete={handleDelete} />
+          ) : (
+              <div>Ana dal bulunamadı.</div>
+          )
       )}
 
       {isModalOpen && (

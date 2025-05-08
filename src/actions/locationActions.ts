@@ -10,15 +10,20 @@ import { z } from 'zod';
 /**
  * Fetch all locations with their associated lab type information.
  */
-export async function fetchLocations(): Promise<LocationWithLabType[]> {
-  const { data, error } = await supabase
+export async function fetchLocations(semesterId?: string): Promise<LocationWithLabType[]> {
+  let query = supabase
     .from('locations')
     .select(`
       *,
       branch:branches ( id, name ),
       labType:lab_types ( id, name, code )
-    `)
-    .order('name', { ascending: true });
+    `);
+
+  if (semesterId) {
+    query = query.eq('semester_id', semesterId);
+  }
+
+  const { data, error } = await query.order('name', { ascending: true });
 
   if (error) {
     console.error('Error fetching locations:', error);
@@ -185,17 +190,22 @@ export async function deleteLocation(id: string): Promise<{ success: boolean; er
 /**
  * Fetch all locations for a specific branch by its ID, including lab type info.
  */
-export async function fetchLocationsByBranch(branchId: string): Promise<LocationWithLabType[]> {
+export async function fetchLocationsByBranch(branchId: string, semesterId?: string): Promise<LocationWithLabType[]> {
   if (!branchId) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from('locations')
     .select(
       `*,
       branch:branches ( id, name ),
       labType:lab_types ( id, name, code )`
     )
-    .eq('branch_id', branchId)
-    .order('name', { ascending: true });
+    .eq('branch_id', branchId);
+
+  if (semesterId) {
+    query = query.eq('semester_id', semesterId);
+  }
+
+  const { data, error } = await query.order('name', { ascending: true });
 
   if (error) {
     console.error(`Error fetching locations for branch ${branchId}:`, error);

@@ -10,6 +10,8 @@ import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24
 import { toast } from 'react-toastify';
 import { Teacher, TeacherFormValues } from '@/types/teachers';
 import { BranchFormValues } from '@/types/branches';
+import { useSemesterStore } from '@/stores/useSemesterStore';
+import { AcademicCapIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -20,20 +22,26 @@ interface TeacherWithBranchName extends Teacher {
 
 export default function AreaTeachersPage() {
   const queryClient = useQueryClient();
+  const selectedSemesterId = useSemesterStore((state) => state.selectedSemesterId);
+  const setSelectedSemesterId = useSemesterStore((state) => state.setSelectedSemesterId);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Partial<Teacher> | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBranch, setSelectedBranch] = useState<string>('');
 
-  // Fetch teachers (returns Partial<Teacher>[] now)
-  const { data: teachers = [], isLoading: isLoadingTeachers, error: errorTeachers } = useQuery<Partial<Teacher>[]>({ 
-    queryKey: ['teachers'],
-    queryFn: fetchTeachers,
+  // Fetch teachers - FILTER BY SEMESTER
+  const { data: teachers = [], isLoading: isLoadingTeachers, error: errorTeachers } = useQuery<Partial<Teacher>[], Error>({
+    // Include semester in key
+    queryKey: ['teachers', selectedSemesterId],
+    // Pass semesterId to fetch function
+    queryFn: () => fetchTeachers(selectedSemesterId ?? undefined),
+    // Only fetch if semester is selected
+    enabled: !!selectedSemesterId,
   });
 
   // Fetch branches
-  const { data: branches = [], isLoading: isLoadingBranches, error: errorBranches } = useQuery<Branch[]>({ 
+  const { data: branches = [], isLoading: isLoadingBranches, error: errorBranches } = useQuery<Branch[], Error>({
     queryKey: ['branches'],
     queryFn: fetchBranches,
   });
@@ -68,15 +76,13 @@ export default function AreaTeachersPage() {
 
   // Filter teachers based on selected branch
   const filteredTeachers = useMemo(() => {
-      if (!selectedBranch) {
-          return teachers; // No filter applied
-      }
-      return teachers.filter(teacher => teacher.branchId === selectedBranch);
+    if (!selectedBranch) return teachers;
+    return teachers.filter(teacher => teacher.branchId === selectedBranch);
   }, [teachers, selectedBranch]);
 
   // Reset page to 1 when filter changes
   useEffect(() => {
-      setCurrentPage(1);
+    setCurrentPage(1);
   }, [selectedBranch]);
 
   // --- Pagination Logic (using filteredTeachers) --- Start
@@ -122,62 +128,57 @@ export default function AreaTeachersPage() {
 
   // Mutations (remain the same, but adapt handleEdit/handleFormSubmit)
   const createTeacherMutation = useMutation({
-    mutationFn: createTeacher,
-    onSuccess: (data) => {
-      console.log('[Create Mutation] Success:', data);
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        toast.success('Öğretmen başarıyla eklendi!');
-        setIsTeacherModalOpen(false);
-      } else {
-        toast.error(`Öğretmen eklenemedi: ${data.error}`);
-      }
+    // Pass semesterId when calling createTeacher
+    mutationFn: (payload: TeacherFormValues) => {
+        if (!selectedSemesterId) throw new Error('Cannot create teacher without a selected semester.');
+        return createTeacher(payload, selectedSemesterId);
     },
-    onError: (err) => {
-      toast.error(`Öğretmen eklenemedi: ${err instanceof Error ? err.message : String(err)}`);
-      console.error("Create teacher error:", err);
+    onSuccess: (data) => {
+        if (data.success) {
+            toast.success('Öğretmen başarıyla eklendi.');
+            queryClient.invalidateQueries({ queryKey: ['teachers', selectedSemesterId] }); // Invalidate with semesterId
+            setIsTeacherModalOpen(false);
+        } else {
+            toast.error(`Öğretmen eklenemedi: ${data.error}`);
+        }
+    },
+     onError: (err) => {
+        toast.error(`Hata: ${err.message}`);
     },
   });
 
   const updateTeacherMutation = useMutation({
+    // Update doesn't need semesterId passed typically
     mutationFn: (vars: { id: string; payload: TeacherFormValues }) => updateTeacher(vars.id, vars.payload),
     onSuccess: (data) => {
-      console.log('[Update Mutation] Success:', data);
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        toast.success('Öğretmen başarıyla güncellendi!');
-        setIsTeacherModalOpen(false);
-        setEditingTeacher(null);
-      } else {
-        toast.error(`Öğretmen güncellenemedi: ${data.error}`);
-      }
+        if (data.success) {
+            toast.success('Öğretmen başarıyla güncellendi.');
+            queryClient.invalidateQueries({ queryKey: ['teachers', selectedSemesterId] }); // Invalidate with semesterId
+            setIsTeacherModalOpen(false);
+            setEditingTeacher(null);
+        } else {
+            toast.error(`Öğretmen güncellenemedi: ${data.error}`);
+        }
     },
-    onError: (err, variables) => {
-      toast.error(`Öğretmen güncellenemedi: ${err instanceof Error ? err.message : String(err)}`);
-      console.error(`Update teacher error (ID: ${variables.id}):`, err);
+     onError: (err) => {
+        toast.error(`Hata: ${err.message}`);
     },
   });
 
    const deleteTeacherMutation = useMutation({
-    mutationFn: deleteTeacher,
-    onSuccess: (data, teacherId) => {
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ['teachers'] });
-        toast.success('Öğretmen başarıyla silindi!');
-         // Adjust page if last item deleted - use correct variable
-         if (paginatedTeachersWithBranchName.length === 1 && safeCurrentPage > 1) {
-            setCurrentPage(safeCurrentPage - 1);
-         }
-      } else {
-         toast.error(`Öğretmen silinemedi: ${data.error}`);
-      }
-    },
-    // Fix type errors for onError parameters
-    onError: (err: Error, teacherId: string) => {
-       toast.error(`Öğretmen silinemedi: ${err instanceof Error ? err.message : String(err)}`);
-       console.error(`Delete teacher error (ID: ${teacherId}):`, err);
-    },
-  });
+        mutationFn: deleteTeacher,
+        onSuccess: (data) => {
+            if (data.success) {
+                toast.success('Öğretmen başarıyla silindi.');
+                queryClient.invalidateQueries({ queryKey: ['teachers', selectedSemesterId] }); // Invalidate with semesterId
+            } else {
+                toast.error(`Öğretmen silinemedi: ${data.error}`);
+            }
+        },
+        onError: (err) => {
+             toast.error(`Hata: ${err.message}`);
+        },
+    });
 
   // --- Branch Mutation --- Start
   const createBranchMutation = useMutation({
@@ -205,7 +206,7 @@ export default function AreaTeachersPage() {
     onSuccess: (data, variables) => {
       if (data.success) {
         // Invalidate teachers query to refetch updated data
-        queryClient.invalidateQueries({ queryKey: ['teachers'] });
+        queryClient.invalidateQueries({ queryKey: ['teachers', selectedSemesterId] });
         toast.success('Öğretmen durumu güncellendi!');
       } else {
         toast.error(`Durum güncellenemedi: ${data.error}`);
@@ -292,26 +293,62 @@ export default function AreaTeachersPage() {
   const teacherMutationLoading = createTeacherMutation.isPending || updateTeacherMutation.isPending || deleteTeacherMutation.isPending || updateStatusMutation.isPending;
   const branchMutationLoading = createBranchMutation.isPending;
 
+  // Conditional rendering for missing semester, loading, and error states
+  if (!selectedSemesterId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+        <AcademicCapIcon className="w-16 h-16 text-gray-400 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-700 mb-2">Sömestr Seçilmedi</h2>
+        <p className="text-gray-500">
+          Lütfen öğretmenleri görüntülemek için bir sömestr seçin. Sömestr yönetimi sayfasından aktif bir sömestr belirleyebilirsiniz.
+        </p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p>Yükleniyor...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-red-50 border border-red-200 rounded-md">
+        <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mb-3" />
+        <h2 className="text-lg font-semibold text-red-700">Veri Yüklenirken Hata Oluştu</h2>
+        <p className="text-red-600">
+          Öğretmen veya branş verileri yüklenirken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.
+        </p>
+        <pre className="mt-2 text-xs text-red-500 bg-red-100 p-2 rounded overflow-auto">
+          {error.message}
+        </pre>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-4 md:p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-800">Öğretmenler</h1>
-        <div className="flex space-x-2">
-            <button
-              onClick={handleAddTeacher}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Yeni Öğretmen Ekle
-            </button>
-            <button
-              onClick={handleAddBranch}
-              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-              title="Yeni Branş Ekle"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Yeni Branş Ekle
-            </button>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+        <h1 className="text-3xl font-bold text-blue-700">Alan Öğretmenleri Yönetimi</h1>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button
+            onClick={handleAddTeacher}
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Yeni Öğretmen Ekle
+          </button>
+          <button
+            onClick={handleAddBranch}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            title="Yeni Branş Ekle"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Yeni Branş Ekle
+          </button>
         </div>
       </div>
       
@@ -331,9 +368,6 @@ export default function AreaTeachersPage() {
               ))}
           </select>
       </div>
-
-      {isLoading && <p>Veriler yükleniyor...</p>}
-      {error && <p className="text-red-600">Veriler yüklenirken bir hata oluştu: {error.message}</p>}
 
       {!isLoading && !error && (
         <>

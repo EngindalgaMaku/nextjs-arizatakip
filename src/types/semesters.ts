@@ -10,8 +10,8 @@ const SemesterBaseSchema = z.object({
   start_date: dateSchema,
   end_date: dateSchema,
   is_active: z.boolean().default(false),
-  created_at: z.string().datetime().optional(), // Handled by DB
-  updated_at: z.string().datetime().optional(), // Handled by DB
+  created_at: z.string().optional(), // Just validate as string
+  updated_at: z.string().optional(), // Just validate as string
 });
 
 // Apply refinement for the final schema used for parsing full objects

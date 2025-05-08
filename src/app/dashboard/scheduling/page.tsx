@@ -25,13 +25,13 @@ export default function SchedulingPage() {
 
     const { data: teachersData, isLoading: isLoadingTeachers } = useQuery<Partial<Teacher>[], Error>({
         queryKey: ['teachers'],
-        queryFn: fetchTeachers,
+        queryFn: () => fetchTeachers(undefined),
         staleTime: 5 * 60 * 1000,
     });
 
     const { data: locationsData, isLoading: isLoadingLocations } = useQuery<LocationWithLabType[], Error>({
         queryKey: ['locations'],
-        queryFn: fetchLocations,
+        queryFn: () => fetchLocations(undefined),
         staleTime: 5 * 60 * 1000,
     });
 

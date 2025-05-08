@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'react-toastify';
 
 interface BranchFormProps {
@@ -28,10 +29,14 @@ export function BranchForm({
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
+    watch,
   } = useForm<BranchFormData>({
     resolver: zodResolver(BranchFormSchema),
-    defaultValues: initialData || { name: '', code: '', description: '' },
+    defaultValues: initialData || { name: '', code: '', description: '', type: 'kultur' },
   });
+
+  const watchType = watch('type');
 
   const handleFormSubmit: SubmitHandler<BranchFormData> = async (data) => {
     try {
@@ -42,6 +47,13 @@ export function BranchForm({
       // Hata burada da yakalanabilir ama genellikle onSubmit mutasyonu kendi hata yönetimini yapar.
       // toast.error(error instanceof Error ? error.message : 'Bir hata oluştu');
     }
+  };
+
+  // Select bileşeni için onChange handler
+  const handleTypeChange = (value: string) => {
+    setValue('type', value as 'meslek' | 'kultur', {
+      shouldValidate: true,
+    });
   };
 
   return (
@@ -56,6 +68,24 @@ export function BranchForm({
         <Label htmlFor="code">Branş Kodu</Label>
         <Input id="code" {...register('code')} disabled={isPending} />
         {errors.code && <p className="text-red-500 text-sm mt-1">{errors.code.message}</p>}
+      </div>
+
+      <div>
+        <Label htmlFor="type">Kategori</Label>
+        <Select 
+          value={watchType || 'kultur'} 
+          onValueChange={handleTypeChange}
+          disabled={isPending}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Kategori seçiniz" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="kultur">Kültür</SelectItem>
+            <SelectItem value="meslek">Meslek</SelectItem>
+          </SelectContent>
+        </Select>
+        {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type.message}</p>}
       </div>
 
       <div>

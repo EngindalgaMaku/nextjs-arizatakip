@@ -4,42 +4,99 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchClasses, createClass, updateClass, deleteClass } from '@/actions/classActions';
 import { fetchTeachers } from '@/actions/teacherActions'; // To build teacher map
+import { fetchBranches } from '@/actions/branchActions'; // <<< Import fetchBranches
+import { fetchDallar } from '@/actions/dalActions'; // <<< Import fetchDallar
 import { Class, ClassFormValues } from '@/types/classes';
 import { Teacher } from '@/types/teachers';
+import { Branch } from '@/types/branches'; // <<< Import Branch type
+import { Dal } from '@/types/dallar'; // <<< Import Dal type
 import { ClassesTable } from '@/components/classes/ClassesTable';
 import { ClassFormModal } from '@/components/classes/ClassFormModal';
 import { PlusIcon } from '@heroicons/react/24/outline';
+import { useSemesterStore } from '@/stores/useSemesterStore';
 
 export default function ClassesPage() {
   const queryClient = useQueryClient();
+  const { selectedSemesterId } = useSemesterStore(); // Get selected semester ID
 
   // Fetch Classes
-  const { data: classes = [], isLoading: isLoadingClasses, error: errorClasses } = useQuery<Class[], Error>({
-    queryKey: ['classes'],
-    queryFn: fetchClasses,
+  const { data: classesRaw = [], isLoading: isLoadingClasses, error: errorClasses } = useQuery<Class[], Error>({
+    queryKey: ['classes', selectedSemesterId],
+    queryFn: () => fetchClasses(selectedSemesterId || undefined),
+    enabled: !!selectedSemesterId,
   });
 
   // Fetch Teachers 
-  // Explicitly cast the queryFn result to Teacher[]
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery<Teacher[], Error>({
-    queryKey: ['teachers'],
-    queryFn: () => fetchTeachers() as Promise<Teacher[]>, // Add type assertion here
+    queryKey: ['teachers', selectedSemesterId],
+    queryFn: () => fetchTeachers(selectedSemesterId || undefined) as Promise<Teacher[]>, 
+    enabled: !!selectedSemesterId,
+  });
+
+  // Fetch Branches
+  const { data: branches = [], isLoading: isLoadingBranches, error: errorBranchesFetch } = useQuery<Branch[], Error>({
+    queryKey: ['allBranches'], // Use a distinct query key for all branches
+    queryFn: fetchBranches,
+    // Branches are not semester-specific for this lookup, so no semesterId needed here
+  });
+
+  // Fetch Dallar
+  const { data: dallar = [], isLoading: isLoadingDallar, error: errorDallarFetch } = useQuery<Dal[], Error>({
+    queryKey: ['allDallar'], // Use a distinct query key for all dallar
+    queryFn: fetchDallar,
   });
 
   // Create a map for quick teacher name lookup
   const teachersMap = React.useMemo(() => {
     const map = new Map<string, string>();
-    // Since we asserted Teacher[], we can directly access id and name
     teachers.forEach(teacher => {
         map.set(teacher.id, teacher.name);
     });
     return map;
   }, [teachers]);
 
+  // Create a map for quick branch name lookup
+  const branchesMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    branches.forEach(branch => {
+      if (branch.id && branch.name) { // Ensure id and name are present
+        map.set(branch.id, branch.name);
+      }
+    });
+    return map;
+  }, [branches]);
+
+  // Create a map for quick dal name lookup
+  const dalsMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    dallar.forEach(dal => {
+      if (dal.id && dal.name) { // Ensure id and name are present
+        map.set(dal.id, dal.name);
+      }
+    });
+    return map;
+  }, [dallar]);
+
+  // Enhance classes data with branch_name and dal_name
+  const classes = React.useMemo(() => {
+    return classesRaw.map(cls => ({
+      ...cls,
+      branch_name: cls.branch_id ? branchesMap.get(cls.branch_id) || null : null,
+      dal_name: cls.dal_id ? dalsMap.get(cls.dal_id) || null : null,
+    }));
+  }, [classesRaw, branchesMap, dalsMap]);
+
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (payload: ClassFormValues) => createClass(payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['classes'] }),
+    // mutationFn should now accept semesterId or get it from the store
+    mutationFn: (payload: ClassFormValues) => {
+      if (!selectedSemesterId) {
+        // Or handle this more gracefully, maybe disable the form if no semester
+        return Promise.reject(new Error('Aktif sömestr seçili değil.')); 
+      }
+      return createClass(payload, selectedSemesterId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['classes', selectedSemesterId] }), // Invalidate with semesterId
     onError: (error) => {
       console.error("Error creating class:", error);
       // TODO: Add user notification (e.g., toast)
@@ -71,7 +128,7 @@ export default function ClassesPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [editingClass, setEditingClass] = React.useState<ClassFormValues | null>(null);
+  const [editingClass, setEditingClass] = React.useState<(ClassFormValues & { id?: string }) | null>(null);
 
   const handleAdd = () => {
     setEditingClass(null);
@@ -79,10 +136,14 @@ export default function ClassesPage() {
   };
 
   const handleEdit = (cls: Class) => {
-    // Prepare initialData for the form (ensure teacher ID is correct format)
-    const initialData: ClassFormValues = {
-        ...cls,
-        classTeacherId: cls.classTeacherId ?? null, // Ensure null if undefined/empty
+    // Prepare initialData for the form
+    const initialData: ClassFormValues & { id: string } = {
+        name: cls.name,
+        department: cls.department,
+        classTeacherId: cls.classTeacherId ?? null, 
+        classPresidentName: cls.classPresidentName,
+        grade_level: cls.grade_level,
+        id: cls.id, // Now we can include id directly
     };
     setEditingClass(initialData);
     setIsModalOpen(true);
@@ -95,26 +156,34 @@ export default function ClassesPage() {
   };
 
   const handleFormSubmit = (data: ClassFormValues) => {
-    const mutationPayload = { ...data, classTeacherId: data.classTeacherId || null }; // Ensure null is sent if empty
+    let id: string | undefined;
+    let formData: ClassFormValues = { ...data };
+    
+    // Check if we're in edit mode (editingClass has an id)
+    if (editingClass && 'id' in editingClass) {
+      id = editingClass.id as string;
+    }
+    
+    // Set classTeacherId to null if it's falsy
+    formData = {
+      ...formData,
+      classTeacherId: formData.classTeacherId || null
+    };
 
-    if (editingClass?.id) {
-       // --- DEBUG LOGS --- 
-      console.log(`Attempting to update class with ID: ${editingClass.id}`);
-      console.log("Payload prepared for mutation:", mutationPayload);
-      // --- END DEBUG LOGS --- 
-      updateMutation.mutate({ id: editingClass.id, payload: mutationPayload });
+    if (id) { 
+      console.log(`Attempting to update class with ID: ${id}`);
+      console.log("Payload prepared for mutation:", formData);
+      updateMutation.mutate({ id, payload: formData });
     } else {
-      // --- DEBUG LOGS --- 
-      console.log("Attempting to create class with payload:", mutationPayload);
-      // --- END DEBUG LOGS --- 
-      createMutation.mutate(mutationPayload);
+      console.log("Attempting to create class with payload:", formData);
+      createMutation.mutate(formData);
     }
     setIsModalOpen(false);
   };
 
-  const isLoading = isLoadingClasses || isLoadingTeachers;
+  const isLoading = isLoadingClasses || isLoadingTeachers || isLoadingBranches || isLoadingDallar;
   const mutationLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
-  const error = errorClasses; // Can combine errors later if needed
+  const error = errorClasses || errorBranchesFetch || errorDallarFetch; // Combine errors
 
   return (
     <div className="p-4 space-y-6">
