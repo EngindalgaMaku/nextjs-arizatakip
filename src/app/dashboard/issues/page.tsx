@@ -21,7 +21,29 @@ interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_
 }
 
 // IssueList component that encapsulates the issue list functionality
-const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, onSelectIssue?: (issue: IssueData | null) => void }) => {
+const IssueList = ({ 
+  selectedId, 
+  onSelectIssue, 
+  isAddModalOpen,
+  setIsAddModalOpen,
+  isViewModalOpen,
+  setIsViewModalOpen,
+  isEditModalOpen,
+  setIsEditModalOpen,
+  currentIssue,
+  setCurrentIssue
+}: {
+  selectedId?: string | null;
+  onSelectIssue?: (issue: IssueData | null) => void;
+  isAddModalOpen: boolean;
+  setIsAddModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isViewModalOpen: boolean;
+  setIsViewModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isEditModalOpen: boolean;
+  setIsEditModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  currentIssue: IssueData | null;
+  setCurrentIssue: React.Dispatch<React.SetStateAction<IssueData | null>>;
+}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [issues, setIssues] = useState<IssueData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,12 +51,7 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [selectedReporter, setSelectedReporter] = useState<string>('all');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
   const [isAddFormSubmitted, setIsAddFormSubmitted] = useState(false);
-  // Sayfalama için state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -207,7 +224,7 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
         setSelectedReporter(filterReporter);
       }
     }
-  }, [issues, isLoading, loadIssues]);
+  }, [issues, isLoading, loadIssues, setIsAddModalOpen]);
 
   // Filtre based on search term, status, and device type
   const filteredIssues = issues.filter((issue) => {
@@ -279,12 +296,33 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
   // Modal kapatıldığında URL'i temizle
   const closeViewModal = () => {
     setIsViewModalOpen(false);
+    setCurrentIssue(null);
     
     // URL'i temizle
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.delete('id');
       window.history.pushState({}, '', url.toString());
+    }
+  };
+
+  const openEditModal = (issue: IssueData) => {
+    setCurrentIssue(issue);
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setCurrentIssue(null);
+  };
+
+  const closeAddModal = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setIsAddModalOpen(false);
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('open');
+        window.history.pushState({}, '', url.toString());
     }
   };
 
@@ -352,24 +390,6 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
     setIsAddFormSubmitted(true);
     setIsAddModalOpen(false);
     loadIssues();
-  };
-
-  // Modal kapatma fonksiyonu  
-  const closeAddModal = (e?: React.MouseEvent) => {
-    // Modal açıkken ve form gönderilirken veya gönderildikten sonra
-    // kazara kapanmayı önlemek için
-    if (isAddFormSubmitted) {
-      e?.stopPropagation();
-      return;
-    }
-    
-    if (window.confirm('Form kapatılacak. Devam etmek istiyor musunuz? Girdiğiniz bilgiler kaybolacak.')) {
-      setIsAddModalOpen(false);
-    }
-  };
-
-  const openAddModal = () => {
-    setIsAddModalOpen(true);
   };
 
   if (isLoading) {
@@ -662,18 +682,23 @@ const IssueList = ({ selectedId, onSelectIssue }: { selectedId?: string | null, 
 };
 
 export default function IssuesPage() {
-  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
-  const [issueId, setIssueId] = useState<string | null>(null);
-  
-  // useSearchParams'ı useEffect içinde kullan
-  useEffect(() => {
-    // Client-side kodu olduğunu belirt
-    if (typeof window !== 'undefined') { // Check if window is defined
-      const searchParams = new URLSearchParams(window.location.search);
-      const id = searchParams.get('id');
-      setIssueId(id);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentIssue, setCurrentIssue] = useState<IssueData | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleSelectIssue = (issue: IssueData | null) => {
+    if (issue) {
+      setCurrentIssue(issue);
+      setIsViewModalOpen(true);
+      setSelectedId(issue.id);
+    } else {
+      setCurrentIssue(null);
+      setIsViewModalOpen(false);
+      setSelectedId(null);
     }
-  }, []);
+  };
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
@@ -691,12 +716,20 @@ export default function IssuesPage() {
           </Button>
         </div>
       </div>
-      {/* Wrap IssueList in a dashboard-style card */}
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-        <div className="p-4 sm:p-6"> {/* Added padding */} 
-           {/* Filter controls can be added here inside the card header if desired */}
-           {/* Example: <div className="mb-4">...filters...</div> */}
-          <IssueList selectedId={issueId} onSelectIssue={setSelectedIssue} />
+        <div className="p-4 sm:p-6">
+          <IssueList 
+            selectedId={selectedId}
+            onSelectIssue={handleSelectIssue} 
+            isAddModalOpen={isAddModalOpen}
+            setIsAddModalOpen={setIsAddModalOpen}
+            isViewModalOpen={isViewModalOpen}
+            setIsViewModalOpen={setIsViewModalOpen}
+            isEditModalOpen={isEditModalOpen}
+            setIsEditModalOpen={setIsEditModalOpen}
+            currentIssue={currentIssue}
+            setCurrentIssue={setCurrentIssue}
+          />
         </div>
       </div>
     </div>

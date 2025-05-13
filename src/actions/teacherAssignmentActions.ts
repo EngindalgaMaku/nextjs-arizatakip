@@ -26,7 +26,7 @@ export async function fetchTeacherAssignments(teacherId: string): Promise<Teache
       assignment, 
       created_at,
       updated_at,
-      dal_ders:dal_dersleri ( id, ders_adi, sinif_seviyesi ),
+      dal_ders:dal_dersleri ( id, ders_adi, sinif_seviyesi, dal_id ),
       teachers ( id, name )
     `)
     .eq('teacher_id', teacherId)
@@ -42,23 +42,40 @@ export async function fetchTeacherAssignments(teacherId: string): Promise<Teache
   
   // Log before mapping
   console.log('[Action] Mapping fetched data...');
-  const mappedData = data?.map(item => ({
-    id: item.id,
-    teacher_id: item.teacher_id,
-    dal_ders_id: item.dal_ders_id,
-    assignment: item.assignment,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-    teacher: Array.isArray(item.teachers) && item.teachers.length > 0 ? {
-      id: item.teachers[0]?.id,
-      name: item.teachers[0]?.name
-    } : undefined,
-    dal_ders: Array.isArray(item.dal_ders) && item.dal_ders.length > 0 ? {
-        id: item.dal_ders[0]?.id,
-        dersAdi: item.dal_ders[0]?.ders_adi,
-        sinifSeviyesi: item.dal_ders[0]?.sinif_seviyesi
-    } : undefined,
-  })) || [];
+  const mappedData = data?.map(item => {
+    let finalTeacher = undefined;
+    const teacherData = item.teachers;
+    if (Array.isArray(teacherData) && teacherData.length > 0 && teacherData[0]) {
+        if (teacherData[0].id !== undefined && teacherData[0].name !== undefined) {
+            finalTeacher = { id: String(teacherData[0].id), name: String(teacherData[0].name) };
+        }
+    }
+
+    let finalDalDers = undefined;
+    const dalDersData = item.dal_ders;
+    if (Array.isArray(dalDersData) && dalDersData.length > 0 && dalDersData[0]) {
+        const firstDalDers = dalDersData[0];
+        if (firstDalDers.id !== undefined && firstDalDers.ders_adi !== undefined && firstDalDers.sinif_seviyesi !== undefined) {
+            finalDalDers = {
+                id: String(firstDalDers.id),
+                dersAdi: String(firstDalDers.ders_adi),
+                sinifSeviyesi: Number(firstDalDers.sinif_seviyesi),
+                dalId: firstDalDers.dal_id ? String(firstDalDers.dal_id) : undefined
+            };
+        }
+    }
+
+    return {
+        id: item.id,
+        teacher_id: item.teacher_id,
+        dal_ders_id: item.dal_ders_id,
+        assignment: item.assignment,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        teacher: finalTeacher,
+        dal_ders: finalDalDers,
+    };
+  }) || [];
   
   // Log after mapping
   console.log('[Action] Mapped data:', mappedData);
@@ -100,7 +117,7 @@ export async function createTeacherAssignment(teacherId: string, dalDersId: stri
             .insert(assignmentData) 
             .select(`
               id, teacher_id, dal_ders_id, assignment, created_at, updated_at, 
-              dal_ders:dal_dersleri ( id, ders_adi, sinif_seviyesi ), 
+              dal_ders:dal_dersleri ( id, ders_adi, sinif_seviyesi, dal_id ),
               teachers ( id, name )
             `)
             .single();
@@ -118,6 +135,28 @@ export async function createTeacherAssignment(teacherId: string, dalDersId: stri
 
         revalidatePath(`/dashboard/area-teachers/${teacherId}/assignments`);
         
+        let finalTeacher = undefined;
+        const teacherData = data.teachers;
+        if (Array.isArray(teacherData) && teacherData.length > 0 && teacherData[0]) {
+            if (teacherData[0].id !== undefined && teacherData[0].name !== undefined) {
+                finalTeacher = { id: String(teacherData[0].id), name: String(teacherData[0].name) };
+            }
+        }
+
+        let finalDalDers = undefined;
+        const dalDersData = data.dal_ders;
+        if (Array.isArray(dalDersData) && dalDersData.length > 0 && dalDersData[0]) {
+            const firstDalDers = dalDersData[0];
+            if (firstDalDers.id !== undefined && firstDalDers.ders_adi !== undefined && firstDalDers.sinif_seviyesi !== undefined) {
+                finalDalDers = {
+                    id: String(firstDalDers.id),
+                    dersAdi: String(firstDalDers.ders_adi),
+                    sinifSeviyesi: Number(firstDalDers.sinif_seviyesi),
+                    dalId: firstDalDers.dal_id ? String(firstDalDers.dal_id) : undefined
+                };
+            }
+        }
+
         const createdAssignment: TeacherCourseAssignment = {
             id: data.id,
             teacher_id: data.teacher_id,
@@ -125,15 +164,8 @@ export async function createTeacherAssignment(teacherId: string, dalDersId: stri
             assignment: data.assignment,
             created_at: data.created_at,
             updated_at: data.updated_at,
-            teacher: Array.isArray(data.teachers) && data.teachers.length > 0 ? {
-              id: data.teachers[0]?.id,
-              name: data.teachers[0]?.name
-            } : undefined,
-            dal_ders: Array.isArray(data.dal_ders) && data.dal_ders.length > 0 ? { 
-                id: data.dal_ders[0]?.id,
-                dersAdi: data.dal_ders[0]?.ders_adi,
-                sinifSeviyesi: data.dal_ders[0]?.sinif_seviyesi
-            } : undefined,
+            teacher: finalTeacher,
+            dal_ders: finalDalDers,
         };
 
         return { success: true, assignment: createdAssignment };
@@ -162,7 +194,7 @@ export async function updateTeacherAssignment(assignmentId: string, teacherId: s
             .eq('id', assignmentId)
             .select(`
               id, teacher_id, dal_ders_id, assignment, created_at, updated_at, 
-              dal_ders:dal_dersleri ( id, ders_adi, sinif_seviyesi ), 
+              dal_ders:dal_dersleri ( id, ders_adi, sinif_seviyesi, dal_id ),
               teachers ( id, name )
             `)
             .single();
@@ -174,6 +206,28 @@ export async function updateTeacherAssignment(assignmentId: string, teacherId: s
 
         revalidatePath(`/dashboard/area-teachers/${teacherId}/assignments`);
 
+        let finalTeacher = undefined;
+        const teacherData = data.teachers;
+        if (Array.isArray(teacherData) && teacherData.length > 0 && teacherData[0]) {
+            if (teacherData[0].id !== undefined && teacherData[0].name !== undefined) {
+                finalTeacher = { id: String(teacherData[0].id), name: String(teacherData[0].name) };
+            }
+        }
+
+        let finalDalDers = undefined;
+        const dalDersData = data.dal_ders;
+        if (Array.isArray(dalDersData) && dalDersData.length > 0 && dalDersData[0]) {
+            const firstDalDers = dalDersData[0];
+            if (firstDalDers.id !== undefined && firstDalDers.ders_adi !== undefined && firstDalDers.sinif_seviyesi !== undefined) {
+                finalDalDers = {
+                    id: String(firstDalDers.id),
+                    dersAdi: String(firstDalDers.ders_adi),
+                    sinifSeviyesi: Number(firstDalDers.sinif_seviyesi),
+                    dalId: firstDalDers.dal_id ? String(firstDalDers.dal_id) : undefined
+                };
+            }
+        }
+
          const updatedAssignment: TeacherCourseAssignment = {
             id: data.id,
             teacher_id: data.teacher_id,
@@ -181,15 +235,8 @@ export async function updateTeacherAssignment(assignmentId: string, teacherId: s
             assignment: data.assignment,
             created_at: data.created_at,
             updated_at: data.updated_at,
-            teacher: Array.isArray(data.teachers) && data.teachers.length > 0 ? {
-              id: data.teachers[0]?.id,
-              name: data.teachers[0]?.name
-            } : undefined,
-            dal_ders: Array.isArray(data.dal_ders) && data.dal_ders.length > 0 ? { 
-                id: data.dal_ders[0]?.id,
-                dersAdi: data.dal_ders[0]?.ders_adi,
-                sinifSeviyesi: data.dal_ders[0]?.sinif_seviyesi
-            } : undefined,
+            teacher: finalTeacher,
+            dal_ders: finalDalDers,
         };
 
         return { success: true, assignment: updatedAssignment };

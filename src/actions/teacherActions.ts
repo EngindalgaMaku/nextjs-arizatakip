@@ -11,7 +11,7 @@ import { TeacherSchema } from '@/types/teachers';
 /**
  * Fetch all teachers, optionally filtered by semester.
  */
-export async function fetchTeachers(semesterId?: string): Promise<Partial<Teacher>[]> {
+export async function fetchTeachers(semesterId?: string): Promise<Teacher[]> {
   const supabase = createSupabaseServerClient();
   let query = supabase
     .from('teachers')
@@ -32,7 +32,7 @@ export async function fetchTeachers(semesterId?: string): Promise<Partial<Teache
     const mappedRole = typeof teacher.role === 'string' ? teacher.role.toUpperCase() as TeacherRole : null;
     return {
       id: teacher.id,
-      semester_id: teacher.semester_id, // Map semester_id
+      semester_id: teacher.semester_id,
       name: teacher.name,
       birthDate: teacher.birth_date,
       role: mappedRole,
@@ -44,15 +44,19 @@ export async function fetchTeachers(semesterId?: string): Promise<Partial<Teache
     };
   });
 
-  // Validate mapped data (ensure partial() allows missing semester_id if schema expects it)
+  // Validate mapped data using the full TeacherSchema
   const validatedData = mappedData.map(teacher => {
-    const parseResult = TeacherSchema.partial().safeParse(teacher);
+    // Ensure 'name' is provided and is a string, otherwise provide a default or handle error
+    // For now, assuming DB provides valid 'name' as per schema
+    const parseResult = TeacherSchema.safeParse(teacher); // Use full TeacherSchema, not partial()
     if (!parseResult.success) {
-      console.warn(`Fetched teacher data validation failed for ID ${teacher.id}:`, parseResult.error);
+      console.warn(`Fetched teacher data validation failed for ID ${teacher.id}:`, parseResult.error.flatten());
+      // Optionally, decide how to handle invalid records, e.g., filter them out or throw
+      // For now, returning null to be filtered, but this means data loss if a teacher is invalid
       return null;
     }
     return parseResult.data;
-  }).filter(Boolean) as Partial<Teacher>[];
+  }).filter(Boolean) as Teacher[]; // Cast to Teacher[]
 
   return validatedData;
 }

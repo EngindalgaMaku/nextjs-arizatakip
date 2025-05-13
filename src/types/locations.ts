@@ -9,6 +9,8 @@ export const LocationSchema = z.object({
   code: z.string().max(20, 'Konum kodu en fazla 20 karakter olabilir.').optional().nullable(), // Optional code
   capacity: z.number().int().positive('Kapasite pozitif bir tam sayı olmalıdır.').optional().nullable(), // Optional capacity
   location_type_id: z.string().uuid('Geçerli bir lokasyon tipi seçilmelidir.').nullable(), // Changed from lab_type_id, made nullable if a location might not have a type initially
+  is_suitable_for_theory: z.boolean().default(false).optional().nullable(), // Added field
+  is_suitable_for_practice: z.boolean().default(false).optional().nullable(), // Added field
   created_at: z.string().optional(), // Managed by DB
   updated_at: z.string().optional(), // Managed by DB
 });

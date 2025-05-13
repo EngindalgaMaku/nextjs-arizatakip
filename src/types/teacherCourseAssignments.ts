@@ -26,6 +26,7 @@ export const TeacherCourseAssignmentSchema = z.object({
       id: z.string().uuid(),
       dersAdi: z.string(),
       sinifSeviyesi: z.number(), // Assuming sinifSeviyesi is a number
+      dalId: z.string().uuid().optional().nullable(),
   }).optional().nullable(),
 });
 

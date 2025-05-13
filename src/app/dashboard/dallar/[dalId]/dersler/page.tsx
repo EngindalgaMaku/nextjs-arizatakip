@@ -8,7 +8,7 @@ import { fetchDalById } from '@/actions/dalActions'; // We need this to get the 
 import { fetchDalDersleri, createDalDers, updateDalDers, deleteDalDers } from '@/actions/dalDersActions';
 import { fetchLocationTypes, fetchDalDersLocationTypes } from '@/actions/locationTypeActions'; // UPDATED import
 import { LocationType } from '@/types/locationTypes'; // UPDATED import
-import { DalDersleriYonetim } from '@/components/dallar/DalDersleriYonetim';
+import { DalDersleriYonetim as DalDersleriTable } from '@/components/dallar/DalDersleriYonetim';
 import { DalDersFormModal } from '@/components/dallar/DalDersFormModal';
 import { DalDers, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
 import { Dal } from '@/types/dallar';
@@ -16,7 +16,6 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
-import { DalDersleriTable } from '@/components/daldersleri/DalDersleriTable';
 
 export default function DalDersleriPage() {
   const params = useParams();
@@ -50,14 +49,18 @@ export default function DalDersleriPage() {
   });
 
   // Fetch associated location types for the ders being edited
-  const { data: currentDersLocationTypes, refetch: refetchDersLocationTypes } = useQuery<string[]>({ // UPDATED query key and type
-    queryKey: ['dalDersLocationTypes', editingDers?.id], // UPDATED query key
-    queryFn: () => fetchDalDersLocationTypes(editingDers!.id), // UPDATED function call
+  const { data: currentDersLocationTypes, refetch: refetchDersLocationTypes, isSuccess: isCurrentDersLocationTypesSuccess } = useQuery<string[], Error>({
+    queryKey: ['dalDersLocationTypes', editingDers?.id],
+    queryFn: () => fetchDalDersLocationTypes(editingDers!.id),
     enabled: !!editingDers, // Only fetch when editingDers is not null
-    onSuccess: (data) => {
-      setInitialLocationTypeIds(data || []); // UPDATED state setter
-    },
   });
+
+  // useEffect to handle setting initialLocationTypeIds on successful fetch
+  useEffect(() => {
+    if (isCurrentDersLocationTypesSuccess && currentDersLocationTypes) {
+      setInitialLocationTypeIds(currentDersLocationTypes || []);
+    }
+  }, [isCurrentDersLocationTypesSuccess, currentDersLocationTypes]);
 
   // Mutations
   const createMutation = useMutation({
@@ -198,6 +201,7 @@ export default function DalDersleriPage() {
           dersler={dersler}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onAdd={handleAdd}
         />
       )}
 

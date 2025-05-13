@@ -18,7 +18,7 @@ import { Branch } from '@/types/branches';
 import { Dal } from '@/types/dallar';
 import { DalDers } from '@/types/dalDersleri';
 import { TeacherUnavailability } from '@/types/teacherUnavailability';
-import { LocationWithLabType } from '@/types/locations';
+import { LocationWithDetails as LocationWithLabType } from '@/types/locations';
 import { Semester } from '@/types/semesters';
 import { TeacherCourseAssignment } from '@/types/teacherCourseAssignments';
 import { AcademicCapIcon, BookOpenIcon, MapPinIcon, ClipboardDocumentCheckIcon, IdentificationIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
@@ -111,7 +111,10 @@ interface TimeTable {
     locationSchedules: { [locationId: string]: WeeklySchedule };
     unassignedLessons: DalDers[];
     excludedLessons: DalDers[];
-    teacherTotalHours?: { [teacherId: string]: number }; // Changed from Map to object
+    teacherTotalHours?: { [teacherId: string]: number }; 
+    teacherFreeDays?: { [key: string]: string[] }; // Added
+    schedulingStats?: { min: number; max: number; avgDeviation: number }; // Added
+    grade12DaysByDal?: { [dalId: string]: number[] }; // Added
 }
 
 // Add a helper function to generate a unique color based on lesson ID
@@ -285,7 +288,7 @@ export default function SmartTimetablePage() {
     const locationOptions: SelectOptionType[] = useMemo(() => 
         locations.map(loc => ({ 
             value: loc.id!, 
-            label: `${loc.name}${loc.lab_type ? ` (${loc.lab_type.name})` : ''}${loc.is_suitable_for_theory ? ' [Teori]' : ''}${loc.is_suitable_for_practice ? ' [Uygulama]' : ''}`
+            label: `${loc.name}${loc.locationType ? ` (${loc.locationType.name})` : ''}${loc.is_suitable_for_theory ? ' [Teori]' : ''}${loc.is_suitable_for_practice ? ' [Uygulama]' : ''}`
         }))
     , [locations]);
 
@@ -374,7 +377,7 @@ export default function SmartTimetablePage() {
                     if (a.dal_ders) { // Prefer direct nested object
                         lessonName = a.dal_ders.dersAdi || lessonName;
                         sinifSeviyesi = a.dal_ders.sinifSeviyesi;
-                        dalId = a.dal_ders.dalId;
+                        dalId = a.dal_ders.dalId ?? undefined; // Handle possible null by converting to undefined
                     } else if (a.dal_ders_id && dalDersMapForAssignments.has(a.dal_ders_id)) {
                         const mappedDers = dalDersMapForAssignments.get(a.dal_ders_id)!;
                         lessonName = mappedDers.dersAdi || lessonName;
@@ -491,13 +494,9 @@ export default function SmartTimetablePage() {
                     periodArray.push(i);
                 }
                 
-                // Handle both day and day_of_week column names
-                const dayValue = unavailability.day_of_week !== undefined 
-                    ? unavailability.day_of_week 
-                    : unavailability.day;
-                
+                // Directly use day_of_week as it's the defined field in TeacherUnavailability type
                 teacherUnavailabilityMap.get(unavailability.teacher_id!)!.push({
-                    day: dayValue,
+                    day: unavailability.day_of_week, 
                     periods: periodArray
                 });
             });
@@ -1042,7 +1041,7 @@ export default function SmartTimetablePage() {
             }
 
             // After scheduling, add information about free days to the timetable output
-            const teacherFreeDays = {};
+            const teacherFreeDays: { [key: string]: string[] } = {}; // Typed the object
             const minMaxHours = { min: Infinity, max: 0, avgDeviation: 0 };
 
             // Calculate total hours and min/max for stats
@@ -1081,7 +1080,7 @@ export default function SmartTimetablePage() {
             await new Promise(resolve => setTimeout(resolve, 800));
             
             // Calculate total teaching hours for each teacher at the end of scheduling
-            const teacherTotalHours = {};
+            const teacherTotalHours: { [key: string]: number } = {}; // Typed the object
 
             // Count all lessons in the teacher's schedule
             for (const teacherId of Object.keys(timetable.teacherSchedules)) {
@@ -1103,11 +1102,11 @@ export default function SmartTimetablePage() {
                 success: true,
                 message: `Dağıtım tamamlandı! ${scheduled} ders atandı. ${timetable.unassignedLessons.length} ders atanamadı. ${excludedLessons.length} ders otomatik çizelgeleme dışında.`,
                 timetable: {
-                    ...timetable,
-                    teacherTotalHours,
+                    ...timetable, // Spread existing timetable properties first
+                    teacherTotalHours, // Then add new/updated ones
                     teacherFreeDays,
                     schedulingStats: minMaxHours,
-                    grade12DaysByDal: data.grade12DaysByDal // Use the dal-specific days mapping
+                    grade12DaysByDal: data.grade12DaysByDal 
                 }
             };
         },
@@ -1972,10 +1971,10 @@ export default function SmartTimetablePage() {
             <div className="mt-8 pt-6 border-t border-gray-200 flex justify-center">
                 <Button 
                     onClick={handleStartDistribution}
-                    disabled={!canStartDistribution || isLoadingBranches || isLoadingDallar || isLoadingSemesterTeachers || isLoadingDalLessons || isLoadingTeacherUnavailability || isLoadingLocations || isLoadingCompulsoryAssignments || runSchedulerMutation.isLoading}
+                    disabled={!canStartDistribution || isLoadingBranches || isLoadingDallar || isLoadingSemesterTeachers || isLoadingDalLessons || isLoadingTeacherUnavailability || isLoadingLocations || isLoadingCompulsoryAssignments || runSchedulerMutation.isPending}
                     className="w-auto px-10 py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60"
                 >
-                    {runSchedulerMutation.isLoading ? 'Dağıtım Yapılıyor...' : 'Ders Dağıtımını Başlat'}
+                    {runSchedulerMutation.isPending ? 'Dağıtım Yapılıyor...' : 'Ders Dağıtımını Başlat'}
                 </Button>
             </div>
 
@@ -2208,7 +2207,7 @@ export default function SmartTimetablePage() {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-red-100">
-                                            {generatedTimetable.unassignedLessons.map(lesson => (
+                                            {generatedTimetable.unassignedLessons.map((lesson: DalDers) => (
                                                 <tr key={lesson.id} className="hover:bg-red-50">
                                                     <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-red-800">{lesson.dersAdi}</td>
                                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-red-700">{lesson.haftalikSaat} saat</td>
@@ -2268,7 +2267,7 @@ export default function SmartTimetablePage() {
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-100">
-                                            {generatedTimetable.excludedLessons.map(lesson => (
+                                            {generatedTimetable.excludedLessons.map((lesson: DalDers) => (
                                                 <tr key={lesson.id} className="hover:bg-gray-50">
                                                     <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-800">{lesson.dersAdi}</td>
                                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{lesson.haftalikSaat} saat</td>
