@@ -83,8 +83,9 @@ export default function ClassesPage() {
       ...cls,
       branch_name: cls.branch_id ? branchesMap.get(cls.branch_id) || null : null,
       dal_name: cls.dal_id ? dalsMap.get(cls.dal_id) || null : null,
+      teacherName: cls.classTeacherId ? teachersMap.get(cls.classTeacherId) || null : null,
     }));
-  }, [classesRaw, branchesMap, dalsMap]);
+  }, [classesRaw, branchesMap, dalsMap, teachersMap]);
 
   // Mutations
   const createMutation = useMutation({
@@ -139,7 +140,9 @@ export default function ClassesPage() {
     // Prepare initialData for the form
     const initialData: ClassFormValues & { id: string } = {
         name: cls.name,
-        department: cls.department,
+        department: cls.department, // Bu dal_id olarak kullanılacaksa kalabilir veya cls.dal_id kullanılır
+        branch_id: cls.branch_id ?? null, // branch_id eklendi
+        dal_id: cls.dal_id ?? null, // dal_id eklendi (eğer department ayrı bir alansa)
         classTeacherId: cls.classTeacherId ?? null, 
         classPresidentName: cls.classPresidentName,
         grade_level: cls.grade_level,

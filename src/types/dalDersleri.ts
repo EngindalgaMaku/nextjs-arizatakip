@@ -34,7 +34,7 @@ export const DalDersFormSchema = DalDersSchema.omit({
 }).extend({
    // Make bolunebilir_mi optional in the form input if it defaults in DB/schema
    bolunebilir_mi: z.boolean().optional(), 
-   suitableLabTypeIds: z.array(z.string().uuid()).optional(), // Add optional array of UUIDs for lab types
+   suitableLocationTypeIds: z.array(z.string().uuid()).optional(), // UPDATED: from suitableLabTypeIds
    cizelgeye_dahil_et: z.boolean().optional(), // Add optional boolean for schedule inclusion
    requires_multiple_resources: z.boolean().optional(), // Add optional boolean for multi-resource need
 });

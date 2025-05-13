@@ -5,15 +5,17 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchLocations, fetchLocationsByBranch, createLocation, updateLocation, deleteLocation } from '@/actions/locationActions';
 import { fetchBranches } from '@/actions/branchActions';
-import { fetchLabTypes } from '@/actions/labTypeActions';
+import { fetchLocationTypes } from '@/actions/locationTypeActions';
 import LocationsTable from '@/components/locations/LocationsTable';
 import { LocationFormModal } from '@/components/locations/LocationFormModal';
-import { Location, LocationFormValues } from '@/types/locations';
+import { Location, LocationFormValues, LocationWithDetails } from '@/types/locations';
 import { Branch } from '@/types/branches';
-import { LabType } from '@/types/labTypes';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { LocationType } from '@/types/locationTypes';
+import { PlusIcon, TagIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-toastify';
 import { useSemesterStore } from '@/stores/useSemesterStore';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function LocationsClient() {
   const searchParams = useSearchParams();
@@ -42,7 +44,7 @@ export default function LocationsClient() {
   }, [branchId, branches, loadingBranches, router]);
 
   // Fetch locations
-  const { data: locations = [], isLoading: loadingLocations } = useQuery<Location[], Error>({
+  const { data: locations = [], isLoading: loadingLocations } = useQuery<LocationWithDetails[], Error>({
     queryKey: branchId
       ? ['locations', branchId, selectedSemesterId]
       : ['locations', selectedSemesterId],
@@ -52,10 +54,10 @@ export default function LocationsClient() {
     enabled: !!selectedSemesterId,
   });
 
-  // Fetch lab types
-  const { data: labTypes = [], isLoading: loadingLabTypes } = useQuery<LabType[], Error>({
-    queryKey: ['labTypes'],
-    queryFn: fetchLabTypes,
+  // Fetch location types
+  const { data: locationTypes = [], isLoading: loadingLocationTypes } = useQuery<LocationType[], Error>({
+    queryKey: ['locationTypes'],
+    queryFn: fetchLocationTypes,
   });
 
   // Mutations
@@ -67,7 +69,7 @@ export default function LocationsClient() {
         queryClient.invalidateQueries({ queryKey: ['locations'] });
         setIsModalOpen(false);
       } else {
-        toast.error(`Ekleme hatası: ${res.error}`);
+        toast.error(`Ekleme hatası: ${Array.isArray(res.error) ? res.error.map(e => e.message).join(', ') : res.error}`);
       }
     },
   });
@@ -80,7 +82,7 @@ export default function LocationsClient() {
         queryClient.invalidateQueries({ queryKey: ['locations'] });
         setIsModalOpen(false);
       } else {
-        toast.error(`Güncelleme hatası: ${res.error}`);
+        toast.error(`Güncelleme hatası: ${Array.isArray(res.error) ? res.error.map(e => e.message).join(', ') : res.error}`);
       }
     },
   });
@@ -102,24 +104,40 @@ export default function LocationsClient() {
   const handleEdit = (loc: Location) => { setEditingLocation(loc); setIsModalOpen(true); };
   const handleDelete = (id: string) => { if (confirm('Silmek istediğinize emin misiniz?')) deleteMutation.mutate(id); };
   const handleSubmit = (data: LocationFormValues) => {
-    if (editingLocation?.id) updateMutation.mutate({ id: editingLocation.id, payload: data });
-    else createMutation.mutate(data);
+    const payload = {
+      ...data,
+      location_type_id: data.location_type_id || null,
+    };
+    if (editingLocation?.id) updateMutation.mutate({ id: editingLocation.id, payload });
+    else createMutation.mutate(payload);
   };
 
-  const isLoading = loadingLocations || loadingBranches;
+  const isLoading = loadingLocations || loadingBranches || loadingLocationTypes;
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-semibold">Konum Yönetimi</h1>
-        <button onClick={handleAdd} disabled={isLoading} className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
-          <PlusIcon className="w-5 h-5 mr-2" /> Yeni Konum
-        </button>
+    <div className="p-4 space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold">Konum Yönetimi</h1>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/location-types" passHref>
+            <Button variant="secondary">
+              <TagIcon className="h-5 w-5 mr-2" />
+              Lokasyon Tiplerini Yönet
+            </Button>
+          </Link>
+          <Button
+            onClick={handleAdd}
+            disabled={isLoading || isMutating}
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Yeni Konum Ekle
+          </Button>
+        </div>
       </div>
       {!isLoading && (
-        <select value={branchId} onChange={e => router.push(`/dashboard/locations?branchId=${e.target.value}`)} className="border p-1 mb-4">
-          <option value="">Tümü</option>
+        <select value={branchId} onChange={e => router.push(`/dashboard/locations?branchId=${e.target.value}`)} className="border p-1 mb-4 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+          <option value="">Tüm Branşlar</option>
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       )}
@@ -131,13 +149,17 @@ export default function LocationsClient() {
       {isLoading ? (
         <p>Yükleniyor...</p>
       ) : selectedSemesterId ? (
-        <LocationsTable locations={locations} onEdit={handleEdit} onDelete={handleDelete} />
+        <LocationsTable 
+          locations={locations} 
+          onEdit={handleEdit} 
+          onDelete={handleDelete} 
+        />
       ) : null}
       {isModalOpen && (
         <LocationFormModal
           initialData={editingLocation ?? undefined}
           availableBranches={branches}
-          availableLabTypes={labTypes}
+          availableLocationTypes={locationTypes}
           onSubmit={handleSubmit}
           onClose={() => { setIsModalOpen(false); setEditingLocation(null); }}
           isLoading={isMutating}

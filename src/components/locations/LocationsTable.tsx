@@ -1,14 +1,15 @@
 'use client';
 
 import React from 'react';
-import { LocationWithLabType } from '@/types/locations';
+import { LocationWithDetails } from '@/types/locations';
 // Button importunu tekrar deneyelim, doğru yolu bulana kadar yorumda kalabilir
 // import { Button } from '@/components/ui/button'; // Re-commented the import
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface LocationsTableProps {
-  locations: LocationWithLabType[];
-  onEdit: (location: LocationWithLabType) => void;
+  locations: LocationWithDetails[];
+  // locationTypesMap: Map<string, string>; // BU SATIRI KALDIR
+  onEdit: (location: LocationWithDetails) => void;
   onDelete: (id: string) => void;
   isLoading?: boolean; // Make loading optional
 }
@@ -22,6 +23,7 @@ const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
 
 export default function LocationsTable({
   locations,
+  // locationTypesMap, // BU SATIRI KALDIR
   onEdit,
   onDelete,
   isLoading = false
@@ -35,7 +37,7 @@ export default function LocationsTable({
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Konum Adı</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branş</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kod</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Laboratuvar Tipi</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasyon Tipi</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kapasite</th>
             <th scope="col" className="relative px-6 py-3">
               <span className="sr-only">İşlemler</span>
@@ -49,7 +51,7 @@ export default function LocationsTable({
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.branch?.name ?? '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.code ?? '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {location.labType ? `${location.labType.name} (${location.labType.code})` : 'Belirtilmemiş'}
+                {location.locationType?.name ?? (location.location_type_id ? 'Bilinmeyen Tip' : 'Belirtilmemiş')}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.capacity ?? '-'}</td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">

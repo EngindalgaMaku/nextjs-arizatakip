@@ -8,28 +8,21 @@ import { z } from 'zod';
 /**
  * Fetch all unavailability periods for a specific teacher.
  */
-export async function fetchTeacherUnavailability(teacherId: string): Promise<TeacherUnavailability[]> {
-  if (!teacherId) {
-    console.warn('[fetchTeacherUnavailability] teacherId is missing.');
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from('teacher_unavailability')
-    .select('*')
-    .eq('teacher_id', teacherId)
-    .order('day', { ascending: true })
-    .order('start_hour', { ascending: true });
-
-  if (error) {
-    console.error(`Error fetching unavailability for teacher ${teacherId}:`, error);
-    throw error; // Re-throw the error to be caught by useQuery
-  }
-
-  // Basic validation or mapping if needed (assuming DB columns match type)
-  // For now, directly return data, assuming it matches TeacherUnavailability[]
-  // Add Zod validation if strict type checking is required
-  return data || [];
+export async function fetchTeacherUnavailability(teacherId: string): Promise<any[]> {
+    try {
+        // Make a fetch request to your API endpoint
+        const response = await fetch(`/api/teacher-unavailability?teacherId=${teacherId}`);
+        
+        if (!response.ok) {
+            throw new Error(`Error fetching unavailability: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`Error fetching unavailability for teacher ${teacherId}:`, error);
+        return []; // Return empty array on error instead of failing
+    }
 }
 
 // TODO: Implement createTeacherUnavailability

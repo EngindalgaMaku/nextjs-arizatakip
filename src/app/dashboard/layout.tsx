@@ -18,7 +18,8 @@ import {
   BuildingLibraryIcon,
   ComputerDesktopIcon,
   ClockIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  TagIcon
 } from '@heroicons/react/24/outline';
 import { signOut, loadUserData } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
@@ -73,7 +74,7 @@ export default function DashboardLayout({
           <option value="" disabled={!!selectedSemesterId}>-- Sömestr Seçin --</option>
           {semesters.map((semester) => (
             <option key={semester.id} value={semester.id}>
-              {semester.name}{semester.is_active ? ' (Aktif)' : ''}
+              {semester.name}
             </option>
           ))}
         </select>
@@ -178,7 +179,7 @@ export default function DashboardLayout({
         
         {!isPrintView && (
           <div
-            className={`fixed inset-y-0 left-0 w-72 bg-blue-800 shadow-lg transform transition-transform duration-300 ease-in-out z-20 ${
+            className={`fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-blue-900 via-blue-800 to-blue-700 shadow-lg transform transition-transform duration-300 ease-in-out z-20 ${
               isSidebarOpen ? "translate-x-0" : "-translate-x-full"
             } md:translate-x-0 md:static md:w-72 flex flex-col`}
           >
@@ -242,18 +243,6 @@ export default function DashboardLayout({
                 Arızalar
               </Link>
 
-              <Link
-                href="/dashboard/teachers"
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/teachers")
-                    ? "bg-blue-700 text-white"
-                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
-                }`}
-              >
-                <UserGroupIcon className="mr-3 h-5 w-5" />
-                Öğretmen Arıza İstatistikleri
-              </Link>
-
               <div className="pt-4 pb-2 px-3">
                 <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Alan Şeflik Yönetimi</h4>
               </div>
@@ -273,7 +262,7 @@ export default function DashboardLayout({
               <Link
                 href="/dashboard/branches"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/branches")
+                  pathname.includes("/dashboard/branches")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
@@ -285,7 +274,7 @@ export default function DashboardLayout({
               <Link
                 href="/dashboard/classes"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/classes")
+                  pathname.includes("/dashboard/classes")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
@@ -297,24 +286,24 @@ export default function DashboardLayout({
               <Link
                 href="/dashboard/locations"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.startsWith("/dashboard/locations") 
+                  (pathname.includes("/dashboard/locations") || pathname.includes("/dashboard/location-types")) && !pathname.includes("/dashboard/locations/print")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <BuildingLibraryIcon className="mr-3 h-5 w-5" />
+                <MapPinIcon className="mr-3 h-5 w-5" />
                 Lab./Sınıf/Odalar
               </Link>
 
               <Link
                 href="/dashboard/devices"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/devices")
+                  pathname.includes("/dashboard/devices") && !pathname.includes("/dashboard/devices/print")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                 <Cog6ToothIcon className="mr-3 h-5 w-5" /> 
+                <ComputerDesktopIcon className="mr-3 h-5 w-5" />
                 Cihazlar
               </Link>
 

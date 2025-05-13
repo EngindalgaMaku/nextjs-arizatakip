@@ -9,6 +9,10 @@ import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Swal from 'sweetalert2';
 import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon } from '@heroicons/react/24/outline';
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -672,10 +676,20 @@ export default function IssuesPage() {
   }, []);
 
   return (
-    <div> 
-      <div className="flex justify-between items-center mb-6 px-4 sm:px-0"> {/* Added padding for consistency */} 
-        <h1 className="text-2xl font-bold text-gray-900">Arıza Bildirimleri</h1>
-        {/* Buton buraya taşınabilir veya başka yerde kalabilir */} 
+    <div className="container mx-auto py-8 px-4 md:px-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Arızalar Yönetimi</h1>
+        <div className="flex space-x-2">
+          <Link href="/dashboard/teachers" passHref>
+            <Button variant="outline">
+              Öğretmen İstatistikleri
+              <ArrowRightIcon className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+          <Button onClick={() => setIsAddModalOpen(true)}>
+            <PlusCircleIcon className="mr-2 h-4 w-4" /> Yeni Arıza Ekle
+          </Button>
+        </div>
       </div>
       {/* Wrap IssueList in a dashboard-style card */}
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">

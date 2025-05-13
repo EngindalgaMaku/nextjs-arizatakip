@@ -8,7 +8,7 @@ export const LocationSchema = z.object({
   name: z.string().min(1, 'Konum adı zorunludur.').max(100, 'Konum adı en fazla 100 karakter olabilir.'),
   code: z.string().max(20, 'Konum kodu en fazla 20 karakter olabilir.').optional().nullable(), // Optional code
   capacity: z.number().int().positive('Kapasite pozitif bir tam sayı olmalıdır.').optional().nullable(), // Optional capacity
-  lab_type_id: z.string().uuid('Geçerli bir laboratuvar tipi seçilmelidir.'), // Foreign key to lab_types
+  location_type_id: z.string().uuid('Geçerli bir lokasyon tipi seçilmelidir.').nullable(), // Changed from lab_type_id, made nullable if a location might not have a type initially
   created_at: z.string().optional(), // Managed by DB
   updated_at: z.string().optional(), // Managed by DB
 });
@@ -26,12 +26,12 @@ export type Location = z.infer<typeof LocationSchema>;
 // TypeScript type for the form values
 export type LocationFormValues = z.infer<typeof LocationFormSchema>;
 
-// Type including related lab type for display purposes (used in fetch queries)
-export interface LocationWithLabType extends Location {
+// Type including related details for display purposes
+export interface LocationWithDetails extends Location {
     branch?: { id: string; name: string } | null;
-    labType?: { // Use optional chaining or ensure join
+    locationType?: { // Changed from labType
         id: string;
         name: string;
-        code: string;
+        // Add other fields from LocationType if needed for display, e.g., description
     } | null;
 }

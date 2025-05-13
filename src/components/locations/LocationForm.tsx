@@ -3,20 +3,21 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Location, LocationFormValues, LocationFormSchema } from '@/types/locations';
+import { LocationType } from '@/types/locationTypes';
 import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 
-// Define LabType for props
-interface LabTypeSelectItem {
-    id: string;
-    name: string;
-}
+// Define LocationTypeSelectItem for props (if needed, or directly use LocationType)
+// interface LocationTypeSelectItem { // This can be removed if LocationType is directly used
+//     id: string;
+//     name: string;
+// }
 
 interface LocationFormProps {
   onSubmit: (data: LocationFormValues) => Promise<void>;
   onClose: () => void;
   initialData?: Location | null;
   isSubmitting: boolean;
-  availableLabTypes: LabTypeSelectItem[]; // Add prop for lab types
+  availableLocationTypes: LocationType[]; // UPDATED: prop name and type
 }
 
 export default function LocationForm({ 
@@ -24,7 +25,7 @@ export default function LocationForm({
   onClose, 
   initialData,
   isSubmitting,
-  availableLabTypes // Destructure new prop
+  availableLocationTypes // UPDATED: Destructure new prop name
 }: LocationFormProps) {
   const { 
     register, 
@@ -36,8 +37,8 @@ export default function LocationForm({
     defaultValues: {
       name: initialData?.name || '',
       code: initialData?.code || '',
-      capacity: initialData?.capacity ?? undefined, // Use undefined for optional number
-      lab_type_id: initialData?.lab_type_id || '',
+      capacity: initialData?.capacity ?? undefined,
+      location_type_id: initialData?.location_type_id || '',
     },
   });
 
@@ -46,7 +47,7 @@ export default function LocationForm({
         name: initialData?.name || '',
         code: initialData?.code || '',
         capacity: initialData?.capacity ?? undefined,
-        lab_type_id: initialData?.lab_type_id || '',
+        location_type_id: initialData?.location_type_id || '',
      };
     reset(resetData);
   }, [initialData, reset]);
@@ -108,22 +109,22 @@ export default function LocationForm({
       </div>
 
       <div>
-        <label htmlFor="lab_type_id" className="block text-sm font-medium text-gray-700">
-          Laboratuvar Tipi <span className="text-red-500">*</span>
+        <label htmlFor="location_type_id" className="block text-sm font-medium text-gray-700">
+          Lokasyon Tipi <span className="text-red-500">*</span>
         </label>
         <select
-          id="lab_type_id"
-          {...register('lab_type_id')}
-          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.lab_type_id ? 'border-red-500' : ''}`}
+          id="location_type_id"
+          {...register('location_type_id')}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errors.location_type_id ? 'border-red-500' : ''}`}
         >
-          <option value="">-- Laboratuvar Tipi Seçin --</option>
-          {availableLabTypes.map((labType) => (
-            <option key={labType.id} value={labType.id}>
-              {labType.name}
+          <option value="">-- Lokasyon Tipi Seçin --</option>
+          {availableLocationTypes.map((locationType) => (
+            <option key={locationType.id} value={locationType.id}>
+              {locationType.name}
             </option>
           ))}
         </select>
-        {errors.lab_type_id && <p className="mt-1 text-sm text-red-600">{errors.lab_type_id.message}</p>}
+        {errors.location_type_id && <p className="mt-1 text-sm text-red-600">{errors.location_type_id.message}</p>}
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

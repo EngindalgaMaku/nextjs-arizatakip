@@ -6,15 +6,15 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod'; // Import Zod
 import Modal from '@/components/Modal';
 import { DalDersFormSchema, DalDersFormValues } from '@/types/dalDersleri';
-import { LabType } from '@/types/labTypes'; // Import LabType
+import { LocationType } from '@/types/locationTypes'; // UPDATED: LabType to LocationType
 import { SinifSeviyesi } from '@/types/dalDersleri'; // Import SinifSeviyesi
 
 interface DalDersFormModalProps {
-  initialData?: DalDersFormValues & { suitableLabTypeIds?: string[] };
+  initialData?: DalDersFormValues & { suitableLocationTypeIds?: string[] }; // UPDATED: suitableLabTypeIds to suitableLocationTypeIds
   sinifSeviyesi: SinifSeviyesi;
-  availableLabTypes: LabType[]; // Add prop for available lab types
-  initialLabTypeIds?: string[]; // Add prop for pre-selected IDs when editing
-  onSubmit: (data: DalDersFormValues & { suitableLabTypeIds?: string[] }) => void; // Update submit data type
+  availableLocationTypes: LocationType[]; // UPDATED: availableLabTypes to availableLocationTypes and type to LocationType[]
+  initialLocationTypeIds?: string[]; // UPDATED: initialLabTypeIds to initialLocationTypeIds
+  onSubmit: (data: DalDersFormValues & { suitableLocationTypeIds?: string[] }) => void; // UPDATED: suitableLabTypeIds to suitableLocationTypeIds
   onClose: () => void;
   loading?: boolean;
 }
@@ -22,8 +22,8 @@ interface DalDersFormModalProps {
 export function DalDersFormModal({
   initialData,
   sinifSeviyesi,
-  availableLabTypes = [], // Default to empty array
-  initialLabTypeIds = [], // Default to empty array
+  availableLocationTypes = [], // UPDATED: availableLabTypes to availableLocationTypes
+  initialLocationTypeIds = [], // UPDATED: initialLabTypeIds to initialLocationTypeIds
   onSubmit,
   onClose,
   loading = false
@@ -31,17 +31,17 @@ export function DalDersFormModal({
 
   // Log initial data received by the modal
   console.log('[DalDersFormModal] Received initialData:', initialData);
-  console.log('[DalDersFormModal] Received initialLabTypeIds prop:', initialLabTypeIds); // Log the prop
+  console.log('[DalDersFormModal] Received initialLocationTypeIds prop:', initialLocationTypeIds); // UPDATED: initialLabTypeIds to initialLocationTypeIds
 
   const isEditing = !!initialData?.dersAdi; // Check if dersAdi exists in initialData for editing status
   const modalTitle = isEditing
     ? `${sinifSeviyesi}. Sınıf Dersi Düzenle`
     : `${sinifSeviyesi}. Sınıfa Yeni Ders Ekle`;
 
-  const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<DalDersFormValues & { suitableLabTypeIds?: string[] }>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset } = useForm<DalDersFormValues & { suitableLocationTypeIds?: string[] }>({
     // Extend the schema directly for form usage
     resolver: zodResolver(DalDersFormSchema.extend({
-        suitableLabTypeIds: z.array(z.string().uuid()).optional(),
+        suitableLocationTypeIds: z.array(z.string().uuid()).optional(), // UPDATED: suitableLabTypeIds to suitableLocationTypeIds
     })),
     defaultValues: {
       sinifSeviyesi: initialData?.sinifSeviyesi ?? sinifSeviyesi,
@@ -50,16 +50,16 @@ export function DalDersFormModal({
       bolunebilir_mi: initialData?.bolunebilir_mi ?? true,
       cizelgeye_dahil_et: initialData?.cizelgeye_dahil_et ?? true, 
       requires_multiple_resources: initialData?.requires_multiple_resources ?? false, 
-      suitableLabTypeIds: initialLabTypeIds,
+      suitableLocationTypeIds: initialLocationTypeIds, // UPDATED: suitableLabTypeIds to suitableLocationTypeIds and use updated prop
     },
   });
 
   // Log the actual default values being set initially
   // console.log('[DalDersFormModal] Initial defaultValues:', { ... }); // Logging defaultValues might be less useful now
 
-  // --- NEW useEffect to reset form when initialLabTypeIds changes ---
+  // --- NEW useEffect to reset form when initialLocationTypeIds changes ---
   useEffect(() => {
-      console.log('[DalDersFormModal] useEffect triggered. initialLabTypeIds:', initialLabTypeIds);
+      console.log('[DalDersFormModal] useEffect triggered. initialLocationTypeIds:', initialLocationTypeIds); // UPDATED
       // Reset the specific field or the relevant part of the form
       // when the prop holding the fetched IDs changes.
       reset({ 
@@ -71,9 +71,9 @@ export function DalDersFormModal({
          cizelgeye_dahil_et: initialData?.cizelgeye_dahil_et ?? true, 
          requires_multiple_resources: initialData?.requires_multiple_resources ?? false, 
          // Set the lab types based on the potentially updated prop
-         suitableLabTypeIds: initialLabTypeIds 
+         suitableLocationTypeIds: initialLocationTypeIds 
       });
-  }, [initialLabTypeIds, reset, initialData, sinifSeviyesi]); // Add dependencies: initialLabTypeIds is key, reset is needed, others ensure full reset data
+  }, [initialLocationTypeIds, reset, initialData, sinifSeviyesi]); // Add dependencies: initialLocationTypeIds is key, reset is needed, others ensure full reset data
   // --- End of new useEffect ---
 
   const isBusy = loading || isSubmitting;
@@ -154,33 +154,30 @@ export function DalDersFormModal({
                 </div>
                 {errors.requires_multiple_resources && <p className="text-red-600 text-sm">{errors.requires_multiple_resources.message}</p>}
 
-                 {/* Suitable Lab Types (Multi-select) */}
+                 {/* Suitable Location Types (Multi-select) */}
                  <div>
-                    <label htmlFor="suitableLabTypeIds" className="block text-sm font-medium text-gray-700">Uygun Laboratuvar Tipleri</label>
+                    <label htmlFor="suitableLocationTypeIds" className="block text-sm font-medium text-gray-700">Uygun Konum Tipleri</label> {/* UPDATED LABEL */}
                     <Controller
-                        name="suitableLabTypeIds"
+                        name="suitableLocationTypeIds" // UPDATED NAME
                         control={control}
                         render={({ field }) => {
-                            // Add a log to see the field value react-hook-form is using
-                            console.log('[DalDersFormModal] Controller field.value for suitableLabTypeIds:', field.value); 
+                            console.log('[DalDersFormModal] Controller field.value for suitableLocationTypeIds:', field.value); // UPDATED
                             return (
                                 <select
-                                    id="suitableLabTypeIds"
-                                    multiple // Enable multiple selections
+                                    id="suitableLocationTypeIds" // UPDATED ID
+                                    multiple
                                     {...field}
-                                    // Handle multiple select value and onChange
-                                    // Ensure field.value is always an array for multi-select
                                     value={Array.isArray(field.value) ? field.value : []} 
                                     onChange={(e) => {
                                         const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
                                         field.onChange(selectedOptions);
                                     }}
-                                    className={`mt-1 block w-full rounded p-2 border h-32 ${errors.suitableLabTypeIds ? 'border-red-500' : 'border-gray-300'}`}
+                                    className={`mt-1 block w-full rounded p-2 border h-32 ${errors.suitableLocationTypeIds ? 'border-red-500' : 'border-gray-300'}`}
                                 >
-                                    {availableLabTypes.length === 0 && <option disabled>Uygun lab tipi bulunamadı.</option>}
-                                    {availableLabTypes.map((labType) => (
-                                        <option key={labType.id} value={labType.id}>
-                                            {labType.name} ({labType.code})
+                                    {availableLocationTypes.length === 0 && <option disabled>Uygun konum tipi bulunamadı.</option>} {/* UPDATED a11y text and variable */}
+                                    {availableLocationTypes.map((locationType) => ( // UPDATED variable
+                                        <option key={locationType.id} value={locationType.id}>
+                                            {locationType.name} {/* Displaying only name, assuming code might not be on LocationType */}
                                         </option>
                                     ))}
                                 </select>
@@ -188,7 +185,7 @@ export function DalDersFormModal({
                         }}
                     />
                      <p className="mt-1 text-xs text-gray-500">Birden fazla seçmek için CTRL (veya Mac'te Command) tuşunu basılı tutarak tıklayın.</p>
-                    {errors.suitableLabTypeIds && <p className="text-red-600 text-sm">{errors.suitableLabTypeIds.message}</p>}
+                    {errors.suitableLocationTypeIds && <p className="text-red-600 text-sm">{errors.suitableLocationTypeIds.message}</p>} {/* UPDATED error field */}
                 </div>
 
             </fieldset>

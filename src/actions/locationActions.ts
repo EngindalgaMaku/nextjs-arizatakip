@@ -1,22 +1,22 @@
 'use server';
 
 import { supabase } from '@/lib/supabase';
-import { Location, LocationFormValues, LocationFormSchema, LocationWithLabType, LocationSchema } from '@/types/locations';
+import { Location, LocationFormValues, LocationFormSchema, LocationWithDetails, LocationSchema } from '@/types/locations';
 // LabType'ı doğrudan kullanmıyoruz ama ilişki için önemli
 // import { LabType } from '@/types/labTypes';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 /**
- * Fetch all locations with their associated lab type information.
+ * Fetch all locations with their associated location type information.
  */
-export async function fetchLocations(semesterId?: string): Promise<LocationWithLabType[]> {
+export async function fetchLocations(semesterId?: string): Promise<LocationWithDetails[]> {
   let query = supabase
     .from('locations')
     .select(`
       *,
       branch:branches ( id, name ),
-      labType:lab_types ( id, name, code )
+      locationType:location_types ( id, name )
     `);
 
   if (semesterId) {
@@ -30,11 +30,11 @@ export async function fetchLocations(semesterId?: string): Promise<LocationWithL
     throw error;
   }
 
-  const locations = data.map(loc => ({
+  const locations = (data || []).map(loc => ({
     ...loc,
     branch: loc.branch ? { id: (loc.branch as any).id, name: (loc.branch as any).name } : null,
-    labType: loc.labType ? { id: (loc.labType as any).id, name: (loc.labType as any).name, code: (loc.labType as any).code } : null,
-  })) as LocationWithLabType[];
+    locationType: loc.locationType ? { id: (loc.locationType as any).id, name: (loc.locationType as any).name } : null,
+  })) as LocationWithDetails[];
 
   return locations;
 }
@@ -93,7 +93,7 @@ export async function createLocation(payload: LocationFormValues): Promise<{ suc
         return { success: false, error: 'Bu kod veya isim ile başka bir konum zaten mevcut olabilir.' };
       }
        if (error?.code === '23503') { // Foreign key violation
-            return { success: false, error: 'Seçilen Laboratuvar Tipi geçersiz veya bulunamadı.' };
+            return { success: false, error: 'Seçilen Branş veya Lokasyon Tipi geçersiz/bulunamadı.' };
        }
       return { success: false, error: error?.message || 'Konum oluşturulamadı.' };
     }
@@ -139,7 +139,7 @@ export async function updateLocation(id: string, payload: LocationFormValues): P
         return { success: false, error: 'Bu kod veya isim ile başka bir konum zaten mevcut olabilir.' };
       }
       if (error?.code === '23503') { // Foreign key violation
-            return { success: false, error: 'Seçilen Laboratuvar Tipi geçersiz veya bulunamadı.' };
+            return { success: false, error: 'Seçilen Branş veya Lokasyon Tipi geçersiz/bulunamadı.' };
       }
       return { success: false, error: error?.message || 'Konum güncellenemedi.' };
     }
@@ -188,17 +188,17 @@ export async function deleteLocation(id: string): Promise<{ success: boolean; er
 }
 
 /**
- * Fetch all locations for a specific branch by its ID, including lab type info.
+ * Fetch all locations for a specific branch by its ID, including location type info.
  */
-export async function fetchLocationsByBranch(branchId: string, semesterId?: string): Promise<LocationWithLabType[]> {
+export async function fetchLocationsByBranch(branchId: string, semesterId?: string): Promise<LocationWithDetails[]> {
   if (!branchId) return [];
   let query = supabase
     .from('locations')
     .select(
       `*,
       branch:branches ( id, name ),
-      labType:lab_types ( id, name, code )`
-    )
+      locationType:location_types ( id, name )
+    `)
     .eq('branch_id', branchId);
 
   if (semesterId) {
@@ -215,8 +215,8 @@ export async function fetchLocationsByBranch(branchId: string, semesterId?: stri
   const locations = (data || []).map(loc => ({
     ...loc,
     branch: loc.branch ? { id: (loc.branch as any).id, name: (loc.branch as any).name } : null,
-    labType: loc.labType ? { id: (loc.labType as any).id, name: (loc.labType as any).name, code: (loc.labType as any).code } : null,
-  })) as LocationWithLabType[];
+    locationType: loc.locationType ? { id: (loc.locationType as any).id, name: (loc.locationType as any).name } : null,
+  })) as LocationWithDetails[];
 
   return locations;
 }

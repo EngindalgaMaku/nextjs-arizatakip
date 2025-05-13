@@ -117,15 +117,17 @@ export function AreaTeacherFormModal({ initialData, onSubmit, onClose, loading =
                   id="role"
                   {...field}
                   value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value || null)}
                   aria-invalid={errors.role ? 'true' : 'false'}
                   className={`mt-1 block w-full rounded p-2 border ${errors.role ? 'border-red-500' : 'border-gray-300'}`}
                 >
-                  <option value="" disabled>-- Görev Seçiniz --</option>
-                  {teacherRoles.options.map((role) => (
-                    <option key={role} value={role}>
-                      {teacherRoleLabels[role]} 
-                    </option>
-                  ))}
+                  <option value="">-- Görev Seçiniz --</option>
+                  <option value="MUDUR">{teacherRoleLabels.MUDUR}</option>
+                  <option value="MUDUR_YARDIMCISI">{teacherRoleLabels.MUDUR_YARDIMCISI}</option>
+                  <option value="OGRETMEN">{teacherRoleLabels.OGRETMEN}</option>
+                  <option value="REHBER">{teacherRoleLabels.REHBER}</option>
+                  <option value="ATOLYE_SEFI">{teacherRoleLabels.ATOLYE_SEFI}</option>
+                  <option value="ALAN-SEFI">{teacherRoleLabels.ALAN_SEFI}</option>
                 </select>
               )}
             />

@@ -4,7 +4,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Location, LocationFormValues, LocationFormSchema } from '@/types/locations';
-import { LabType } from '@/types/labTypes';
+import { LocationType } from '@/types/locationTypes';
 import { Branch } from '@/types/branches';
 import Modal from '@/components/Modal'; // Assuming a reusable Modal component exists
 // Temporary Button for fallback
@@ -18,7 +18,7 @@ const Button = ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
 interface LocationFormModalProps {
   initialData?: Location; // Use base Location type for initial data
   availableBranches: Branch[]; // New prop for branch options
-  availableLabTypes: LabType[];
+  availableLocationTypes: LocationType[];
   onSubmit: (data: LocationFormValues) => void;
   onClose: () => void;
   isLoading?: boolean;
@@ -27,7 +27,7 @@ interface LocationFormModalProps {
 export function LocationFormModal({
   initialData,
   availableBranches = [],
-  availableLabTypes = [],
+  availableLocationTypes = [],
   onSubmit,
   onClose,
   isLoading = false,
@@ -43,7 +43,7 @@ export function LocationFormModal({
       name: initialData?.name ?? '',
       code: initialData?.code ?? '',
       capacity: initialData?.capacity ?? undefined, // Default to undefined if null/0 not desired
-      lab_type_id: initialData?.lab_type_id ?? '', // Default to empty string or first available lab type ID
+      location_type_id: initialData?.location_type_id ?? '',
     },
   });
 
@@ -115,25 +115,25 @@ export function LocationFormModal({
             {errors.capacity && <p className="text-red-600 text-sm">{errors.capacity.message}</p>}
           </div>
 
-          {/* Lab Type (Required) */}
+          {/* Location Type (Now uses location_type_id) */}
           <div>
-            <label htmlFor="lab_type_id" className="block text-sm font-medium text-gray-700">Laboratuvar Tipi *</label>
+            <label htmlFor="location_type_id" className="block text-sm font-medium text-gray-700">Lokasyon Tipi</label>
             <select
-              id="lab_type_id"
-              {...register('lab_type_id')}
-              aria-invalid={errors.lab_type_id ? 'true' : 'false'}
-              className={`mt-1 block w-full rounded p-2 border ${errors.lab_type_id ? 'border-red-500' : 'border-gray-300'}`}
-              defaultValue={initialData?.lab_type_id ?? ''}
+              id="location_type_id"
+              {...register('location_type_id')}
+              aria-invalid={errors.location_type_id ? 'true' : 'false'}
+              className={`mt-1 block w-full rounded p-2 border ${errors.location_type_id ? 'border-red-500' : 'border-gray-300'}`}
+              defaultValue={initialData?.location_type_id ?? ''}
             >
-              <option value="" disabled>-- Seçiniz --</option>
-              {availableLabTypes.map(labType => (
-                <option key={labType.id} value={labType.id}>
-                  {labType.name} ({labType.code})
+              <option value="">-- Tip Seçiniz (Opsiyonel) --</option>
+              {availableLocationTypes.map(locType => (
+                <option key={locType.id} value={locType.id}>
+                  {locType.name}
                 </option>
               ))}
             </select>
-             {availableLabTypes.length === 0 && <p className="text-sm text-gray-500 mt-1">Uygun laboratuvar tipi bulunamadı. Lütfen önce laboratuvar tiplerini tanımlayın.</p>}
-            {errors.lab_type_id && <p className="text-red-600 text-sm">{errors.lab_type_id.message}</p>}
+             {availableLocationTypes.length === 0 && <p className="text-sm text-gray-500 mt-1">Uygun lokasyon tipi bulunamadı. Lütfen önce lokasyon tiplerini tanımlayın.</p>}
+            {errors.location_type_id && <p className="text-red-600 text-sm">{errors.location_type_id.message}</p>}
           </div>
         </fieldset>
 

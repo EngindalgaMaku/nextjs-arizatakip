@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { DalDers, DalDersFormSchema, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod'; // Assuming zod might be needed or remove if not
-import { setDalDersLabTypes } from '@/actions/labTypeActions';
+import { setDalDersLocationTypes } from '@/actions/locationTypeActions';
 /**
  * Fetch all lessons for a specific branch (dal).
  */
@@ -47,7 +47,7 @@ export async function fetchDalDersleri(dalId: string): Promise<DalDers[]> {
 export async function createDalDers(
   dalId: string,
   payload: DalDersFormValues,
-  suitableLabTypeIds: string[] = []
+  suitableLocationTypeIds: string[] = []
 ): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string }> {
   const parse = DalDersFormSchema.safeParse(payload);
   if (!parse.success) {
@@ -86,12 +86,12 @@ export async function createDalDers(
     }
     createdDersRecord = data;
 
-    const { success: setTypesSuccess, error: setTypesError } = await setDalDersLabTypes(createdDersRecord.id, suitableLabTypeIds);
+    const { success: setTypesSuccess, error: setTypesError } = await setDalDersLocationTypes(createdDersRecord.id, suitableLocationTypeIds);
 
     let partialError: string | undefined = undefined;
     if (!setTypesSuccess) {
-        console.warn(`Dal dersi ${createdDersRecord.id} oluşturuldu ancak lab tipleri ayarlanamadı:`, setTypesError);
-        partialError = `Ders oluşturuldu ancak lab tipleri ayarlanamadı: ${setTypesError}`; 
+        console.warn(`Dal dersi ${createdDersRecord.id} oluşturuldu ancak konum tipleri ayarlanamadı:`, setTypesError);
+        partialError = `Ders oluşturuldu ancak konum tipleri ayarlanamadı: ${setTypesError}`; 
     }
 
     revalidatePath(`/dashboard/dallar/${dalId}/dersler`);
@@ -122,7 +122,7 @@ export async function createDalDers(
 export async function updateDalDers(
   dersId: string,
   payload: DalDersFormValues,
-  suitableLabTypeIds: string[]
+  suitableLocationTypeIds: string[]
 ): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string }> {
   const parse = DalDersFormSchema.safeParse(payload);
   if (!parse.success) {
@@ -171,12 +171,12 @@ export async function updateDalDers(
     }
     updatedDersRecord = data;
 
-    const { success: setTypesSuccess, error: setTypesError } = await setDalDersLabTypes(updatedDersRecord.id, suitableLabTypeIds);
+    const { success: setTypesSuccess, error: setTypesError } = await setDalDersLocationTypes(updatedDersRecord.id, suitableLocationTypeIds);
     
     let partialError: string | undefined = undefined;
     if (!setTypesSuccess) {
-        console.warn(`Dal dersi ${updatedDersRecord.id} güncellendi ancak lab tipleri ayarlanamadı:`, setTypesError);
-        partialError = `Ders güncellendi ancak lab tipleri ayarlanamadı: ${setTypesError}`; 
+        console.warn(`Dal dersi ${updatedDersRecord.id} güncellendi ancak konum tipleri ayarlanamadı:`, setTypesError);
+        partialError = `Ders güncellendi ancak konum tipleri ayarlanamadı: ${setTypesError}`; 
     }
 
     if (existingData?.dal_id) {
