@@ -219,59 +219,49 @@ export async function deleteTeacher(id: string): Promise<{ success: boolean; err
  */
 export async function fetchTeacherById(id: string): Promise<Teacher | null> {
    if (!id) return null;
+   const supabase = createSupabaseServerClient();
    const { data, error } = await supabase
     .from('teachers')
-    // Select ALL fields defined in TeacherSchema (using snake_case)
-    .select(`id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active`)
+    // Select ALL fields defined in TeacherSchema (using snake_case), including semester_id
+    .select(`id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active, semester_id`)
     .eq('id', id)
     .single();
 
     if (error) {
       console.error(`[fetchTeacherById] Error fetching teacher ${id}:`, error);
-      // If Supabase returns error indicating 0 rows found, return null
       if (error.code === 'PGRST116') { 
           console.log(`[fetchTeacherById] Teacher ${id} not found (PGRST116).`);
           return null; 
       }
-      // For other errors, you might throw or return null depending on desired handling
-      // Throwing might be better to indicate a real DB issue
-      throw error;
+      throw error; // Propagate other errors
     }
     
-    // If data is null/undefined even without an error (shouldn't happen with .single() unless RLS hides it)
     if (!data) { 
         console.warn(`[fetchTeacherById] No data returned for teacher ${id} despite no error.`);
         return null;
     }
     
-    // Map ALL fields from snake_case to camelCase
     const mappedRole = typeof data.role === 'string' ? data.role.toUpperCase() as TeacherRole : null;
     const teacherData = {
         id: data.id,
         name: data.name,
         birthDate: data.birth_date,
-        role: mappedRole, // Use mapped role
+        role: mappedRole,
         phone: data.phone,
-        branchId: data.branch_id, 
-        createdAt: data.created_at, // Add createdAt
-        updatedAt: data.updated_at, // Add updatedAt
-        is_active: data.is_active   // Add is_active
+        branchId: data.branch_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        is_active: data.is_active,
+        semester_id: data.semester_id, // Ensure semester_id is mapped
     };
-    
-    // Validate the complete mapped object against the full TeacherSchema
-    console.log(`[fetchTeacherById] Validating mapped data for teacher ${id}:`, teacherData);
+
     const parseResult = TeacherSchema.safeParse(teacherData);
-    
     if (!parseResult.success) {
-        // Log detailed validation errors
-        console.error(`[fetchTeacherById] Validation failed for fetched teacher ${id}:`, JSON.stringify(parseResult.error.flatten(), null, 2));
-        // Return null if validation fails, as the data doesn't match the expected type
-        return null;
+        console.error(`[fetchTeacherById] Validation failed for teacher ${id}:`, parseResult.error.flatten());
+        return null; // Return null if schema validation fails
     }
-    
-    console.log(`[fetchTeacherById] Successfully fetched and validated teacher ${id}.`);
-    // Return the validated data which conforms to the Teacher type
-    return parseResult.data; 
+
+    return parseResult.data;
 }
 
 // Add other teacher actions (create, update, delete) here if needed later 

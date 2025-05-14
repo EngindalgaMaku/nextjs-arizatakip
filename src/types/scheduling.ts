@@ -47,10 +47,10 @@ export interface LocationScheduleData {
 export interface ScheduledEntry {
   lessonId: string;        // Atanan LessonScheduleData ID'si (dal_dersleri.id)
   lessonName: string;      // Ders adı (debugging ve UI için)
-  teacherId: string;       // Atanan öğretmenin ID'si
-  teacherName: string;     // Atanan öğretmenin adı
-  locationId: string;      // Atanan konumun ID'si
-  locationName: string;    // Atanan konumun adı
+  teacherIds: string[];       // Atanan öğretmenlerin ID'leri
+  teacherNames: string[];     // Atanan öğretmenlerin adları
+  locationIds: string[];      // Atanan konumların ID'leri
+  locationNames: string[];    // Atanan konumların adları
   timeSlot: TimeSlot;      // Zaman dilimi
   dalId: string;           // Dersin ait olduğu dal ID'si (çakışma kontrolü için)
   sinifSeviyesi: number;   // Dersin sınıf seviyesi (çakışma kontrolü için)

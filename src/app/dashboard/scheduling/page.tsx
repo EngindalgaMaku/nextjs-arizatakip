@@ -111,7 +111,7 @@ interface TimeTable {
     locationSchedules: { [locationId: string]: WeeklySchedule };
     unassignedLessons: DalDers[];
     excludedLessons: DalDers[];
-    teacherTotalHours?: { [teacherId: string]: number }; 
+    teacherTotalHours?: { [key: string]: number }; 
     teacherFreeDays?: { [key: string]: string[] }; // Added
     schedulingStats?: { min: number; max: number; avgDeviation: number }; // Added
     grade12DaysByDal?: { [dalId: string]: number[] }; // Added
@@ -138,10 +138,8 @@ export default function SmartTimetablePage() {
     const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
     const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
     
-    // Replace single grade12Days state with mapping
     const [grade12DaysByDal, setGrade12DaysByDal] = useState<{[dalId: string]: number[]}>({});
     
-    // Add state for storing generated timetable
     const [generatedTimetable, setGeneratedTimetable] = useState<any>(null);
     const [showTimetable, setShowTimetable] = useState(false);
 
@@ -443,14 +441,75 @@ export default function SmartTimetablePage() {
         mutationFn: async (data: SchedulerInputData): Promise<{ success: boolean; message?: string; timetable?: TimeTable }> => {
             console.log("Running scheduler with data:", data);
             
-            // Create a new timetable structure
             const timetable: TimeTable = {
                 teacherSchedules: {},
                 locationSchedules: {},
                 unassignedLessons: [],
                 excludedLessons: []
             };
-            
+
+            // Define scheduleMultiResourceLesson directly inside mutationFn
+            const scheduleMultiResourceLessonScoped = (
+                currentTimetable: TimeTable, currentLesson: DalDers, teacherId1: string, teacherName1: string,
+                teacherId2: string, teacherName2: string,
+                currentSlots: { day: number; period: number; locationId: string; secondLocationId: string }[],
+                currentDallar: Dal[], currentLocations: LocationWithLabType[]
+            ): void => {
+                const lessonColor = getLessonColor(currentLesson.id!);
+                const isConsecutive = currentLesson.bolunebilir_mi === false;
+                currentSlots.forEach(slotPair => {
+                    const timeSlotForT1L1: TimeSlot = {
+                        day: slotPair.day, period: slotPair.period, teacherId: teacherId1, teacherName: teacherName1,
+                        lessonId: currentLesson.id!, lessonName: currentLesson.dersAdi, locationId: slotPair.locationId,
+                        locationName: currentLocations.find(l => l.id === slotPair.locationId)?.name || `Sınıf ${slotPair.locationId}`,
+                        dalId: currentLesson.dalId!, dalName: currentDallar.find(d => d.id === currentLesson.dalId)?.name || 'Bilinmeyen Dal',
+                        sinifSeviyesi: currentLesson.sinifSeviyesi, secondTeacherId: teacherId2, secondTeacherName: teacherName2,
+                        secondLocationId: slotPair.secondLocationId, 
+                        secondLocationName: currentLocations.find(l => l.id === slotPair.secondLocationId)?.name || `Sınıf ${slotPair.secondLocationId}`,
+                        isMultiResource: true, color: lessonColor, isConsecutive: isConsecutive,
+                        totalConsecutiveHours: isConsecutive ? currentLesson.haftalikSaat : undefined
+                    };
+                    const timeSlotForT2L2: TimeSlot = {
+                        day: slotPair.day, period: slotPair.period, teacherId: teacherId2, teacherName: teacherName2,
+                        lessonId: currentLesson.id!, lessonName: currentLesson.dersAdi, locationId: slotPair.secondLocationId,
+                        locationName: currentLocations.find(l => l.id === slotPair.secondLocationId)?.name || `Sınıf ${slotPair.secondLocationId}`,
+                        dalId: currentLesson.dalId!, dalName: currentDallar.find(d => d.id === currentLesson.dalId)?.name || 'Bilinmeyen Dal',
+                        sinifSeviyesi: currentLesson.sinifSeviyesi, secondTeacherId: teacherId1, secondTeacherName: teacherName1,
+                        secondLocationId: slotPair.locationId, 
+                        secondLocationName: currentLocations.find(l => l.id === slotPair.locationId)?.name || `Sınıf ${slotPair.locationId}`,
+                        isMultiResource: true, color: lessonColor, isConsecutive: isConsecutive,
+                        totalConsecutiveHours: isConsecutive ? currentLesson.haftalikSaat : undefined
+                    };
+                    currentTimetable.teacherSchedules[teacherId1][slotPair.day][slotPair.period] = timeSlotForT1L1;
+                    currentTimetable.teacherSchedules[teacherId2][slotPair.day][slotPair.period] = timeSlotForT2L2;
+                    currentTimetable.locationSchedules[slotPair.locationId][slotPair.day][slotPair.period] = timeSlotForT1L1;
+                    currentTimetable.locationSchedules[slotPair.secondLocationId][slotPair.day][slotPair.period] = timeSlotForT2L2;
+                });
+            };
+
+            // Define scheduleSplitLesson directly inside mutationFn
+            const scheduleSplitLessonScoped = (
+                currentTimetable: TimeTable, currentLesson: DalDers, teacherId: string, teacherName: string,
+                currentSlots: { day: number; period: number; locationId: string }[],
+                currentDallar: Dal[], currentSplitGroup: number, currentTotalHours: number, currentSplitHours: number,
+                currentLocations: LocationWithLabType[]
+            ): void => {
+                const lessonColor = getLessonColor(currentLesson.id!);
+                currentSlots.forEach(slot => {
+                    const timeSlotEntry: TimeSlot = {
+                        day: slot.day, period: slot.period, teacherId, teacherName,
+                        lessonId: currentLesson.id!, lessonName: currentLesson.dersAdi, locationId: slot.locationId,
+                        locationName: currentLocations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
+                        dalId: currentLesson.dalId!, dalName: currentDallar.find(d => d.id === currentLesson.dalId)?.name || 'Bilinmeyen Dal',
+                        sinifSeviyesi: currentLesson.sinifSeviyesi, color: lessonColor,
+                        isSplit: true, splitGroup: currentSplitGroup, totalHours: currentTotalHours, splitHours: currentSplitHours,
+                        isConsecutive: false // Split lessons are generally not considered a single consecutive block
+                    };
+                    currentTimetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlotEntry;
+                    currentTimetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlotEntry;
+                });
+            };
+
             // Initialize schedules
             data.teacherIds.forEach(teacherId => {
                 const teacherName = semesterTeachers.find(t => t.id === teacherId)?.name || `Öğretmen ${teacherId}`;
@@ -551,7 +610,8 @@ export default function SmartTimetablePage() {
                                 teacherId,
                                 semesterTeachers.find(t => t.id === teacherId)?.name || `Öğretmen ${teacherId}`,
                                 consecutiveSlots.slice(0, lesson.haftalikSaat),
-                                dallar
+                                dallar,
+                                locations
                             );
                             
                             // Remove from lessons to schedule
@@ -582,7 +642,8 @@ export default function SmartTimetablePage() {
                                 teacherId,
                                 semesterTeachers.find(t => t.id === teacherId)?.name || `Öğretmen ${teacherId}`,
                                 availableSlots.slice(0, lesson.haftalikSaat),
-                                dallar
+                                dallar,
+                                locations
                             );
                             
                             // Remove from lessons to schedule
@@ -754,47 +815,259 @@ export default function SmartTimetablePage() {
                 return null; // No suitable teacher found
             }
 
+            // NEW HELPER FUNCTION: findConsecutiveMultiResourceSlots
+            function findConsecutiveMultiResourceSlots(
+                requiredHours: number,
+                teacherId1: string,
+                teacherId2: string,
+                allLocationIds: string[],
+                timetable: TimeTable,
+                teacherUnavailabilityMap: Map<string, { day: number; periods: number[] }[]>,
+                allowedDays?: number[]
+            ): { day: number; period: number; locationId: string; secondLocationId: string }[] | null {
+                const daysToConsider = allowedDays || [1, 2, 3, 4, 5];
+                const MAX_PERIODS_PER_DAY = 10; // Assuming 10 periods
+
+                for (const day of daysToConsider) {
+                    const unavT1Periods = new Set<number>();
+                    teacherUnavailabilityMap.get(teacherId1)?.forEach(u => { if (u.day === day) u.periods.forEach(p => unavT1Periods.add(p)); });
+                    const unavT2Periods = new Set<number>();
+                    teacherUnavailabilityMap.get(teacherId2)?.forEach(u => { if (u.day === day) u.periods.forEach(p => unavT2Periods.add(p)); });
+
+                    for (let startPeriod = 1; startPeriod <= MAX_PERIODS_PER_DAY - requiredHours + 1; startPeriod++) {
+                        let blockCompletelyAvailable = true;
+                        const currentBlockSlotsDetails: { day: number; period: number; locationId: string; secondLocationId: string }[] = [];
+                        let chosenLocationId1ForBlock: string | null = null;
+                        let chosenLocationId2ForBlock: string | null = null;
+
+                        for (let i = 0; i < requiredHours; i++) {
+                            const period = startPeriod + i;
+
+                            if (unavT1Periods.has(period) || timetable.teacherSchedules[teacherId1]?.[day]?.[period] ||
+                                unavT2Periods.has(period) || timetable.teacherSchedules[teacherId2]?.[day]?.[period]) {
+                                blockCompletelyAvailable = false; break;
+                            }
+
+                            if (i === 0) { // Try to secure locations for the first hour of the block
+                                const availableLocationsForPeriod: string[] = [];
+                                for (const locId of allLocationIds) {
+                                    if (!timetable.locationSchedules[locId]?.[day]?.[period]) {
+                                        availableLocationsForPeriod.push(locId);
+                                    }
+                                }
+                                if (availableLocationsForPeriod.length < 2) { blockCompletelyAvailable = false; break; }
+                                chosenLocationId1ForBlock = availableLocationsForPeriod[0];
+                                chosenLocationId2ForBlock = availableLocationsForPeriod[1];
+                            } else { // For subsequent hours, check the chosen locations
+                                if (!chosenLocationId1ForBlock || !chosenLocationId2ForBlock ||
+                                    timetable.locationSchedules[chosenLocationId1ForBlock]?.[day]?.[period] ||
+                                    timetable.locationSchedules[chosenLocationId2ForBlock]?.[day]?.[period]) {
+                                    blockCompletelyAvailable = false; break;
+                                }
+                            }
+                            currentBlockSlotsDetails.push({
+                                day,
+                                period,
+                                locationId: chosenLocationId1ForBlock!,
+                                secondLocationId: chosenLocationId2ForBlock!
+                            });
+                        }
+
+                        if (blockCompletelyAvailable && currentBlockSlotsDetails.length === requiredHours) {
+                            return currentBlockSlotsDetails;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            // NEW HELPER FUNCTION: updateTeacherMetricsForSegment
+            function updateTeacherMetricsForSegment(
+                teacherId: string,
+                hours: number,
+                dayOfSegment: number,
+                assignedHoursMap: Map<string, number>,
+                scheduledDaysMap: Map<string, Set<number>>
+            ) {
+                assignedHoursMap.set(teacherId, (assignedHoursMap.get(teacherId) || 0) + hours);
+                const days = scheduledDaysMap.get(teacherId) || new Set<number>();
+                days.add(dayOfSegment);
+                scheduledDaysMap.set(teacherId, days);
+            }
+
             // Update the scheduling algorithm for divisible lessons
             for (const lesson of lessonsToSchedule) {
-                // Check if this lesson requires multiple resources
                 const requiresMultipleResources = lesson.requires_multiple_resources === true;
-                
-                // Check if this lesson is divisible
-                const isDivisible = lesson.bolunebilir_mi === true;
-                
-                if (isDivisible) {
-                    // Divisible lessons MUST be split across two days regardless of the number of hours
-                    // Calculate how to split the hours
+                const isDivisible = lesson.bolunebilir_mi === true; // Used for single-resource, divisible path
+
+                if (requiresMultipleResources) {
+                    console.log(`[MR LOG] Processing MULTI-RESOURCE lesson: ${lesson.dersAdi} (ID: ${lesson.id}, Hours: ${lesson.haftalikSaat}, Divisible: ${lesson.bolunebilir_mi})`);
+                    const isDivisibleForMultiResource = lesson.bolunebilir_mi === true;
+
+                    const totalTeachers = data.teacherIds.length;
+                    let tempTotalAssignedHours = 0;
+                    data.teacherIds.forEach(id => { tempTotalAssignedHours += (assignedTeachers.get(id) || 0); });
+                    const targetAverage = (tempTotalAssignedHours + lesson.haftalikSaat) / totalTeachers;
+                    
+                    const sortedTeachers = [...data.teacherIds].sort((a, b) => {
+                        const hoursA = assignedTeachers.get(a) || 0;
+                        const hoursB = assignedTeachers.get(b) || 0;
+                        const diffA = targetAverage - hoursA;
+                        const diffB = targetAverage - hoursB;
+                        return diffB - diffA; 
+                    });
+
+                    let foundAndScheduledForPair = false;
+                    if (sortedTeachers.length >= 2) { // Need at least two teachers to form a pair
+                        console.log(`[MR LOG] Lesson ${lesson.dersAdi}: Considering ${sortedTeachers.length} teachers for pairing.`);
+                        for (let i = 0; i < sortedTeachers.length; i++) {
+                            for (let j = i + 1; j < sortedTeachers.length; j++) {
+                                const teacherId1ToUse = sortedTeachers[i];
+                                const teacherId2ToUse = sortedTeachers[j];
+                                const teacherName1 = semesterTeachers.find(t => t.id === teacherId1ToUse)?.name || `Öğr. ${teacherId1ToUse}`;
+                                const teacherName2 = semesterTeachers.find(t => t.id === teacherId2ToUse)?.name || `Öğr. ${teacherId2ToUse}`;
+                                console.log(`[MR LOG] Lesson ${lesson.dersAdi}: Attempting pair: ${teacherName1} (ID: ${teacherId1ToUse}) & ${teacherName2} (ID: ${teacherId2ToUse})`);
+                                
+                                if (isDivisibleForMultiResource) {
+                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Type: Divisible Multi-Resource.`);
+                                    // MULTI-RESOURCE AND DIVISIBLE
+                                    const totalHours = lesson.haftalikSaat;
+                                    const firstPartHours = Math.ceil(totalHours / 2);
+                                    const secondPartHours = totalHours - firstPartHours;
+                                    let scheduledPart1 = false;
+                                    let scheduledPart2 = false;
+                                    let dayOfPart1: number | null = null;
+                                    let slotsForPart1Holder: { day: number; period: number; locationId: string; secondLocationId: string }[] | null = null;
+
+                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Finding slots for Part 1 (${firstPartHours} hours).`);
+                                    const part1Slots = findConsecutiveMultiResourceSlots(
+                                        firstPartHours, teacherId1ToUse, teacherId2ToUse,
+                                        data.locationIds, timetable, teacherUnavailabilityMap, getLessonAllowedDays(lesson)
+                                    );
+                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Part 1 slots found:`, part1Slots ? `${part1Slots.length} slots` : 'None');
+
+                                    if (part1Slots) {
+                                        slotsForPart1Holder = part1Slots; 
+                                        console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Scheduling Part 1.`);
+                                        scheduleMultiResourceLessonScoped(
+                                            timetable, lesson, teacherId1ToUse,
+                                            teacherName1, // Pass name
+                                            teacherId2ToUse,
+                                            teacherName2, // Pass name
+                                            part1Slots, dallar, locations // Pass locations from component scope
+                                        );
+                                        dayOfPart1 = part1Slots[0].day;
+                                        updateTeacherMetricsForSegment(teacherId1ToUse, firstPartHours, dayOfPart1, assignedTeachers, teacherScheduledDays);
+                                        updateTeacherMetricsForSegment(teacherId2ToUse, firstPartHours, dayOfPart1, assignedTeachers, teacherScheduledDays);
+                                        scheduledPart1 = true;
+                                        console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Part 1 scheduled successfully.`);
+
+                                        if (secondPartHours > 0) {
+                                            console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Finding slots for Part 2 (${secondPartHours} hours).`);
+                                            const allowedDaysForPart2 = (getLessonAllowedDays(lesson) || [1, 2, 3, 4, 5]).filter(d => d !== dayOfPart1);
+                                            if (allowedDaysForPart2.length > 0) {
+                                                const part2Slots = findConsecutiveMultiResourceSlots(
+                                                    secondPartHours, teacherId1ToUse, teacherId2ToUse,
+                                                    data.locationIds, timetable, teacherUnavailabilityMap, allowedDaysForPart2
+                                                );
+                                                console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Part 2 slots found:`, part2Slots ? `${part2Slots.length} slots` : 'None');
+                                                if (part2Slots) {
+                                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Scheduling Part 2.`);
+                                                    scheduleMultiResourceLessonScoped(
+                                                        timetable, lesson, teacherId1ToUse,
+                                                        teacherName1, // Pass name
+                                                        teacherId2ToUse,
+                                                        teacherName2, // Pass name
+                                                        part2Slots, dallar, locations // Pass locations
+                                                    );
+                                                    updateTeacherMetricsForSegment(teacherId1ToUse, secondPartHours, part2Slots[0].day, assignedTeachers, teacherScheduledDays);
+                                                    updateTeacherMetricsForSegment(teacherId2ToUse, secondPartHours, part2Slots[0].day, assignedTeachers, teacherScheduledDays);
+                                                    scheduledPart2 = true;
+                                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Part 2 scheduled successfully.`);
+                                                }
+                                            } else {
+                                                console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): No allowed days for Part 2 after scheduling Part 1.`);
+                                            }
+                                        } else { 
+                                            scheduledPart2 = true; // No second part needed
+                                            console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): No Part 2 needed.`);
+                                        }
+                                    }
+
+                                    if (scheduledPart1 && scheduledPart2) {
+                                        scheduled++;
+                                        foundAndScheduledForPair = true; 
+                                        console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Successfully scheduled both parts.`);
+                                        break; 
+                                    } else if (scheduledPart1 && !scheduledPart2 && dayOfPart1 && slotsForPart1Holder) { 
+                                        console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Part 1 scheduled but Part 2 FAILED. Rolling back Part 1.`);
+                                        updateTeacherMetricsForSegment(teacherId1ToUse, -firstPartHours, dayOfPart1, assignedTeachers, teacherScheduledDays);
+                                        updateTeacherMetricsForSegment(teacherId2ToUse, -firstPartHours, dayOfPart1, assignedTeachers, teacherScheduledDays);
+                                        slotsForPart1Holder.forEach(s => {
+                                            if (timetable.teacherSchedules[teacherId1ToUse!]?.[s.day]?.[s.period]?.lessonId === lesson.id) delete timetable.teacherSchedules[teacherId1ToUse!]![s.day]![s.period];
+                                            if (timetable.teacherSchedules[teacherId2ToUse!]?.[s.day]?.[s.period]?.lessonId === lesson.id) delete timetable.teacherSchedules[teacherId2ToUse!]![s.day]![s.period];
+                                            if (timetable.locationSchedules[s.locationId]?.[s.day]?.[s.period]?.lessonId === lesson.id) delete timetable.locationSchedules[s.locationId]![s.day]![s.period];
+                                            if (timetable.locationSchedules[s.secondLocationId]?.[s.day]?.[s.period]?.lessonId === lesson.id) delete timetable.locationSchedules[s.secondLocationId]![s.day]![s.period];
+                                        });
+                                    }
+                                } else { // MULTI-RESOURCE AND NOT DIVISIBLE
+                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Type: Non-Divisible Multi-Resource. Finding slots for ${lesson.haftalikSaat} hours.`);
+                                    const blockSlots = findConsecutiveMultiResourceSlots(
+                                        lesson.haftalikSaat, teacherId1ToUse, teacherId2ToUse,
+                                        data.locationIds, timetable, teacherUnavailabilityMap, getLessonAllowedDays(lesson)
+                                    );
+                                    console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Non-Divisible slots found:`, blockSlots ? `${blockSlots.length} slots` : 'None');
+                                    if (blockSlots) {
+                                        console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Scheduling Non-Divisible block.`);
+                                        scheduleMultiResourceLessonScoped(
+                                            timetable, lesson, teacherId1ToUse,
+                                            teacherName1, // Pass name
+                                            teacherId2ToUse,
+                                            teacherName2, // Pass name
+                                            blockSlots, dallar, locations // Pass locations
+                                        );
+                                        const dayOfBlock = blockSlots[0].day;
+                                        updateTeacherMetricsForSegment(teacherId1ToUse, lesson.haftalikSaat, dayOfBlock, assignedTeachers, teacherScheduledDays);
+                                        updateTeacherMetricsForSegment(teacherId2ToUse, lesson.haftalikSaat, dayOfBlock, assignedTeachers, teacherScheduledDays);
+                                        scheduled++;
+                                        foundAndScheduledForPair = true; 
+                                        console.log(`[MR LOG] Lesson ${lesson.dersAdi} (Pair: ${teacherName1} & ${teacherName2}): Successfully scheduled Non-Divisible block.`);
+                                        break; 
+                                    }
+                                }
+                            } // End inner teacher loop (j)
+                            if (foundAndScheduledForPair) break; 
+                        } // End outer teacher loop (i)
+                    } else {
+                        console.log(`[MR LOG] Lesson ${lesson.dersAdi}: Not enough teachers to form a pair (need at least 2, have ${sortedTeachers.length}).`);
+                    }
+                    
+                    if (!foundAndScheduledForPair) {
+                        console.log(`[MR LOG] Lesson ${lesson.dersAdi}: FAILED to schedule with any teacher pair. Adding to unassigned lessons.`);
+                        timetable.unassignedLessons.push(lesson); 
+                    }
+
+                } else if (isDivisible) {
+                    // Logic for SINGLE-RESOURCE, DIVISIBLE lessons
+                    // This was the original `if (isDivisible)` block
+                    console.log(`[SCHEDULER] Processing SINGLE-RESOURCE DIVISIBLE lesson: ${lesson.dersAdi}`);
                     const totalHours = lesson.haftalikSaat;
                     const firstPartHours = Math.floor(totalHours / 2);
                     const secondPartHours = totalHours - firstPartHours;
                     
-                    // Find the best teacher considering workload balance and free day
                     const bestTeacher = findBestTeacherForLesson(
-                        data.teacherIds,
-                        assignedTeachers,
-                        teacherScheduledDays,
-                        false, // Not consecutive
-                        totalHours, // Total required hours
-                        teacherUnavailabilityMap,
-                        timetable,
-                        data.locationIds,
-                        getLessonAllowedDays(lesson)
+                        data.teacherIds, assignedTeachers, teacherScheduledDays,
+                        false, totalHours, teacherUnavailabilityMap,
+                        timetable, data.locationIds, getLessonAllowedDays(lesson)
                     );
                     
                     if (bestTeacher) {
                         const bestTeacherId = bestTeacher.teacherId;
-                        
-                        // Get available slots by day for the selected teacher
                         const availableSlotsByDay = findAvailableSlotsByDay(
-                            timetable,
-                            bestTeacherId,
-                            data.locationIds,
-                            teacherUnavailabilityMap,
-                            getLessonAllowedDays(lesson)
+                            timetable, bestTeacherId, data.locationIds,
+                            teacherUnavailabilityMap, getLessonAllowedDays(lesson)
                         );
                         
-                        // Sort days by available slots (descending) to maximize efficient use
                         const sortedDays = Object.entries(availableSlotsByDay)
                             .filter(([day, slots]) => slots.length > 0)
                             .sort((a, b) => b[1].length - a[1].length)
@@ -804,202 +1077,60 @@ export default function SmartTimetablePage() {
                             const firstDay = sortedDays[0];
                             const secondDay = sortedDays[1];
                             
-                            // Schedule first part
                             const firstDaySlots = availableSlotsByDay[firstDay].slice(0, firstPartHours);
-                            scheduleSplitLesson(
-                                timetable,
-                                lesson,
-                                bestTeacherId,
-                                semesterTeachers.find(t => t.id === bestTeacherId)?.name || `Öğretmen ${bestTeacherId}`,
-                                firstDaySlots,
-                                dallar,
-                                1, // first part
-                                totalHours,
-                                firstPartHours
-                            );
-                            
-                            // Schedule second part
-                            const secondDaySlots = availableSlotsByDay[secondDay].slice(0, secondPartHours);
-                            scheduleSplitLesson(
-                                timetable,
-                                lesson,
-                                bestTeacherId,
-                                semesterTeachers.find(t => t.id === bestTeacherId)?.name || `Öğretmen ${bestTeacherId}`,
-                                secondDaySlots,
-                                dallar,
-                                2, // second part
-                                totalHours,
-                                secondPartHours
-                            );
-                            
-                            // Update assigned hours and scheduled days
-                            const currentHours = assignedTeachers.get(bestTeacherId) || 0;
-                            assignedTeachers.set(bestTeacherId, currentHours + totalHours);
-                            
-                            const currentDays = teacherScheduledDays.get(bestTeacherId) || new Set<number>();
-                            currentDays.add(firstDay);
-                            currentDays.add(secondDay);
-                            teacherScheduledDays.set(bestTeacherId, currentDays);
-                            
-                            scheduled++;
+                            if (firstDaySlots.length === firstPartHours) { // Ensure enough slots for the first part
+                                scheduleSplitLessonScoped(
+                                    timetable, lesson, bestTeacherId,
+                                    semesterTeachers.find(t => t.id === bestTeacherId)?.name || `Öğr. ${bestTeacherId}`,
+                                    firstDaySlots, dallar, 1, totalHours, firstPartHours,
+                                    locations // Pass locations
+                                );
+                                
+                                const secondDaySlots = availableSlotsByDay[secondDay].slice(0, secondPartHours);
+                                if (secondDaySlots.length === secondPartHours) { // Ensure enough slots for the second part
+                                    scheduleSplitLessonScoped(
+                                        timetable, lesson, bestTeacherId,
+                                        semesterTeachers.find(t => t.id === bestTeacherId)?.name || `Öğr. ${bestTeacherId}`,
+                                        secondDaySlots, dallar, 2, totalHours, secondPartHours,
+                                        locations // Pass locations
+                                    );
+                                
+                                    const currentHours = assignedTeachers.get(bestTeacherId) || 0;
+                                    assignedTeachers.set(bestTeacherId, currentHours + totalHours);
+                                    const currentDays = teacherScheduledDays.get(bestTeacherId) || new Set<number>();
+                                    currentDays.add(firstDay);
+                                    currentDays.add(secondDay);
+                                    teacherScheduledDays.set(bestTeacherId, currentDays);
+                                    scheduled++;
+                                } else {
+                                    // Not enough slots for the second part, so unassign the first part too (or handle differently)
+                                    // For simplicity, adding to unassigned if full split not possible.
+                                    // This part would need careful backtracking if we want to be more robust.
+                                    timetable.unassignedLessons.push(lesson);
+                                }
+                            } else {
+                                timetable.unassignedLessons.push(lesson);
+                            }
                         } else {
                             timetable.unassignedLessons.push(lesson);
                         }
                     } else {
                         timetable.unassignedLessons.push(lesson);
                     }
-                } else if (requiresMultipleResources) {
-                    // For multiple resources, we need to find 2 teachers with balanced workloads
-                    // Calculate target hours per teacher (for balancing)
-                    const totalTeachers = data.teacherIds.length;
-                    let totalAssignedHours = 0;
-                    data.teacherIds.forEach(id => {
-                        totalAssignedHours += assignedTeachers.get(id) || 0;
-                    });
-                    
-                    // Target average is the current total plus new hours divided by teacher count
-                    const targetAverage = (totalAssignedHours + lesson.haftalikSaat) / totalTeachers;
-                    
-                    // Sort teachers by how far they are below the target average
-                    const sortedTeachers = [...data.teacherIds].sort((a, b) => {
-                        const hoursA = assignedTeachers.get(a) || 0;
-                        const hoursB = assignedTeachers.get(b) || 0;
-                        
-                        const diffA = targetAverage - hoursA;
-                        const diffB = targetAverage - hoursB;
-                        
-                        // Prioritize teachers with lower hours
-                        return diffB - diffA;
-                    });
-                    
-                    // Find two teachers with the most balanced workload
-                    let bestTeacherId1 = '';
-                    let bestTeacherId2 = '';
-                    let bestSlots: { day: number; period: number; locationId: string; secondLocationId: string }[] = [];
-                    
-                    // Try each teacher as the first teacher
-                    for (const teacherId1 of sortedTeachers) {
-                        // Check if we can maintain a free day for this teacher
-                        const currentDays1 = teacherScheduledDays.get(teacherId1) || new Set<number>();
-                        
-                        // Get available slots for the first teacher
-                        const availableSlots1 = findAvailableSlots(
-                            timetable,
-                            teacherId1,
-                            data.locationIds,
-                            teacherUnavailabilityMap,
-                            lesson.haftalikSaat,
-                            getLessonAllowedDays(lesson)
-                        );
-                        
-                        if (availableSlots1.length >= lesson.haftalikSaat) {
-                            // Try to find a second teacher
-                            for (const teacherId2 of sortedTeachers) {
-                                if (teacherId2 === teacherId1) continue; // Skip same teacher
-                                
-                                // Check if we can maintain a free day for the second teacher
-                                const currentDays2 = teacherScheduledDays.get(teacherId2) || new Set<number>();
-                                
-                                // Find matching slots between the two teachers
-                                const matchingSlots = findMatchingTeacherSlots(
-                                    timetable,
-                                    teacherId2,
-                                    availableSlots1,
-                                    teacherUnavailabilityMap,
-                                    data.locationIds,
-                                    getLessonAllowedDays(lesson)
-                                );
-                                
-                                if (matchingSlots.length >= lesson.haftalikSaat) {
-                                    // Check if these slots would preserve at least one free day for both teachers
-                                    const newDays1 = new Set(currentDays1);
-                                    const newDays2 = new Set(currentDays2);
-                                    
-                                    let wouldPreserveFreeDay = true;
-                                    for (let i = 0; i < lesson.haftalikSaat; i++) {
-                                        newDays1.add(matchingSlots[i].day);
-                                        newDays2.add(matchingSlots[i].day);
-                                        
-                                        if (newDays1.size === 5 || newDays2.size === 5) {
-                                            wouldPreserveFreeDay = false;
-                                            break;
-                                        }
-                                    }
-                                    
-                                    if (wouldPreserveFreeDay) {
-                                        bestTeacherId1 = teacherId1;
-                                        bestTeacherId2 = teacherId2;
-                                        bestSlots = matchingSlots.slice(0, lesson.haftalikSaat);
-                                        break;
-                                    }
-                                    
-                                    // If we haven't found a solution that preserves free days yet,
-                                    // save this as a potential fallback
-                                    if (bestTeacherId1 === '') {
-                                        bestTeacherId1 = teacherId1;
-                                        bestTeacherId2 = teacherId2;
-                                        bestSlots = matchingSlots.slice(0, lesson.haftalikSaat);
-                                    }
-                                }
-                            }
-                            
-                            if (bestTeacherId1 !== '' && bestTeacherId2 !== '' && bestSlots.length >= lesson.haftalikSaat) {
-                                // Schedule this multi-resource lesson
-                                scheduleMultiResourceLesson(
-                                    timetable,
-                                    lesson,
-                                    bestTeacherId1,
-                                    semesterTeachers.find(t => t.id === bestTeacherId1)?.name || `Öğretmen ${bestTeacherId1}`,
-                                    bestTeacherId2,
-                                    semesterTeachers.find(t => t.id === bestTeacherId2)?.name || `Öğretmen ${bestTeacherId2}`,
-                                    bestSlots,
-                                    dallar
-                                );
-                                
-                                // Update assigned hours and scheduled days for both teachers
-                                const currentHours1 = assignedTeachers.get(bestTeacherId1) || 0;
-                                const currentHours2 = assignedTeachers.get(bestTeacherId2) || 0;
-                                
-                                assignedTeachers.set(bestTeacherId1, currentHours1 + lesson.haftalikSaat);
-                                assignedTeachers.set(bestTeacherId2, currentHours2 + lesson.haftalikSaat);
-                                
-                                const currentDays1 = teacherScheduledDays.get(bestTeacherId1) || new Set<number>();
-                                const currentDays2 = teacherScheduledDays.get(bestTeacherId2) || new Set<number>();
-                                
-                                bestSlots.forEach(slot => {
-                                    currentDays1.add(slot.day);
-                                    currentDays2.add(slot.day);
-                                });
-                                
-                                teacherScheduledDays.set(bestTeacherId1, currentDays1);
-                                teacherScheduledDays.set(bestTeacherId2, currentDays2);
-                                
-                                scheduled++;
-                            } else {
-                                timetable.unassignedLessons.push(lesson);
-                            }
-                        }
-                    }
                 } else {
-                    // Non-divisible lessons must be scheduled on the same day in consecutive periods
-                    // Find the best teacher considering workload balance and free day
+                    // Logic for SINGLE-RESOURCE, NON-DIVISIBLE (CONSECUTIVE/BLOK) lessons
+                    // This was the original `else` block (after `else if (requiresMultipleResources)`)
+                    console.log(`[SCHEDULER] Processing SINGLE-RESOURCE NON-DIVISIBLE lesson: ${lesson.dersAdi}`);
                     const bestTeacher = findBestTeacherForLesson(
-                        data.teacherIds,
-                        assignedTeachers,
-                        teacherScheduledDays,
-                        true, // Consecutive slots required
-                        lesson.haftalikSaat,
-                        teacherUnavailabilityMap,
-                        timetable,
-                        data.locationIds,
-                        getLessonAllowedDays(lesson)
+                        data.teacherIds, assignedTeachers, teacherScheduledDays,
+                        true, lesson.haftalikSaat, teacherUnavailabilityMap,
+                        timetable, data.locationIds, getLessonAllowedDays(lesson)
                     );
                     
                     if (bestTeacher) {
                         const bestTeacherId = bestTeacher.teacherId;
                         const bestSlots = bestTeacher.slots;
                         
-                        // Double-check that all slots are on the same day and consecutive
                         const allSameDay = bestSlots.every(slot => slot.day === bestSlots[0].day);
                         let allConsecutive = true;
                         for (let i = 0; i < bestSlots.length - 1; i++) {
@@ -1010,24 +1141,18 @@ export default function SmartTimetablePage() {
                         }
                         
                         if (allSameDay && allConsecutive) {
-                            // Schedule this lesson
                             scheduleConsecutiveLesson(
-                                timetable,
-                                lesson,
-                                bestTeacherId,
-                                semesterTeachers.find(t => t.id === bestTeacherId)?.name || `Öğretmen ${bestTeacherId}`,
-                                bestSlots,
-                                dallar
+                                timetable, lesson, bestTeacherId,
+                                semesterTeachers.find(t => t.id === bestTeacherId)?.name || `Öğr. ${bestTeacherId}`,
+                                bestSlots, dallar,
+                                locations
                             );
                             
-                            // Update assigned hours and scheduled days
                             const currentHours = assignedTeachers.get(bestTeacherId) || 0;
                             assignedTeachers.set(bestTeacherId, currentHours + lesson.haftalikSaat);
-                            
                             const currentDays = teacherScheduledDays.get(bestTeacherId) || new Set<number>();
                             currentDays.add(bestSlots[0].day);
                             teacherScheduledDays.set(bestTeacherId, currentDays);
-                            
                             scheduled++;
                         } else {
                             console.error(`Found slots for ${lesson.dersAdi} but they are not all on the same day or not consecutive`);
@@ -1128,415 +1253,157 @@ export default function SmartTimetablePage() {
         },
     });
     
-    // Helper function to initialize weekly schedule
-    function initializeWeeklySchedule(ownerName: string): WeeklySchedule {
+    // --- HELPER FUNCTION DEFINITIONS ---
+
+    const initializeWeeklySchedule = (ownerName: string): WeeklySchedule => {
         const schedule: WeeklySchedule = {};
-        
-        // Days 1-5 (Monday to Friday)
         for (let day = 1; day <= 5; day++) {
             schedule[day] = {};
-            
-            // Periods 1-10
             for (let period = 1; period <= 10; period++) {
                 schedule[day][period] = null;
             }
         }
-        
         return schedule;
-    }
-    
-    // Helper function to find available slots
-    function findAvailableSlots(
+    };
+
+    const findAvailableSlots = (
         timetable: TimeTable,
         teacherId: string,
         locationIds: string[],
         teacherUnavailabilityMap: Map<string, { day: number; periods: number[] }[]>,
-        requiredSlots: number,
-        allowedDays?: number[] // Optional parameter for limiting to specific days
-    ): { day: number; period: number; locationId: string }[] {
+        requiredSlots: number, 
+        allowedDays?: number[]
+    ): { day: number; period: number; locationId: string }[] => {
         const availableSlots: { day: number; period: number; locationId: string }[] = [];
-        
-        // Days 1-5 (Monday to Friday) or only the allowed days if specified
         const daysToCheck = allowedDays || [1, 2, 3, 4, 5];
-        
         for (const day of daysToCheck) {
-            // Check teacher unavailabilities for this day
-            const unavailablePeriods = new Set<number>();
-            if (teacherUnavailabilityMap.has(teacherId)) {
-                teacherUnavailabilityMap.get(teacherId)!.forEach(unavailability => {
-                    if (unavailability.day === day) {
-                        unavailability.periods.forEach(period => {
-                            unavailablePeriods.add(period);
-                        });
-                    }
-                });
-            }
-            
-            // Periods 1-10
+            const unavailableTeacherPeriods = new Set<number>();
+            teacherUnavailabilityMap.get(teacherId)?.forEach(unav => {
+                if (unav.day === day) unav.periods.forEach(p => unavailableTeacherPeriods.add(p));
+            });
             for (let period = 1; period <= 10; period++) {
-                // Skip if teacher is unavailable
-                if (unavailablePeriods.has(period)) continue;
-                
-                // Skip if teacher already has a class
+                if (unavailableTeacherPeriods.has(period)) continue;
                 if (timetable.teacherSchedules[teacherId]?.[day]?.[period]) continue;
-                
-                // Find an available location
-                for (const locationId of locationIds) {
+                for (const locationId of locationIds) { 
                     if (!timetable.locationSchedules[locationId]?.[day]?.[period]) {
-                        // This slot is available
                         availableSlots.push({ day, period, locationId });
-                        break; // Only need one location per slot
+                        break; // Found a location for this slot
                     }
                 }
             }
         }
-        
         return availableSlots;
     }
     
-    // Helper function to schedule a lesson
+    // Helper function to schedule a single-resource, non-consecutive/split lesson part
     function scheduleLesson(
         timetable: TimeTable,
         lesson: DalDers,
         teacherId: string,
         teacherName: string,
         slots: { day: number; period: number; locationId: string }[],
-        dallar: Dal[]
+        dallar: Dal[],
+        componentLocations: LocationWithLabType[] // Explicitly pass component's locations state
     ): void {
-        // Generate a unique and consistent color for this lesson
         const lessonColor = getLessonColor(lesson.id!);
-        
-        // Check if this is a non-divisible lesson (bölünemez)
-        const isConsecutive = lesson.bolunebilir_mi === false;
-        
         slots.forEach(slot => {
-            const timeSlot: TimeSlot = {
-                day: slot.day,
-                period: slot.period,
-                teacherId,
-                teacherName,
-                lessonId: lesson.id!,
-                lessonName: lesson.dersAdi,
-                locationId: slot.locationId,
-                locationName: locations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
-                dalId: lesson.dalId!,
-                dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
-                sinifSeviyesi: lesson.sinifSeviyesi,
-                color: lessonColor, // Add consistent color
-                isConsecutive: isConsecutive, // Set based on lesson property
-                totalConsecutiveHours: isConsecutive ? lesson.haftalikSaat : undefined // Set total hours if consecutive
+            const timeSlotEntry: TimeSlot = {
+                day: slot.day, period: slot.period, teacherId, teacherName,
+                lessonId: lesson.id!, lessonName: lesson.dersAdi, locationId: slot.locationId,
+                locationName: componentLocations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
+                dalId: lesson.dalId!, dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
+                sinifSeviyesi: lesson.sinifSeviyesi, color: lessonColor,
+                isConsecutive: false, 
+                isSplit: false 
             };
-            
-            // Update teacher schedule
-            timetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlot;
-            
-            // Update location schedule
-            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlot;
+            timetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlotEntry;
+            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlotEntry;
         });
     }
 
-    // Helper function to find slots that match between two teachers
-    function findMatchingTeacherSlots(
-        timetable: TimeTable,
-        teacherId: string,
-        availableSlotsToMatch: { day: number; period: number; locationId: string }[],
-        teacherUnavailabilityMap: Map<string, { day: number; periods: number[] }[]>,
-        locationIds: string[],
-        allowedDays?: number[] // Optional parameter for limiting to specific days
-    ): { day: number; period: number; locationId: string; secondLocationId: string }[] {
-        const matchingSlots: { day: number; period: number; locationId: string; secondLocationId: string }[] = [];
-        
-        // Check teacher unavailabilities
-        const unavailablePeriods = new Map<number, Set<number>>();
-        
-        if (teacherUnavailabilityMap.has(teacherId)) {
-            teacherUnavailabilityMap.get(teacherId)!.forEach(unavailability => {
-                if (!unavailablePeriods.has(unavailability.day)) {
-                    unavailablePeriods.set(unavailability.day, new Set<number>());
-                }
-                unavailability.periods.forEach(period => {
-                    unavailablePeriods.get(unavailability.day)!.add(period);
-                });
-            });
-        }
-        
-        // Check for each slot from first teacher if second teacher is available
-        for (const slot of availableSlotsToMatch) {
-            // Skip if second teacher is unavailable
-            if (
-                unavailablePeriods.has(slot.day) && 
-                unavailablePeriods.get(slot.day)!.has(slot.period)
-            ) continue;
-            
-            // Skip if second teacher already has a class
-            if (timetable.teacherSchedules[teacherId]?.[slot.day]?.[slot.period]) continue;
-            
-            // Find a different available location than the first teacher
-            for (const locationId of locationIds) {
-                // Skip same location as first teacher
-                if (locationId === slot.locationId) continue;
-                
-                // Check if this location is available
-                if (!timetable.locationSchedules[locationId]?.[slot.day]?.[slot.period]) {
-                    // Found a match with different location
-                    matchingSlots.push({
-                        day: slot.day,
-                        period: slot.period,
-                        locationId: slot.locationId,
-                        secondLocationId: locationId
-                    });
-                    break; // Only need one location per slot
-                }
-            }
-        }
-        
-        return matchingSlots;
-    }
-
-    // Helper function to schedule a multi-resource lesson
-    function scheduleMultiResourceLesson(
-        timetable: TimeTable,
-        lesson: DalDers,
-        teacherId1: string,
-        teacherName1: string,
-        teacherId2: string,
-        teacherName2: string,
-        slots: { day: number; period: number; locationId: string; secondLocationId: string }[],
-        dallar: Dal[]
-    ): void {
-        // Generate a unique and consistent color for this lesson
-        const lessonColor = getLessonColor(lesson.id!);
-        
-        // Check if this is a non-divisible lesson (bölünemez)
-        const isConsecutive = lesson.bolunebilir_mi === false;
-        
-        slots.forEach(slot => {
-            const timeSlot: TimeSlot = {
-                day: slot.day,
-                period: slot.period,
-                teacherId: teacherId1,
-                teacherName: teacherName1,
-                lessonId: lesson.id!,
-                lessonName: lesson.dersAdi,
-                locationId: slot.locationId,
-                locationName: locations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
-                dalId: lesson.dalId!,
-                dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
-                sinifSeviyesi: lesson.sinifSeviyesi,
-                // Add multi-resource information
-                secondTeacherId: teacherId2,
-                secondTeacherName: teacherName2,
-                secondLocationId: slot.secondLocationId,
-                secondLocationName: locations.find(l => l.id === slot.secondLocationId)?.name || `Sınıf ${slot.secondLocationId}`,
-                isMultiResource: true,
-                color: lessonColor, // Add consistent color
-                isConsecutive: isConsecutive, // Set based on lesson property
-                totalConsecutiveHours: isConsecutive ? lesson.haftalikSaat : undefined // Set total hours if consecutive
-            };
-            
-            // Update both teacher schedules
-            timetable.teacherSchedules[teacherId1][slot.day][slot.period] = timeSlot;
-            timetable.teacherSchedules[teacherId2][slot.day][slot.period] = timeSlot;
-            
-            // Update both location schedules
-            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlot;
-            timetable.locationSchedules[slot.secondLocationId][slot.day][slot.period] = timeSlot;
-        });
-    }
-
-    // Helper function to find available slots organized by day
+    // Helper function to find available slots organized by day (needed by findConsecutiveSlotsOnSameDay)
     function findAvailableSlotsByDay(
         timetable: TimeTable,
         teacherId: string,
-        locationIds: string[],
+        locationIds: string[], // from component state
         teacherUnavailabilityMap: Map<string, { day: number; periods: number[] }[]>,
-        allowedDays?: number[] // Optional parameter for limiting to specific days
+        allowedDays?: number[] 
     ): { [day: number]: { day: number; period: number; locationId: string }[] } {
         const slotsByDay: { [day: number]: { day: number; period: number; locationId: string }[] } = {};
-        
-        // Initialize empty arrays for each day
         const daysToCheck = allowedDays || [1, 2, 3, 4, 5];
         for (const day of daysToCheck) {
-            slotsByDay[day] = [];
-        }
-        
-        // Find available slots for each day
-        for (const day of daysToCheck) {
-            // Check teacher unavailabilities for this day
-            const unavailablePeriods = new Set<number>();
-            if (teacherUnavailabilityMap.has(teacherId)) {
-                teacherUnavailabilityMap.get(teacherId)!.forEach(unavailability => {
-                    if (unavailability.day === day) {
-                        unavailability.periods.forEach(period => {
-                            unavailablePeriods.add(period);
-                        });
-                    }
-                });
-            }
-            
-            // Periods 1-10
+            slotsByDay[day] = []; // Initialize for each day
+            const unavailableTeacherPeriods = new Set<number>();
+            teacherUnavailabilityMap.get(teacherId)?.forEach(unav => {
+                if (unav.day === day) unav.periods.forEach(p => unavailableTeacherPeriods.add(p));
+            });
             for (let period = 1; period <= 10; period++) {
-                // Skip if teacher is unavailable
-                if (unavailablePeriods.has(period)) continue;
-                
-                // Skip if teacher already has a class
+                if (unavailableTeacherPeriods.has(period)) continue;
                 if (timetable.teacherSchedules[teacherId]?.[day]?.[period]) continue;
-                
-                // Find an available location
-                for (const locationId of locationIds) {
-                    if (!timetable.locationSchedules[locationId]?.[day]?.[period]) {
-                        // This slot is available
-                        slotsByDay[day].push({ day, period, locationId });
-                        break; // Only need one location per slot
+                for (const locId of locationIds) { // Use passed locationIds
+                    if (!timetable.locationSchedules[locId]?.[day]?.[period]) {
+                        slotsByDay[day].push({ day, period, locationId: locId });
+                        break; 
                     }
                 }
             }
         }
-        
         return slotsByDay;
     }
 
-    // Helper function to schedule a split lesson
-    function scheduleSplitLesson(
-        timetable: TimeTable,
-        lesson: DalDers,
-        teacherId: string,
-        teacherName: string,
-        slots: { day: number; period: number; locationId: string }[],
-        dallar: Dal[],
-        splitGroup: number,
-        totalHours: number,
-        splitHours: number
-    ): void {
-        // Generate a unique and consistent color for this lesson
-        const lessonColor = getLessonColor(lesson.id!);
-        
-        // Split lessons are by definition divisible, so they can't be consecutive (blok ders)
-        const isConsecutive = false;
-        
-        slots.forEach(slot => {
-            const timeSlot: TimeSlot = {
-                day: slot.day,
-                period: slot.period,
-                teacherId,
-                teacherName,
-                lessonId: lesson.id!,
-                lessonName: lesson.dersAdi,
-                locationId: slot.locationId,
-                locationName: locations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
-                dalId: lesson.dalId!,
-                dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
-                sinifSeviyesi: lesson.sinifSeviyesi,
-                // Add split information
-                isSplit: true,
-                splitGroup,
-                totalHours,
-                splitHours,
-                color: lessonColor, // Add consistent color
-                isConsecutive: isConsecutive,
-                totalConsecutiveHours: undefined
-            };
-            
-            // Update teacher schedule
-            timetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlot;
-            
-            // Update location schedule
-            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlot;
-        });
-    }
-
-    // Helper function to find consecutive slots on the same day
+    // Helper function to find consecutive slots on the same day for a single teacher
     function findConsecutiveSlotsOnSameDay(
         timetable: TimeTable,
         teacherId: string,
-        locationIds: string[],
+        locationIdsFromState: string[], // Renamed to avoid conflict, will be passed from selectedLocationIds
         teacherUnavailabilityMap: Map<string, { day: number; periods: number[] }[]>,
         requiredSlots: number,
-        allowedDays?: number[] // Optional parameter for limiting to specific days
+        allowedDays?: number[]
     ): { day: number; period: number; locationId: string }[] {
-        // Get available slots by day
-        const slotsByDay = findAvailableSlotsByDay(
-            timetable,
-            teacherId,
-            locationIds,
-            teacherUnavailabilityMap,
-            allowedDays
+        const slotsByDay = findAvailableSlotsByDay( 
+            timetable, teacherId, locationIdsFromState, teacherUnavailabilityMap, allowedDays
         );
-        
-        // For each day, find consecutive slots
         const daysToCheck = allowedDays || [1, 2, 3, 4, 5];
-        
         for (const day of daysToCheck) {
             if (slotsByDay[day] && slotsByDay[day].length >= requiredSlots) {
-                // Sort slots by period
                 const sortedSlots = slotsByDay[day].sort((a, b) => a.period - b.period);
-                
-                // Find consecutive sequences by checking every possible starting position
                 for (let i = 0; i <= sortedSlots.length - requiredSlots; i++) {
                     const potentialConsecutive = sortedSlots.slice(i, i + requiredSlots);
-                    
-                    // Check if slots are truly consecutive (adjacent periods)
-                    let isConsecutive = true;
+                    let isTrulyConsecutive = true;
                     for (let j = 0; j < potentialConsecutive.length - 1; j++) {
                         if (potentialConsecutive[j].period + 1 !== potentialConsecutive[j + 1].period) {
-                            isConsecutive = false;
-                            break;
+                            isTrulyConsecutive = false; break;
                         }
                     }
-                    
-                    // Also ensure all slots are on the same day
-                    const allSameDay = potentialConsecutive.every(slot => slot.day === potentialConsecutive[0].day);
-                    
-                    if (isConsecutive && allSameDay) {
-                        // Make sure we only return slots from exactly one day
-                        console.log(`Found ${requiredSlots} consecutive slots on day ${day}`);
-                        return potentialConsecutive;
-                    }
+                    if (isTrulyConsecutive) return potentialConsecutive;
                 }
             }
         }
-        
-        // Log when we fail to find consecutive slots
-        console.log(`Could not find ${requiredSlots} consecutive slots for teacher ${teacherId}`);
-        return []; // No consecutive slots found
+        return [];
     }
 
-    // Function to schedule lesson with consecutive slots
+    // Function to schedule lesson with consecutive slots (single resource)
     function scheduleConsecutiveLesson(
         timetable: TimeTable,
         lesson: DalDers,
         teacherId: string,
         teacherName: string,
         slots: { day: number; period: number; locationId: string }[],
-        dallar: Dal[]
+        dallar: Dal[],
+        componentLocations: LocationWithLabType[] // Explicitly pass component's locations state
     ): void {
-        // Generate a unique and consistent color for this lesson
         const lessonColor = getLessonColor(lesson.id!);
-        
         slots.forEach(slot => {
-            const timeSlot: TimeSlot = {
-                day: slot.day,
-                period: slot.period,
-                teacherId,
-                teacherName,
-                lessonId: lesson.id!,
-                lessonName: lesson.dersAdi,
-                locationId: slot.locationId,
-                locationName: locations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
-                dalId: lesson.dalId!,
-                dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
-                sinifSeviyesi: lesson.sinifSeviyesi,
-                color: lessonColor, // Add consistent color
-                isConsecutive: true, // Always true for consecutive lessons
-                isSplit: false, // Not split
-                totalConsecutiveHours: lesson.haftalikSaat // Total consecutive hours
+            const timeSlotEntry: TimeSlot = {
+                day: slot.day, period: slot.period, teacherId, teacherName,
+                lessonId: lesson.id!, lessonName: lesson.dersAdi, locationId: slot.locationId,
+                locationName: componentLocations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
+                dalId: lesson.dalId!, dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
+                sinifSeviyesi: lesson.sinifSeviyesi, color: lessonColor,
+                isConsecutive: true, totalConsecutiveHours: lesson.haftalikSaat, isSplit: false
             };
-            
-            // Update teacher schedule
-            timetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlot;
-            
-            // Update location schedule
-            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlot;
+            timetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlotEntry;
+            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlotEntry;
         });
     }
 
@@ -1632,6 +1499,82 @@ export default function SmartTimetablePage() {
         4: "Perşembe",
         5: "Cuma"
     };
+
+    // Function to schedule a multi-resource lesson
+    function scheduleMultiResourceLesson(
+        timetable: TimeTable,
+        lesson: DalDers,
+        teacherId1: string,
+        teacherName1: string,
+        teacherId2: string,
+        teacherName2: string,
+        slots: { day: number; period: number; locationId: string; secondLocationId: string }[],
+        dallar: Dal[],
+        componentLocations: LocationWithLabType[] // Explicitly pass component's locations state
+    ): void {
+        const lessonColor = getLessonColor(lesson.id!);
+        const isConsecutive = lesson.bolunebilir_mi === false;
+
+        slots.forEach(slotPair => {
+            const timeSlotForT1L1: TimeSlot = {
+                day: slotPair.day, period: slotPair.period, teacherId: teacherId1, teacherName: teacherName1,
+                lessonId: lesson.id!, lessonName: lesson.dersAdi, locationId: slotPair.locationId,
+                locationName: componentLocations.find(l => l.id === slotPair.locationId)?.name || `Sınıf ${slotPair.locationId}`,
+                dalId: lesson.dalId!, dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
+                sinifSeviyesi: lesson.sinifSeviyesi, secondTeacherId: teacherId2, secondTeacherName: teacherName2,
+                secondLocationId: slotPair.secondLocationId, 
+                secondLocationName: componentLocations.find(l => l.id === slotPair.secondLocationId)?.name || `Sınıf ${slotPair.secondLocationId}`,
+                isMultiResource: true, color: lessonColor, isConsecutive: isConsecutive,
+                totalConsecutiveHours: isConsecutive ? lesson.haftalikSaat : undefined
+            };
+            const timeSlotForT2L2: TimeSlot = {
+                day: slotPair.day, period: slotPair.period, teacherId: teacherId2, teacherName: teacherName2,
+                lessonId: lesson.id!, lessonName: lesson.dersAdi, locationId: slotPair.secondLocationId,
+                locationName: componentLocations.find(l => l.id === slotPair.secondLocationId)?.name || `Sınıf ${slotPair.secondLocationId}`,
+                dalId: lesson.dalId!, dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
+                sinifSeviyesi: lesson.sinifSeviyesi, secondTeacherId: teacherId1, secondTeacherName: teacherName1,
+                secondLocationId: slotPair.locationId, 
+                secondLocationName: componentLocations.find(l => l.id === slotPair.locationId)?.name || `Sınıf ${slotPair.locationId}`,
+                isMultiResource: true, color: lessonColor, isConsecutive: isConsecutive,
+                totalConsecutiveHours: isConsecutive ? lesson.haftalikSaat : undefined
+            };
+            timetable.teacherSchedules[teacherId1][slotPair.day][slotPair.period] = timeSlotForT1L1;
+            timetable.teacherSchedules[teacherId2][slotPair.day][slotPair.period] = timeSlotForT2L2;
+            timetable.locationSchedules[slotPair.locationId][slotPair.day][slotPair.period] = timeSlotForT1L1;
+            timetable.locationSchedules[slotPair.secondLocationId][slotPair.day][slotPair.period] = timeSlotForT2L2;
+        });
+    }
+
+    // Function to schedule a split lesson (single resource)
+    function scheduleSplitLesson(
+        timetable: TimeTable,
+        lesson: DalDers,
+        teacherId: string,
+        teacherName: string,
+        slots: { day: number; period: number; locationId: string }[],
+        dallar: Dal[],
+        splitGroup: number, // 1 for first part, 2 for second part
+        totalHours: number, // Total hours of the original lesson
+        splitHours: number, // Hours in this specific part
+        componentLocations: LocationWithLabType[] // Explicitly pass component's locations state
+    ): void {
+        const lessonColor = getLessonColor(lesson.id!);
+        slots.forEach(slot => {
+            const timeSlotEntry: TimeSlot = {
+                day: slot.day, period: slot.period, teacherId, teacherName,
+                lessonId: lesson.id!, lessonName: lesson.dersAdi, locationId: slot.locationId,
+                locationName: componentLocations.find(l => l.id === slot.locationId)?.name || `Sınıf ${slot.locationId}`,
+                dalId: lesson.dalId!, dalName: dallar.find(d => d.id === lesson.dalId)?.name || 'Bilinmeyen Dal',
+                sinifSeviyesi: lesson.sinifSeviyesi, color: lessonColor,
+                isSplit: true, splitGroup, totalHours, splitHours,
+                isConsecutive: false // Split lessons are generally not considered a single consecutive block
+            };
+            timetable.teacherSchedules[teacherId][slot.day][slot.period] = timeSlotEntry;
+            timetable.locationSchedules[slot.locationId][slot.day][slot.period] = timeSlotEntry;
+        });
+    }
+
+    // --- END OF HELPER FUNCTION DEFINITIONS ---
 
     return (
         <div className="container mx-auto p-4 md:p-6 space-y-8">
@@ -2127,34 +2070,34 @@ export default function SmartTimetablePage() {
                                                                 <td key={day} className="px-3 py-2 whitespace-nowrap text-xs">
                                                                     {slot ? (
                                                                         <div 
-                                                                            className={`p-1 rounded border overflow-hidden ${
+                                                                            className={`p-1 rounded border overflow-hidden relative group ${ // Added relative group for potential tooltips later
                                                                                 slot.isMultiResource 
-                                                                                    ? 'border-yellow-300' 
+                                                                                    ? 'border-yellow-400 bg-yellow-50' 
                                                                                     : slot.isSplit 
-                                                                                        ? 'border-green-300' 
+                                                                                        ? 'border-green-400 bg-green-50' 
                                                                                         : slot.isConsecutive
-                                                                                            ? 'border-blue-300'
-                                                                                            : 'border-gray-200'
+                                                                                            ? 'border-blue-400 bg-blue-50'
+                                                                                            : 'border-gray-300 bg-white'
                                                                             }`} 
-                                                                            style={{ 
-                                                                                backgroundColor: slot.color || (
-                                                                                    slot.isMultiResource 
-                                                                                        ? '#FEF9C3' // yellow-100 
-                                                                                        : slot.isSplit 
-                                                                                            ? '#DCFCE7' // green-100
-                                                                                            : slot.isConsecutive
-                                                                                                ? '#DBEAFE' // blue-100
-                                                                                                : getLessonColor(slot.lessonId)
-                                                                                ) 
-                                                                            }}
+                                                                            // Override background color if slot.color is explicitly set by getLessonColor
+                                                                            style={slot.color ? { backgroundColor: slot.color } : {}}
                                                                         >
-                                                                            <div className="font-medium text-gray-800 text-xs truncate" title={slot.lessonName}>{slot.lessonName}</div>
-                                                                            <div className="text-xxs text-gray-500 truncate" title={slot.locationName}>
+                                                                            <div className="font-semibold text-gray-800 text-xs truncate" title={slot.lessonName}>{slot.lessonName}</div>
+                                                                            <div className="text-xxs text-gray-600 truncate" title={slot.locationName}>
+                                                                                <MapPinIcon className="h-3 w-3 inline-block mr-0.5 text-gray-400" />
                                                                                 {slot.locationName}
                                                                             </div>
+                                                                            
                                                                             {slot.isMultiResource && (
-                                                                                <div className="mt-1 pt-1 border-t border-yellow-200 text-xxs">
-                                                                                    <div className="font-medium text-yellow-800 truncate">Çoklu Kaynak</div>
+                                                                                <div className="mt-1 pt-1 border-t border-yellow-300 text-xxs space-y-0.5">
+                                                                                    <div className="font-medium text-yellow-700 truncate" title={slot.secondTeacherName}>
+                                                                                        <AcademicCapIcon className="h-3 w-3 inline-block mr-0.5 text-yellow-500" />
+                                                                                        {slot.secondTeacherName} 
+                                                                                    </div>
+                                                                                    <div className="text-yellow-600 truncate" title={slot.secondLocationName}>
+                                                                                        <MapPinIcon className="h-3 w-3 inline-block mr-0.5 text-yellow-500" />
+                                                                                        {slot.secondLocationName}
+                                                                                    </div>
                                                                                 </div>
                                                                             )}
                                                                             {slot.isSplit && (

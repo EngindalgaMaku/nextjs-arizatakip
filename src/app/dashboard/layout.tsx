@@ -19,7 +19,8 @@ import {
   ComputerDesktopIcon,
   ClockIcon,
   CalendarDaysIcon,
-  TagIcon
+  TagIcon,
+  BuildingOffice2Icon
 } from '@heroicons/react/24/outline';
 import { signOut, loadUserData } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
@@ -308,6 +309,18 @@ export default function DashboardLayout({
               </Link>
 
               <Link
+                href="/dashboard/businesses"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.startsWith("/dashboard/businesses")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <BuildingOffice2Icon className="mr-3 h-5 w-5" />
+                İşletmeler
+              </Link>
+
+              <Link
                 href="/dashboard/reports"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
                   pathname.includes("/reports")
@@ -417,9 +430,9 @@ export default function DashboardLayout({
           </div>
         )}
 
-        <div className="flex flex-col flex-1 overflow-y-auto bg-gray-100">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {!isPrintView && (
-            <header className="sticky top-0 z-10 flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
+            <header className="bg-blue-50 shadow-md p-4 flex justify-between items-center">
               <div className="flex items-center">
                 <button
                   className="mr-3 md:hidden text-gray-600 hover:text-gray-800 focus:outline-none"

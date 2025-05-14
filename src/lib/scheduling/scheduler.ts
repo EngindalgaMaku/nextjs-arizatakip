@@ -43,61 +43,58 @@ function getScheduleMapKey(slot: TimeSlot, locationId: string): string {
     return `${slot.day}-${slot.hour}-${locationId}`;
 }
 
-/** Belirli bir zamanda öğretmenin müsait olup olmadığını kontrol eder (Doğru Mantık) */
+/** Belirli bir zamanda öğretmenin müsait olup olmadığını kontrol eder */
 function isTeacherAvailable(teacher: TeacherScheduleData, slot: TimeSlot, schedule: Schedule): boolean {
     // 1. Öğretmenin genel müsaitiyetsizliği var mı?
     if (teacher.unavailableSlots.some(unav => unav.day === slot.day && unav.hour === slot.hour)) {
-        // console.log(`[Scheduler Check] Teacher ${teacher.name} unavailable due to general unavailability at ${slot.day}-${slot.hour}`);
         return false;
     }
     // 2. Öğretmen o saatte zaten başka bir derse atanmış mı?
-    for (const entry of schedule.values()) {
-        if (entry.teacherId === teacher.id && entry.timeSlot.day === slot.day && entry.timeSlot.hour === slot.hour) {
-            // console.log(`[Scheduler Check] Teacher ${teacher.name} unavailable due to assignment to ${entry.lessonName} at ${slot.day}-${slot.hour}`);
+    const scheduleKey = getTimeSlotKey(slot);
+    const entryAtSlot = schedule.get(scheduleKey);
+
+    if (entryAtSlot) {
+        if (entryAtSlot.teacherIds && entryAtSlot.teacherIds.includes(teacher.id)) {
             return false;
         }
+        // Fallback logic removed as entries should now conform to the new structure
     }
     return true;
 }
 
-/** Belirli bir zamanda konumun müsait olup olmadığını kontrol eder (Yeni Anahtar ile Basitleştirildi) */
+/** Belirli bir zamanda konumun müsait olup olmadığını kontrol eder */
 function isLocationAvailable(locationId: string, slot: TimeSlot, schedule: Schedule): boolean {
-    const key = getScheduleMapKey(slot, locationId);
-    // O saatte ve o konumda ders var mı? Varsa dolu.
-    return !schedule.has(key); 
+    const scheduleKey = getTimeSlotKey(slot);
+    const entryAtSlot = schedule.get(scheduleKey);
+
+    if (entryAtSlot) {
+        if (entryAtSlot.locationIds && entryAtSlot.locationIds.includes(locationId)) {
+            return false;
+        }
+        // Fallback logic removed as entries should now conform to the new structure
+    }
+    return true; 
 }
 
 /** Belirli bir zamanda sınıfın (Dal+Seviye) müsait olup olmadığını kontrol eder (Doğru Mantık) */
 function isClassAvailable(dalId: string, sinifSeviyesi: number, slot: TimeSlot, schedule: Schedule, lessonsMap: Map<string, LessonScheduleData>): boolean {
-     // O saatte aynı sınıf grubunun (dal+seviye) başka bir dersi var mı?
-    for (const entry of schedule.values()) {
-        // Önce zaman dilimi eşleşiyor mu kontrol et
-        if (entry.timeSlot.day === slot.day && entry.timeSlot.hour === slot.hour) {
-            // Sonra bu entry'nin dersini bul
-            const scheduledLesson = lessonsMap.get(entry.lessonId);
-            // Eğer ders bulunduysa, seviyeye göre kontrol yap
-            if (scheduledLesson) {
-                // --- 9. SINIF ÖZEL KONTROLÜ ---
-                if (sinifSeviyesi === 9) {
-                    // Eğer atanmaya çalışılan ders 9. sınıf ise,
-                    // o saatte başka bir 9. sınıf dersi var mı diye bak (dalId önemsiz).
-                    if (scheduledLesson.sinifSeviyesi === 9) {
-                         // debugLogs.push(`[Scheduler Check Class 9] Class (Seviye: 9) unavailable due to assignment to ${entry.lessonName} at ${slot.day}-${slot.hour}`);
-                         return false; // Bu saatte başka bir 9. sınıf dersi var.
-                    }
-                } else {
-                    // --- 9. SINIF DIŞINDAKİ SINIFLAR İÇİN MEVCUT KONTROL ---
-                    // Eğer atanmaya çalışılan ders 9. sınıf değilse,
-                    // hem dalId hem de sinifSeviyesi eşleşiyor mu diye bak.
-                    if (scheduledLesson.dalId === dalId && scheduledLesson.sinifSeviyesi === sinifSeviyesi) {
-                         // debugLogs.push(`[Scheduler Check Class >9] Class (Dal: ${dalId}, Seviye: ${sinifSeviyesi}) unavailable due to assignment to ${entry.lessonName} at ${slot.day}-${slot.hour}`);
-                         return false; // Bu saatte aynı dal ve seviyedeki sınıfın başka dersi var.
-                    }
+    const scheduleKey = getTimeSlotKey(slot);
+    const entryAtSlot = schedule.get(scheduleKey);
+
+    if (entryAtSlot) {
+        const scheduledLesson = lessonsMap.get(entryAtSlot.lessonId);
+        if (scheduledLesson) {
+            if (sinifSeviyesi === 9) {
+                if (scheduledLesson.sinifSeviyesi === 9) {
+                    return false; 
+                }
+            } else {
+                if (scheduledLesson.dalId === dalId && scheduledLesson.sinifSeviyesi === sinifSeviyesi) {
+                    return false; 
                 }
             }
         }
     }
-    // Döngü bitti ve çakışma bulunamadı.
     return true; // Sınıf bu saatte müsait.
 }
 
@@ -249,27 +246,22 @@ function tryAssigningDualLesson(
                         if (consecutiveSlots) {
                             // Atama yap
                             const previousRemaining = remainingHours.get(currentLesson.id) || 0; // GLOBAL'den al
-                            debugLogs.push(`[Assign OK Dual ${slot.day}-${slot.hour} Dur:${duration}] ...`);
-                            const assignedKeys: string[] = [];
+                            debugLogs.push(`[Assign OK Dual ${slot.day}-${slot.hour} Dur:${duration}] For ${currentLesson.name} with T: ${teacherA.name},${teacherB.name} L: ${locationA.name},${locationB.name}`);
+                            const assignedScheduleKeys: string[] = [];
                             consecutiveSlots.forEach(assignedSlot => {
-                                const keyA = getScheduleMapKey(assignedSlot, locationA.id);
-                                currentSchedule.set(keyA, {
-                                    lessonId: currentLesson.id, lessonName: currentLesson.name,
-                                    teacherId: teacherA.id, teacherName: teacherA.name,
-                                    locationId: locationA.id, locationName: locationA.name,
-                                    timeSlot: assignedSlot, dalId: currentLesson.dalId,
+                                const scheduleKey = getTimeSlotKey(assignedSlot);
+                                currentSchedule.set(scheduleKey, {
+                                    lessonId: currentLesson.id,
+                                    lessonName: currentLesson.name,
+                                    teacherIds: [teacherA.id, teacherB.id], // Use arrays
+                                    teacherNames: [teacherA.name, teacherB.name], // Use arrays
+                                    locationIds: [locationA.id, locationB.id], // Use arrays
+                                    locationNames: [locationA.name, locationB.name], // Use arrays
+                                    timeSlot: assignedSlot,
+                                    dalId: currentLesson.dalId,
                                     sinifSeviyesi: currentLesson.sinifSeviyesi
                                 });
-                                assignedKeys.push(keyA);
-                                const keyB = getScheduleMapKey(assignedSlot, locationB.id);
-                                currentSchedule.set(keyB, {
-                                    lessonId: currentLesson.id, lessonName: currentLesson.name,
-                                    teacherId: teacherB.id, teacherName: teacherB.name,
-                                    locationId: locationB.id, locationName: locationB.name,
-                                    timeSlot: assignedSlot, dalId: currentLesson.dalId,
-                                    sinifSeviyesi: currentLesson.sinifSeviyesi
-                                });
-                                assignedKeys.push(keyB);
+                                assignedScheduleKeys.push(scheduleKey);
                             });
 
                             // GLOBAL map'i GÜNCELLE
@@ -287,8 +279,8 @@ function tryAssigningDualLesson(
                             if (solved) return true;
 
                             // Geri al
-                            debugLogs.push(`[Backtrack Dual ${slot.day}-${slot.hour} Dur:${duration}] ...`);
-                            assignedKeys.forEach(key => currentSchedule.delete(key));
+                            debugLogs.push(`[Backtrack Dual ${slot.day}-${slot.hour} Dur:${duration}] For ${currentLesson.name}`);
+                            assignedScheduleKeys.forEach(key => currentSchedule.delete(key));
                             // GLOBAL map'i GERİ YÜKLE
                             remainingHours.set(currentLesson.id, previousRemaining);
                         }
@@ -530,12 +522,20 @@ function solveRecursive(lessonIndex: number, input: SchedulerInput): boolean {
                         // Max 2 öğretmen kontrolü (değişiklik yok)
                         const assignedTeachers = new Set<string>();
                         for (const entry of currentSchedule.values()) {
-                            if (entry.lessonId === currentLesson.id) {
-                                assignedTeachers.add(entry.teacherId);
+                            // Ensure entry.teacherIds exists before trying to access it
+                            if (entry.lessonId === currentLesson.id && entry.teacherIds) {
+                                // If it's already an array, add all teachers from that entry
+                                entry.teacherIds.forEach(tid => assignedTeachers.add(tid));
                             }
                         }
                         const isNewTeacher = !assignedTeachers.has(currentTeacher.id);
-                        const canAssignTeacher = !isNewTeacher || assignedTeachers.size < 2;
+                        // This logic seems to be about ensuring a lesson isn't split among too many *different* teachers.
+                        // If requiresMultipleResources is false, it should ideally only have 1 teacher.
+                        // If requiresMultipleResources is true, tryAssigningDualLesson handles the 2 teachers.
+                        // This section might be redundant if currentLesson.requiresMultipleResources is false, 
+                        // as the same teacher constraint (lines 496-515) should handle it.
+                        // For now, let's assume this max teacher check is relevant.
+                        const canAssignTeacher = !isNewTeacher || assignedTeachers.size < (currentLesson.requiresMultipleResources ? 2 : 1);
 
                         if (!canAssignTeacher) {
                             const assignedTeacherNames = Array.from(assignedTeachers).map(id => teachersDataMap.get(id)?.name ?? id).join(', ');
@@ -545,17 +545,22 @@ function solveRecursive(lessonIndex: number, input: SchedulerInput): boolean {
 
                         // Atama (currentTeacher kullanılıyor)
                         const previousRemaining = remainingHours.get(currentLesson.id) || 0;
-                        debugLogs.push(`[Assign OK ${slot.day}-${slot.hour} Dur:${duration}] L: ${currentLesson.name} to T: ${currentTeacher.name}...`);
+                        debugLogs.push(`[Assign OK ${slot.day}-${slot.hour} Dur:${duration}] L: ${currentLesson.name} to T: ${currentTeacher.name} at L: ${location.name}`);
+                        const assignedScheduleKeys: string[] = []; // For backtracking
                         consecutiveSlots.forEach(assignedSlot => {
-                            const key = getScheduleMapKey(assignedSlot, location.id);
-                            currentSchedule.set(key, {
-                                lessonId: currentLesson.id, lessonName: currentLesson.name,
-                                teacherId: currentTeacher.id,
-                                teacherName: currentTeacher.name,
-                                locationId: location.id, locationName: location.name,
-                                timeSlot: assignedSlot, dalId: currentLesson.dalId,
+                            const scheduleKey = getTimeSlotKey(assignedSlot); // Use Day-Hour key
+                            currentSchedule.set(scheduleKey, {
+                                lessonId: currentLesson.id, 
+                                lessonName: currentLesson.name,
+                                teacherIds: [currentTeacher.id], // Use array
+                                teacherNames: [currentTeacher.name], // Use array
+                                locationIds: [location.id], // Use array
+                                locationNames: [location.name], // Use array
+                                timeSlot: assignedSlot, 
+                                dalId: currentLesson.dalId,
                                 sinifSeviyesi: currentLesson.sinifSeviyesi
                             });
+                            assignedScheduleKeys.push(scheduleKey);
                         });
                         remainingHours.set(currentLesson.id, previousRemaining - duration);
 
@@ -567,13 +572,9 @@ function solveRecursive(lessonIndex: number, input: SchedulerInput): boolean {
                         if (solved) return true;
 
                         // Geri al (currentTeacher logda belirtilebilir)
-                        debugLogs.push(`[Backtrack ${slot.day}-${slot.hour} Dur:${duration}] Removing ${currentLesson.name} from T: ${currentTeacher.name}`);
-                        consecutiveSlots.forEach(assignedSlot => {
-                            const key = getScheduleMapKey(assignedSlot, location.id);
-                            currentSchedule.delete(key);
-                        });
+                        debugLogs.push(`[Backtrack ${slot.day}-${slot.hour} Dur:${duration}] Removing ${currentLesson.name} from T: ${currentTeacher.name} at L: ${location.name}`);
+                        assignedScheduleKeys.forEach(key => currentSchedule.delete(key)); // Use correct keys for deletion
                         remainingHours.set(currentLesson.id, previousRemaining);
-                        return false;
                     }
                      // --- YENİ LOG: attemptAssignment Sonu (Başarısız) ---
                      else { // consecutiveSlots null ise buraya düşer
