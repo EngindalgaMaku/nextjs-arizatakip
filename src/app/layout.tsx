@@ -1,65 +1,22 @@
-import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { Toaster } from "react-hot-toast";
-// Remove QueryClient imports
-// import { QueryClient, QueryClientProvider } from '@tanstack/react-query'; 
-// import React from 'react';
+import './globals.css';
+import { Inter } from 'next/font/google';
 
-// Import the new provider
-import { QueryProvider } from "@/providers/QueryProvider"; 
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+const inter = Inter({ subsets: ['latin'] });
 
-// Import Sidebar component with the correct path
-import Sidebar from "@/components/Sidebar"; 
-
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Hüsniye Özdilek Ticaret M.T.A.L. - ATSİS",
-  description: "Hüsniye Özdilek Ticaret M.T.A.L. Arıza Takip Sistemi (ATSİS)",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "ATSİS"
-  },
-};
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#4338CA",
+export const metadata = {
+  title: 'Test Platformu',
+  description: 'Bilgi seviyenizi ölçmek için online test platformu',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  // Remove useState for queryClient
-  // const [queryClient] = React.useState(() => new QueryClient());
-
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="tr">
-      <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="mobile-web-app-capable" content="yes" />
-      </head>
-      <body className={inter.className}>
-         {/* Remove QueryProvider wrapper */}
-        <AuthProvider>
-          {/* Remove the NotificationProvider wrapper */}
-          {/* <NotificationProvider> */}
-            {children}
-            <Toaster position="bottom-right" />
-          {/* </NotificationProvider> */}
-        </AuthProvider>
+      <body className={`${inter.className} bg-gray-50 min-h-screen`}>
+        {children}
       </body>
     </html>
   );
