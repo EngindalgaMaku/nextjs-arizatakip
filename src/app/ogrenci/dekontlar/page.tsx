@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UpdateReceiptFormPayload, UploadReceiptFormPayload } from '@/types/schemas/receipt-schema';
-import { ArrowDownTrayIcon, ArrowLeftOnRectangleIcon, ExclamationTriangleIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowLeftOnRectangleIcon, ExclamationTriangleIcon, PencilIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
 import imageCompression from 'browser-image-compression';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useEffect, useState } from 'react';
@@ -136,47 +136,51 @@ function StudentReceiptDashboardContent() {
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const imageFile = event.target.files && event.target.files[0];
-    if (!imageFile) {
+    const selectedFileInstance = event.target.files && event.target.files[0];
+    if (!selectedFileInstance) {
       setSelectedFile(null);
       return;
     }
 
-    // Check if the file type is JPG/JPEG before attempting compression
-    if (!['image/jpeg', 'image/jpg'].includes(imageFile.type)) {
-      toast.error('Lütfen sadece JPG/JPEG formatında bir dosya seçin.');
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(selectedFileInstance.type)) {
+      toast.error('Lütfen sadece JPG/JPEG veya PDF formatında bir dosya seçin.');
       setSelectedFile(null);
       event.target.value = ''; // Reset file input
       return;
     }
 
-    // Maximum file size to trigger compression (e.g., 1MB)
-    // You can adjust this. If original is smaller, it won't be upscaled.
-    const maxSizeMB = 1;
-    const options = {
-      maxSizeMB: maxSizeMB,
-      maxWidthOrHeight: 1920, // Max width or height
-      useWebWorker: true,
-      // CKey: you might want to adjust `initialQuality` for JPG if needed
-      // initialQuality: 0.75 // For JPG, default is 0.8
-    };
+    // For JPG/JPEG, check size and compress if needed
+    if (['image/jpeg', 'image/jpg'].includes(selectedFileInstance.type)) {
+      const maxSizeMB = 1;
+      const options = {
+        maxSizeMB: maxSizeMB,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      };
 
-    if (imageFile.size > options.maxSizeMB * 1024 * 1024) {
-        toast.loading('Dosya boyutu optimize ediliyor...');
-        try {
-            const compressedFile = await imageCompression(imageFile, options);
-            toast.dismiss();
-            toast.success(`Dosya optimize edildi! Yeni boyut: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
-            setSelectedFile(compressedFile);
-        } catch (error) {
-            toast.dismiss();
-            console.error('Dosya sıkıştırma hatası:', error);
-            toast.error('Dosya optimize edilirken bir hata oluştu. Lütfen dosyayı kontrol edin veya daha küçük bir dosya deneyin.');
-            setSelectedFile(null);
-            event.target.value = ''; // Reset file input
-        }
-    } else {
-        setSelectedFile(imageFile); // If already small enough, use the original file
+      if (selectedFileInstance.size > options.maxSizeMB * 1024 * 1024) {
+          toast.loading('Dosya boyutu optimize ediliyor...');
+          try {
+              const compressedFile = await imageCompression(selectedFileInstance, options);
+              toast.dismiss();
+              toast.success(`Dosya optimize edildi! Yeni boyut: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
+              setSelectedFile(compressedFile);
+          } catch (error) {
+              toast.dismiss();
+              console.error('Dosya sıkıştırma hatası:', error);
+              toast.error('Dosya optimize edilirken bir hata oluştu. Lütfen dosyayı kontrol edin veya daha küçük bir dosya deneyin.');
+              setSelectedFile(null);
+              event.target.value = ''; // Reset file input
+          }
+      } else {
+          setSelectedFile(selectedFileInstance); // If already small enough, use the original file
+      }
+    } else if (selectedFileInstance.type === 'application/pdf') {
+      // For PDF files, set directly without compression
+      // You might want to add a size check for PDFs here if needed
+      // For example: if (selectedFileInstance.size > 5 * 1024 * 1024) { toast.error('PDF dosyası 5MB'dan büyük olamaz.'); return; }
+      setSelectedFile(selectedFileInstance);
     }
   };
 
@@ -371,80 +375,7 @@ function StudentReceiptDashboardContent() {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-            <div>
-                <CardTitle className="text-2xl">Hoşgeldin, {decodeURIComponent(studentName || '')}!</CardTitle>
-                <CardDescription>Sınıf: {decodeURIComponent(studentClassName || 'N/A')} - İşletme Dekontları ({academicYearStart}-{academicYearEnd})</CardDescription>
-            </div>
-            <div className="mt-4 sm:mt-0 flex items-center space-x-2">
-                <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
-                    <SelectTrigger className="w-[220px]">
-                        <SelectValue placeholder="Eğitim Yılı Seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {yearOptions.map(opt => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Button onClick={handleLogout} variant="outline" size="icon" title="Çıkış Yap">
-                    <ArrowLeftOnRectangleIcon className="h-5 w-5" />
-                </Button>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {isLoading && <p className="text-center py-4">Dekontlar yükleniyor...</p>}
-      {error && <Alert variant="destructive" className="mb-4"><AlertTitle>Hata!</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-
-      {!isLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {academicMonths.map(month => {
-            const yearForMonth = (month >= 9 && month <= 12) ? academicYearStart : academicYearEnd;
-            const receipt = receipts.find(r => r.month === month && r.year === yearForMonth);
-
-            return (
-              <Card key={`${yearForMonth}-${month}`} className="h-full">
-                <CardHeader>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                    <div>
-                      <CardTitle className="text-sm">{monthNames[month]}</CardTitle>
-                      <CardDescription>{yearForMonth}</CardDescription>
-                    </div>
-                    <div className="mt-4 sm:mt-0 flex items-center space-x-2">
-                      {receipt && (
-                        <>
-                          <Button onClick={() => openUpdateForm(receipt)} variant="outline" size="icon" title="Dekont Güncelle">
-                            <PencilIcon className="h-5 w-5" />
-                          </Button>
-                          <Button onClick={() => handleDownload(receipt)} variant="outline" size="icon" title="Dekont İndir">
-                            <ArrowDownTrayIcon className="h-5 w-5" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {receipt ? (
-                    <p className="text-sm text-gray-600 text-center py-4">Bu ayın dekontu sisteme yüklenmiştir.</p>
-                  ) : (
-                    <p className="text-center py-4">Dekont bulunamadı.</p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
       <Dialog open={isFormModalOpen} onOpenChange={handleDialogVisibilityChange}>
-        <DialogTrigger asChild>
-          <Button className="w-full mt-4">Dekont Ekle</Button>
-        </DialogTrigger>
         <DialogContent 
           className="sm:max-w-[425px]" 
           onPointerDownCapture={(e) => {
@@ -523,7 +454,7 @@ function StudentReceiptDashboardContent() {
               <input 
                 type="file" 
                 id="file" 
-                accept=".jpg,.jpeg" 
+                accept=".jpg,.jpeg,.pdf"
                 onChange={handleFileChange} 
                 className="col-span-3 block w-full text-sm text-slate-500 
                            file:mr-4 file:py-2 file:px-4 
@@ -542,7 +473,83 @@ function StudentReceiptDashboardContent() {
             </DialogClose>
           </DialogFooter>
         </DialogContent>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+              <div>
+                  <CardTitle className="text-2xl">Hoşgeldin, {decodeURIComponent(studentName || '')}!</CardTitle>
+                  <CardDescription>Sınıf: {decodeURIComponent(studentClassName || 'N/A')} - İşletme Dekontları ({academicYearStart}-{academicYearEnd})</CardDescription>
+              </div>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-2">
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <PlusCircleIcon className="h-5 w-5 mr-2" />
+                      Dekont Ekle
+                    </Button>
+                  </DialogTrigger>
+                  <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
+                      <SelectTrigger className="w-[220px]">
+                          <SelectValue placeholder="Eğitim Yılı Seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {yearOptions.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <Button onClick={handleLogout} variant="outline" size="icon" title="Çıkış Yap">
+                      <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+                  </Button>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
       </Dialog>
+
+      {isLoading && <p className="text-center py-4">Dekontlar yükleniyor...</p>}
+      {error && <Alert variant="destructive" className="mb-4"><AlertTitle>Hata!</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+
+      {!isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {academicMonths.map(month => {
+            const yearForMonth = (month >= 9 && month <= 12) ? academicYearStart : academicYearEnd;
+            const receipt = receipts.find(r => r.month === month && r.year === yearForMonth);
+
+            return (
+              <Card key={`${yearForMonth}-${month}`} className="h-full">
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <div>
+                      <CardTitle className="text-sm">{monthNames[month]}</CardTitle>
+                      <CardDescription>{yearForMonth}</CardDescription>
+                    </div>
+                    <div className="mt-4 sm:mt-0 flex items-center space-x-2">
+                      {receipt && (
+                        <>
+                          <Button onClick={() => openUpdateForm(receipt)} variant="outline" size="icon" title="Dekont Güncelle">
+                            <PencilIcon className="h-5 w-5" />
+                          </Button>
+                          <Button onClick={() => handleDownload(receipt)} variant="outline" size="icon" title="Dekont İndir">
+                            <ArrowDownTrayIcon className="h-5 w-5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {receipt ? (
+                    <p className="text-sm text-gray-600 text-center py-4">Bu ayın dekontu sisteme yüklenmiştir.</p>
+                  ) : (
+                    <p className="text-center py-4">Dekont bulunamadı.</p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
