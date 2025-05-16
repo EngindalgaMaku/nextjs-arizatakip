@@ -1,16 +1,16 @@
 'use client';
 
 import {
-    AcademicCapIcon,
-    ArrowLeftOnRectangleIcon,
-    BookOpenIcon,
-    CalendarDaysIcon,
-    ClipboardDocumentListIcon,
-    Cog6ToothIcon,
-    DocumentTextIcon,
-    ExclamationCircleIcon,
-    HomeIcon,
-    UserGroupIcon
+  AcademicCapIcon,
+  ArrowLeftOnRectangleIcon,
+  BookOpenIcon,
+  CalendarDaysIcon,
+  ClipboardDocumentListIcon,
+  Cog6ToothIcon,
+  DocumentTextIcon,
+  ExclamationCircleIcon,
+  HomeIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -83,6 +83,17 @@ export default function Sidebar() {
         />
         
         <div className="pt-4 pb-2 px-3">
+          <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Modüller</h4>
+        </div>
+
+        <NavItem
+          href="/dashboard/live-exams"
+          icon={<ClipboardDocumentListIcon />}
+          label="Canlı Sınavlar"
+          active={pathname.startsWith('/dashboard/live-exams')}
+        />
+        
+        <div className="pt-4 pb-2 px-3">
           <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Yönetimsel İşlemler</h4>
         </div>
         
@@ -98,13 +109,6 @@ export default function Sidebar() {
           icon={<UserGroupIcon />} 
           label="Kullanıcılar"
           active={pathname.startsWith('/dashboard/users')} 
-        />
-
-        <NavItem
-          href="/teacher/exams"
-          icon={<ClipboardDocumentListIcon />}
-          label="Canlı Sınavlar"
-          active={pathname.startsWith('/teacher/exams')}
         />
 
         <NavItem 
