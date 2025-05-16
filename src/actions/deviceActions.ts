@@ -3,7 +3,6 @@
 import { supabase } from '@/lib/supabase';
 import { Device, DeviceFormData, DeviceSchema } from '@/types/devices';
 import { Location } from '@/types/locations'; // Import Location type for relationship typing
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod'; // Keep Zod import for validation logic
 import { Issue } from '@/types/devices';
 
@@ -134,7 +133,6 @@ export async function createDevice(formData: DeviceFormData): Promise<{ success:
        throw new Error(updateError?.message || 'Cihaz barkodu ayarlanırken bir hata oluştu.');
     }
 
-    revalidatePath('/dashboard/devices'); // Revalidate the devices page path
     return { success: true, device: updatedDevice as Device };
 
   } catch (error) {
@@ -200,7 +198,6 @@ export async function updateDevice(id: string, formData: DeviceFormData): Promis
             throw new Error(updateError?.message || 'Cihaz güncellenirken bir veritabanı hatası oluştu.');
         }
 
-        revalidatePath('/dashboard/devices'); // Revalidate the devices page path
         return { success: true, device: updatedDeviceData as Device };
 
     } catch (error) {
@@ -232,7 +229,6 @@ export async function deleteDevice(id: string): Promise<{ success: boolean; erro
 
         // No need to decrement sort_order
 
-        revalidatePath('/dashboard/devices'); // Revalidate the devices page path
         return { success: true };
 
     } catch (error) {
@@ -327,7 +323,6 @@ export async function moveDevice(id: string, direction: 'up' | 'down'): Promise<
             throw new Error('Sıralama güncellenirken bir hata oluştu.');
         }
 
-        revalidatePath('/dashboard/devices');
         return { success: true };
 
     } catch (error) {
@@ -368,8 +363,6 @@ async function initializeDeviceSortOrder(): Promise<void> {
                 // Continue with other devices
             }
         }
-
-        revalidatePath('/dashboard/devices');
     } catch (error) {
         console.error('Initialize Device Sort Order Error:', error);
         throw error;
@@ -446,7 +439,6 @@ export async function updateIssueInDevice(
     return { success: false, error: updateError.message };
   }
   // Optionally revalidate device page
-  revalidatePath('/dashboard/devices');
   return { success: true, device: updatedDevice as Device };
 }
 
@@ -486,6 +478,5 @@ export async function deleteIssueFromDevice(
     console.error('Error deleting device issue:', updateError);
     return { success: false, error: updateError.message };
   }
-  revalidatePath('/dashboard/devices');
   return { success: true, device: updatedDevice as Device };
 } 

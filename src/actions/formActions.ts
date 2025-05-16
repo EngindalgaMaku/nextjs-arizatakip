@@ -1,7 +1,7 @@
 'use server';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
+// import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import {
   Form,
@@ -223,7 +223,7 @@ export async function createForm(payload: FormValues): Promise<{ success: boolea
       console.error('Error creating form:', error?.message);
       return { success: false, error: error?.message || 'Form oluşturulamadı.' };
     }
-    revalidatePath(FORMS_PATH);
+    // revalidatePath(FORMS_PATH);
     // Map back to camelCase before returning
      const createdForm = {
         id: data.id,
@@ -272,8 +272,8 @@ export async function updateForm(id: string, payload: FormValues): Promise<{ suc
       console.error('Error updating form:', error?.message);
       return { success: false, error: error?.message || 'Form güncellenemedi.' };
     }
-    revalidatePath(FORMS_PATH);
-    revalidatePath(`${FORMS_PATH}/${id}/edit`); // Revalidate edit page too
+    // revalidatePath(FORMS_PATH);
+    // revalidatePath(`${FORMS_PATH}/${id}/edit`); // Revalidate edit page too
      // Map back to camelCase
       const updatedForm = {
         id: data.id,
@@ -307,7 +307,7 @@ export async function deleteForm(id: string): Promise<{ success: boolean; error?
       console.error('Error deleting form:', error);
       return { success: false, error: error.message };
     }
-    revalidatePath(FORMS_PATH);
+    // revalidatePath(FORMS_PATH);
     return { success: true };
   } catch (err) {
     console.error('deleteForm error:', err);
@@ -371,7 +371,7 @@ export async function addFormField(
       return { success: false, error: error?.message || 'Form alanı oluşturulamadı.' };
     }
 
-    revalidatePath(`${FORMS_PATH}/${formId}/edit`); // Revalidate form edit page
+    // revalidatePath(`${FORMS_PATH}/${formId}/edit`); // Revalidate form edit page
 
     // Map back to camelCase
     const createdField: FormField = {
@@ -446,7 +446,7 @@ export async function updateFormField(
     }
 
     if (existingField?.form_id) {
-       revalidatePath(`${FORMS_PATH}/${existingField.form_id}/edit`);
+       // revalidatePath(`${FORMS_PATH}/${existingField.form_id}/edit`);
     }
 
      // Map back to camelCase
@@ -498,7 +498,7 @@ export async function deleteFormField(fieldId: string): Promise<{ success: boole
     }
 
      if (existingField?.form_id) {
-       revalidatePath(`${FORMS_PATH}/${existingField.form_id}/edit`);
+       // revalidatePath(`${FORMS_PATH}/${existingField.form_id}/edit`);
        // TODO: Consider re-ordering remaining fields after deletion?
     }
 

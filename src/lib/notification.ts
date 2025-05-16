@@ -307,7 +307,7 @@ export const showIssueUpdateNotification = (issue: Issue, previousStatus?: strin
   // Durum değişikliği varsa
   if (previousStatus && previousStatus !== issue.status) {
     let title = 'Arıza kaydınız güncellendi';
-    let body = `"${issue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(issue.status)}" olarak güncellendi.`;
+    const body = `"${issue.device_name}" cihazı için bildiriminizin durumu "${getStatusName(issue.status)}" olarak güncellendi.`;
     
     // Çözüldü durumu için farklı başlık
     if (issue.status === 'cozuldu') {

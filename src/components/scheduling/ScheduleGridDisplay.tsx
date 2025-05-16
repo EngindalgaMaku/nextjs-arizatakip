@@ -1,8 +1,7 @@
 'use client'; // Needs client-side cache for colors
 
-import React from 'react';
 import { Schedule, ScheduledEntry } from '@/types/scheduling';
-import { DAYS, getLessonColor, dayIndexToName } from './scheduleUtils'; // dayIndexToName eklendi
+import { DAYS, getLessonColor } from './scheduleUtils'; // dayIndexToName eklendi
 
 interface ScheduleGridDisplayProps {
     scheduleMap: Schedule | null;
@@ -28,8 +27,8 @@ export function ScheduleGridDisplay({
     let maxHourNumber = 0; // Derslerdeki en yüksek saat numarasını (1 tabanlı) bul
 
     for (const [key, entry] of scheduleMap.entries()) {
-        if (!entry || !entry.teacherId) continue;
-        allTeacherIds.add(entry.teacherId);
+        if (!entry || !entry.teacherIds || entry.teacherIds.length === 0) continue;
+        allTeacherIds.add(entry.teacherIds[0]); // Assuming we take the first teacherId if it's an array
 
         // Anahtardan saat numarasını çıkar ve maxHourNumber'ı güncelle
         const parts = key.split('-');
@@ -41,14 +40,14 @@ export function ScheduleGridDisplay({
             }
         }
 
-        if (!teacherSchedules.has(entry.teacherId)) {
-            teacherSchedules.set(entry.teacherId, {
-                teacherName: teacherMap?.get(entry.teacherId) || entry.teacherName || 'Bilinmeyen Öğretmen',
+        if (!teacherSchedules.has(entry.teacherIds[0])) {
+            teacherSchedules.set(entry.teacherIds[0], {
+                teacherName: teacherMap?.get(entry.teacherIds[0]) || (entry.teacherNames && entry.teacherNames.length > 0 ? entry.teacherNames[0] : undefined) || 'Bilinmeyen Öğretmen',
                 lessons: new Map<string, ScheduledEntry>()
             });
         }
-        const teacherData = teacherSchedules.get(entry.teacherId)!;
-        teacherData.teacherName = teacherMap?.get(entry.teacherId) || entry.teacherName || teacherData.teacherName;
+        const teacherData = teacherSchedules.get(entry.teacherIds[0])!;
+        teacherData.teacherName = teacherMap?.get(entry.teacherIds[0]) || (entry.teacherNames && entry.teacherNames.length > 0 ? entry.teacherNames[0] : undefined) || teacherData.teacherName;
         teacherData.lessons.set(key, entry); 
     }
 
@@ -124,7 +123,7 @@ export function ScheduleGridDisplay({
 
                                                 // Ders varsa, bilgileri göster
                                                 const lessonName = lessonMap?.get(entry.lessonId) || entry.lessonName || 'Bilinmeyen Ders';
-                                                const locationName = locationMap?.get(entry.locationId) || entry.locationName || 'Bilinmeyen Konum';
+                                                const locationName = locationMap?.get(entry.locationIds?.[0]) || (entry.locationNames && entry.locationNames.length > 0 ? entry.locationNames[0] : undefined) || 'Bilinmeyen Konum';
                                                 const sinifSeviyesi = entry.sinifSeviyesi;
                                                 const cellStyle = getLessonColor(entry.lessonId);
 

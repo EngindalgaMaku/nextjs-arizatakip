@@ -11,7 +11,8 @@ import {
   ArrowLeftOnRectangleIcon,
   BookOpenIcon,
   AcademicCapIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
 
 interface NavItemProps {
@@ -72,6 +73,13 @@ export default function Sidebar() {
           icon={<DocumentTextIcon />} 
           label="Raporlar"
           active={pathname.startsWith('/dashboard/reports')} 
+        />
+        
+        <NavItem 
+          href="/dashboard/business-receipts" 
+          icon={<ClipboardDocumentListIcon />} 
+          label="İşletme Dekontları"
+          active={pathname.startsWith('/dashboard/business-receipts')} 
         />
         
         <div className="pt-4 pb-2 px-3">

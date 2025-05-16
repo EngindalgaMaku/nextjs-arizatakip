@@ -12,6 +12,25 @@ export default function TestPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
   const test = useMemo(() => getTestBySlug(params.slug), [params.slug]);
   
+  // Soruları karıştırma fonksiyonu (Fisher-Yates shuffle)
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    if (!array) return [];
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+  };
+
+  // Test sorularını, randomizeQuestions true ise karıştır
+  const questionsToDisplay = useMemo(() => {
+    if (test && test.randomizeQuestions) {
+      return shuffleArray(test.questions);
+    }
+    return test ? test.questions : [];
+  }, [test]);
+
   const [testState, setTestState] = useState<TestUserState>({
     answers: {},
     startTime: new Date(),
@@ -39,7 +58,27 @@ export default function TestPage({ params }: { params: { slug: string } }) {
     );
   }
   
-  const currentQuestion = test.questions[currentQuestionIndex];
+  const currentQuestion = questionsToDisplay[currentQuestionIndex];
+  
+  // Eğer questionsToDisplay boşsa veya currentQuestion tanımsızsa (örneğin test yüklenemedi), bir yükleme veya hata durumu göster
+  if (!questionsToDisplay || questionsToDisplay.length === 0 || !currentQuestion) {
+    // Testin varlığını zaten yukarıda kontrol etmiştik, !test durumunda return ediyoruz.
+    // Bu nokta, test var ama questionsToDisplay bir şekilde boşsa diye ek bir güvenlik.
+    // Veya test yükleniyor durumu için bir spinner gösterilebilir.
+    // Şimdilik, test yoksa zaten return edildiği için bu durumu basitçe geçebiliriz
+    // ya da daha spesifik bir hata mesajı gösterebiliriz.
+    if (!test) { // Bu kontrol aslında yukarıdakiyle aynı, mantıksal olarak buraya düşmemeli
+      return (
+        <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
+          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Test Verisi Yüklenemedi</h2>
+          <p className="text-gray-600">Sorular yüklenirken bir sorun oluştu.</p>
+        </div>
+      );
+    }
+    // Eğer test var ama currentQuestion yoksa (index hatası vb.), bu da bir sorun.
+    // Bu genellikle currentQuestionIndex'in sınırları aşmasıyla olur.
+  }
   
   // Kullanıcının bir seçenek seçmesini işle
   const handleOptionSelect = (questionId: number, optionId: string) => {
@@ -54,7 +93,7 @@ export default function TestPage({ params }: { params: { slug: string } }) {
   
   // Bir sonraki soruya geç
   const goToNextQuestion = () => {
-    if (currentQuestionIndex < test.questions.length - 1) {
+    if (currentQuestionIndex < questionsToDisplay.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
@@ -68,7 +107,7 @@ export default function TestPage({ params }: { params: { slug: string } }) {
   
   // Belirli bir soruya git
   const goToQuestion = (index: number) => {
-    if (index >= 0 && index < test.questions.length) {
+    if (index >= 0 && index < questionsToDisplay.length) {
       setCurrentQuestionIndex(index);
     }
   };
@@ -106,9 +145,9 @@ export default function TestPage({ params }: { params: { slug: string } }) {
   
   // Test sonucu istatistiklerini hesapla
   const testResults = useMemo(() => {
-    const totalQuestions = test.questions.length;
+    const totalQuestions = questionsToDisplay.length;
     const answered = Object.keys(testState.answers).length;
-    const correct = test.questions.filter(
+    const correct = questionsToDisplay.filter(
       q => testState.answers[q.id] === q.correctOptionId
     ).length;
     const incorrect = answered - correct;
@@ -210,7 +249,7 @@ export default function TestPage({ params }: { params: { slug: string } }) {
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Soru Detayları</h3>
             <div className="space-y-6">
-              {test.questions.map((question, index) => {
+              {questionsToDisplay.map((question, index) => {
                 const status = getAnswerStatus(question);
                 const userAnswer = testState.answers[question.id];
                 
@@ -306,11 +345,11 @@ export default function TestPage({ params }: { params: { slug: string } }) {
       <div className="bg-white shadow-md rounded-lg p-6 mb-8">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <span className="text-xl font-semibold">Soru {currentQuestionIndex + 1}/{test.questions.length}</span>
+            <span className="text-xl font-semibold">Soru {currentQuestionIndex + 1}/{questionsToDisplay.length}</span>
           </div>
           <div>
             <span className="text-gray-500">
-              Cevaplanan: {Object.keys(testState.answers).length}/{test.questions.length}
+              Cevaplanan: {Object.keys(testState.answers).length}/{questionsToDisplay.length}
             </span>
           </div>
         </div>
@@ -357,7 +396,7 @@ export default function TestPage({ params }: { params: { slug: string } }) {
             Önceki Soru
           </button>
           
-          {currentQuestionIndex < test.questions.length - 1 ? (
+          {currentQuestionIndex < questionsToDisplay.length - 1 ? (
             <button
               onClick={goToNextQuestion}
               className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
@@ -379,8 +418,8 @@ export default function TestPage({ params }: { params: { slug: string } }) {
       
       <div className="bg-white shadow-md rounded-lg p-6">
         <h3 className="text-lg font-medium text-gray-800 mb-4">Sorular</h3>
-        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
-          {test.questions.map((question, index) => {
+        <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1">
+          {questionsToDisplay.map((question, index) => {
             const isAnswered = !!testState.answers[question.id];
             const isCurrentQuestion = index === currentQuestionIndex;
             
@@ -388,7 +427,7 @@ export default function TestPage({ params }: { params: { slug: string } }) {
               <button
                 key={question.id}
                 onClick={() => goToQuestion(index)}
-                className={`w-10 h-10 rounded-md flex items-center justify-center font-medium ${
+                className={`w-8 h-8 rounded-md flex items-center justify-center font-medium text-xs ${
                   isCurrentQuestion
                     ? 'bg-indigo-600 text-white'
                     : isAnswered

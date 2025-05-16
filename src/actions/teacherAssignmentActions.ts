@@ -8,7 +8,6 @@ import {
     TeacherCourseAssignmentFormSchema
 } from '@/types/teacherCourseAssignments'; // Assuming types are defined here
 import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
 
 /**
  * Fetch all course assignments for a specific teacher.
@@ -133,8 +132,6 @@ export async function createTeacherAssignment(teacherId: string, dalDersId: stri
             return { success: false, error: error?.message || 'Öğretmen ders ataması oluşturulamadı.' };
         }
 
-        revalidatePath(`/dashboard/area-teachers/${teacherId}/assignments`);
-        
         let finalTeacher = undefined;
         const teacherData = data.teachers;
         if (Array.isArray(teacherData) && teacherData.length > 0 && teacherData[0]) {
@@ -204,8 +201,6 @@ export async function updateTeacherAssignment(assignmentId: string, teacherId: s
             return { success: false, error: error?.message || 'Öğretmen ders ataması güncellenemedi.' };
         }
 
-        revalidatePath(`/dashboard/area-teachers/${teacherId}/assignments`);
-
         let finalTeacher = undefined;
         const teacherData = data.teachers;
         if (Array.isArray(teacherData) && teacherData.length > 0 && teacherData[0]) {
@@ -261,8 +256,6 @@ export async function deleteTeacherAssignment(assignmentId: string, teacherId: s
              // Handle potential foreign key issues if assignments are referenced elsewhere
             return { success: false, error: error.message };
         }
-
-        revalidatePath(`/dashboard/area-teachers/${teacherId}/assignments`);
 
         return { success: true };
     } catch (err) {

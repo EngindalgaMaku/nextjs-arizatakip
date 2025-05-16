@@ -559,29 +559,42 @@ export const TESTS: Test[] = [
       }
     ],
     timeLimit: 50,
-    randomizeQuestions: false,
+    randomizeQuestions: true,
     randomizeOptions: false,
-    passingScore: 70
+    passingScore: 70,
+    isPublished: true,
+    createdAt: new Date('2023-10-01T10:00:00Z'),
+    updatedAt: new Date('2023-10-15T14:30:00Z'),
+  },
+  {
+    id: '2',
+    title: 'Bölüm 8: Nmap Port Tarama Teknikleri Testi',
+    slug: 'nmap-port-scanning-techniques',
+    description: 'Nmap kullanarak çeşitli port tarama teknikleri hakkında 50 soruluk çoktan seçmeli test.',
+    questions: [
+      // Nmap ve port tarama teknikleri ile ilgili sorular eklenecek
+    ],
+    timeLimit: 50,
+    randomizeQuestions: true,
+    randomizeOptions: false,
+    passingScore: 70,
+    isPublished: true,
+    createdAt: new Date('2023-10-02T10:00:00Z'),
+    updatedAt: new Date('2023-10-16T14:30:00Z'),
   }
 ];
 
-/**
- * Get all available tests
- */
-export function getTests(): Test[] {
-  return TESTS;
-}
-
-/**
- * Get a test by slug
- */
 export function getTestBySlug(slug: string): Test | undefined {
   return TESTS.find(test => test.slug === slug);
 }
 
-/**
- * Get a test by ID
- */
+// The following functions will be removed as they are now handled by testActions.ts with Supabase integration.
+/*
+export function getTests(): Test[] {
+  return TESTS;
+}
+
 export function getTestById(id: string): Test | undefined {
   return TESTS.find(test => test.id === id);
-} 
+}
+*/ 

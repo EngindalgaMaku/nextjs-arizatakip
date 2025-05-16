@@ -76,7 +76,7 @@ export default function SavedScheduleDetailPage() {
                 let dayIndex: number | undefined;
                 let periodIndex: number | undefined;
                 let finalKey: string | undefined;
-                let teacherId: string | undefined = (value as ScheduledEntry)?.teacherId; // Get teacherId from value first
+                let teacherId: string | undefined = (value as ScheduledEntry)?.teacherIds?.[0]; // Get first teacherId from array
 
                 // --- Try parsing as Optimized Format (teacherId-dayIndex-periodIndex) ---
                 if (parts.length >= 3) {

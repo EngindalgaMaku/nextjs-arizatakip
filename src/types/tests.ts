@@ -20,6 +20,9 @@ export interface Test {
   questions: TestQuestion[];
   passingScore?: number;
   timeLimit?: number; // in minutes
+  randomizeQuestions?: boolean;
+  randomizeOptions?: boolean;
+  isPublished?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -1,16 +1,16 @@
 'use server';
 
 import {
-    SchedulerInput,
-    SchedulerResult,
+    DayOfWeek,
+    HourOfDay,
+    LessonScheduleData,
+    LocationScheduleData,
     Schedule,
     ScheduledEntry,
-    TimeSlot,
-    LessonScheduleData,
+    SchedulerInput,
+    SchedulerResult,
     TeacherScheduleData,
-    LocationScheduleData,
-    DayOfWeek,
-    HourOfDay
+    TimeSlot
 } from '@/types/scheduling';
 
 // --- Constants ---
@@ -477,7 +477,10 @@ function solveRecursive(lessonIndex: number, input: SchedulerInput): boolean {
                         let existingTeacherId: string | null = null;
                         for(const entry of currentSchedule.values()) {
                             if (entry.lessonId === currentLesson.id) {
-                                existingTeacherId = entry.teacherId;
+                                // Corrected: Use teacherIds array
+                                if (entry.teacherIds && entry.teacherIds.length > 0) {
+                                    existingTeacherId = entry.teacherIds[0]; // Assuming the first teacher if multiple
+                                }
                                 break;
                             }
                         }
@@ -721,14 +724,17 @@ function calculateShortDayPenalty(
     const teacherDailyLessons = new Map<string, Map<DayOfWeek, number>>();
 
     schedule.forEach((entry) => {
-        const teacherId = entry.teacherId;
-        const day = entry.timeSlot.day;
-        
-        if (!teacherDailyLessons.has(teacherId)) {
-            teacherDailyLessons.set(teacherId, new Map<DayOfWeek, number>());
+        // Corrected: Iterate over teacherIds if present
+        if (entry.teacherIds && entry.teacherIds.length > 0) {
+            entry.teacherIds.forEach(teacherId => {
+                const day = entry.timeSlot.day;
+                if (!teacherDailyLessons.has(teacherId)) {
+                    teacherDailyLessons.set(teacherId, new Map<DayOfWeek, number>());
+                }
+                const dailyMap = teacherDailyLessons.get(teacherId)!;
+                dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
+            });
         }
-        const dailyMap = teacherDailyLessons.get(teacherId)!;
-        dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
     });
 
     // Calculate penalty
@@ -827,7 +833,7 @@ async function runSingleScheduleAttempt(input: SchedulerInput): Promise<Schedule
     const finalSchedule = success ? currentSchedule : new Map();
 
     let allHoursAssigned = true;
-    let unassignedLessonNames: string[] = [];
+    const unassignedLessonNames: string[] = [];
     remainingHours.forEach((hoursLeft, lessonId) => {
         const lesson = lessonsDataMap.get(lessonId);
         if (lesson?.needsScheduling && hoursLeft > 0) {
@@ -836,7 +842,7 @@ async function runSingleScheduleAttempt(input: SchedulerInput): Promise<Schedule
         }
     });
 
-    let finalUnassignedLessons: LessonScheduleData[] = [];
+    const finalUnassignedLessons: LessonScheduleData[] = [];
     if (!success || !allHoursAssigned) {
         remainingHours.forEach((hoursLeft, lessonId) => {
             const lesson = lessonsDataMap.get(lessonId);
@@ -971,30 +977,26 @@ function calculateTeacherWorkloadVariance(
 
   const teacherHours = new Map<string, number>();
   teachers.forEach(t => teacherHours.set(t.id, 0)); // Başlangıçta tüm öğretmenlerin saati 0
-
-  // Programdaki her bir ders saatini ilgili öğretmene ekle
-  // Dikkat: schedule Map'inin key'i zaman + LOKASYON içeriyor.
-  // Bu nedenle aynı saatte, aynı ders için birden fazla entry olabilir (multi-resource).
-  // Öğretmene saat eklerken bunu dikkate almalıyız.
   const processedEntries = new Set<string>(); // İşlenen ders-saat kombinasyonlarını takip et
 
   for (const entry of schedule.values()) {
       const entryKey = `${entry.lessonId}-${entry.timeSlot.day}-${entry.timeSlot.hour}`;
-      // Eğer bu ders-saat kombinasyonu daha önce işlenmediyse, ilgili öğretmenin saatini artır
       if (!processedEntries.has(entryKey)) {
-          const currentHours = teacherHours.get(entry.teacherId) ?? 0;
-          teacherHours.set(entry.teacherId, currentHours + 1);
+          if (entry.teacherIds && entry.teacherIds.length > 0) {
+              entry.teacherIds.forEach(teacherId => {
+                  const currentHours = teacherHours.get(teacherId) ?? 0;
+                  teacherHours.set(teacherId, currentHours + 1);
+              });
+          }
           processedEntries.add(entryKey); // Bu kombinasyonu işlendi olarak işaretle
       }
   }
 
   const hoursArray = Array.from(teacherHours.values());
 
-  // Ortalama ders saatini hesapla
   const totalHours = hoursArray.reduce((sum, hours) => sum + hours, 0);
   const meanHours = teachers.length > 0 ? totalHours / teachers.length : 0;
 
-  // Varyansı hesapla: (saat - ortalama)^2 toplamı / öğretmen sayısı
   const variance = teachers.length > 0
     ? hoursArray.reduce((sum, hours) => sum + Math.pow(hours - meanHours, 2), 0) / teachers.length
     : 0;
@@ -1012,7 +1014,7 @@ function calculateTotalGaps(schedule: Schedule, teachers: TeacherScheduleData[])
     
     // Schedule Map'ini kullanarak öğretmenin derslerini günlere ayır
     for (const entry of schedule.values()) {
-        if (entry.teacherId === teacher.id) {
+        if (entry.teacherIds && entry.teacherIds.includes(teacher.id)) {
             const day = entry.timeSlot.day;
             const hour = entry.timeSlot.hour;
             if (!dailySchedules[day]) {
@@ -1060,18 +1062,17 @@ function hasAllTeachersWithFreeDay(
 
     // Find all days the teacher has at least one lesson scheduled
     for (const entry of schedule.values()) {
-      if (entry.teacherId === teacher.id) {
+      if (entry.teacherIds && entry.teacherIds.includes(teacher.id)) {
         workingDays.add(entry.timeSlot.day);
         // If teacher works on all possible days, no need to check further for this teacher
         if (workingDays.size === daysOfWeekCount) {
           // This teacher has no free day, so the schedule is invalid according to the rule.
-          // console.log(`[Scheduler Constraint Check] Teacher ${teacher.name} (${teacher.id}) has no free day. Discarding schedule.`);
           return false; 
         }
       }
     }
-    // After checking all schedule entries, if the teacher doesn't work on all days, 
-    // they have at least one free day. Continue to the next teacher.
+    // After checking all schedule entries for a given teacher, if workingDays.size < daysOfWeekCount,
+    // it means this teacher has at least one free day. Loop continues to check next teacher.
   }
 
   // If the loop completes without returning false, it means all teachers have at least one free day.

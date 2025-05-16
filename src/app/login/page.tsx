@@ -134,7 +134,7 @@ export default function LoginPage() {
               // Service Worker kaydını sil
               if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
-                for(let registration of registrations) {
+                for(const registration of registrations) {
                   await registration.unregister();
                   console.log('Service Worker kaydı silindi');
                 }

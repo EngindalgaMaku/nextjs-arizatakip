@@ -194,8 +194,6 @@ export async function createTeacherScheduleEntry(
       updatedAt: data.updated_at,
     };
 
-    revalidatePath(`/dashboard/teachers/${teacherId}/schedule`);
-
   } catch (err) {
     console.error('createTeacherScheduleEntry error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -268,7 +266,6 @@ export async function createTeacherScheduleEntry(
         // If sync didn't fail, revalidate location path
         if (!syncError) {
              console.log(`Sync Success: Revalidating location path /dashboard/locations/${labId}/schedule`);
-             revalidatePath(`/dashboard/locations/${labId}/schedule`);
         }
 
     } else {
@@ -303,7 +300,7 @@ export async function updateTeacherScheduleEntry(
   let syncError: string | undefined = undefined;
   let oldLabIdToRevalidate: string | null = null;
   let newLabIdToRevalidate: string | null = null;
-  let insertSyncSuccessful = false; // Initialize flag here
+  const insertSyncSuccessful = false; // Initialize flag here
 
   // 1. Fetch original entry details BEFORE updating
   // Need more fields for sync: teacher_id, day_of_week, time_slot, location_name, class_name (for old lesson_id), class_id

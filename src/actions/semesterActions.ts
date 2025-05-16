@@ -2,7 +2,6 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Semester, SemesterSchema, SemesterFormValues, SemesterFormSchema } from '@/types/semesters';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 const SEMESTERS_TABLE = 'semesters';
@@ -64,7 +63,6 @@ export async function createSemester(formData: SemesterFormValues): Promise<{ su
         return { success: false, error: 'Sömestr oluşturuldu ancak dönen veri doğrulanamadı.' };
     }
 
-    revalidatePath(SEMESTERS_PATH);
     return { success: true, semester: finalParse.data };
 
   } catch (err) {
@@ -106,7 +104,6 @@ export async function updateSemester(id: string, formData: SemesterFormValues): 
         return { success: false, error: 'Sömestr güncellendi ancak dönen veri doğrulanamadı.' };
     }
 
-    revalidatePath(SEMESTERS_PATH);
     return { success: true, semester: finalParse.data };
 
   } catch (err) {
@@ -133,7 +130,6 @@ export async function deleteSemester(id: string): Promise<{ success: boolean; er
       return { success: false, error: error.message };
     }
 
-    revalidatePath(SEMESTERS_PATH);
     return { success: true };
   } catch (err) {
     console.error(`Unexpected error deleting semester ${id}:`, err);
@@ -173,9 +169,6 @@ export async function setActiveSemester(id: string): Promise<{ success: boolean;
       return { success: false, error: 'Seçilen sömestr aktif hale getirilemedi.' };
     }
 
-    revalidatePath(SEMESTERS_PATH);
-    // Potentially revalidate other paths that depend on the active semester
-    // revalidatePath('/dashboard/...');
     return { success: true };
 
   } catch (err) {

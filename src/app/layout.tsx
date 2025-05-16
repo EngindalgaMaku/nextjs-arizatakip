@@ -1,11 +1,13 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { Metadata } from 'next';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata = {
-  title: 'Test Platformu',
-  description: 'Bilgi seviyenizi ölçmek için online test platformu',
+export const metadata: Metadata = {
+  title: 'Hüsniye Özdilek ATSİS',
+  description: 'Hüsniye Özdilek Ticaret Meslek Lisesi Staj Takip ve İzleme Sistemi',
 };
 
 export default function RootLayout({
@@ -16,7 +18,9 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className={`${inter.className} bg-gray-50 min-h-screen`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

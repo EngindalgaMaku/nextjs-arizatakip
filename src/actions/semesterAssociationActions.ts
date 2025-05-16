@@ -1,15 +1,14 @@
 'use server';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
 
 // Common paths to revalidate
-const PATHS_TO_REVALIDATE = [
-  '/dashboard/semesters',
-  '/dashboard/area-teachers',
-  '/dashboard/classes',
-  '/dashboard/locations'
-];
+// const PATHS_TO_REVALIDATE = [
+//   '/dashboard/semesters',
+//   '/dashboard/area-teachers',
+//   '/dashboard/classes',
+//   '/dashboard/locations'
+// ];
 
 /**
  * Associates teachers with a semester
@@ -30,7 +29,7 @@ export async function associateTeachersWithSemester(semesterId: string, teacherI
     }
 
     // Revalidate relevant paths
-    PATHS_TO_REVALIDATE.forEach(path => revalidatePath(path));
+    // PATHS_TO_REVALIDATE.forEach(path => revalidatePath(path));
     
     return { 
       success: true, 
@@ -64,7 +63,7 @@ export async function associateClassesWithSemester(semesterId: string, classIds:
     }
 
     // Revalidate relevant paths
-    PATHS_TO_REVALIDATE.forEach(path => revalidatePath(path));
+    // PATHS_TO_REVALIDATE.forEach(path => revalidatePath(path));
     
     return { 
       success: true, 
@@ -98,7 +97,7 @@ export async function associateLocationsWithSemester(semesterId: string, locatio
     }
 
     // Revalidate relevant paths
-    PATHS_TO_REVALIDATE.forEach(path => revalidatePath(path));
+    // PATHS_TO_REVALIDATE.forEach(path => revalidatePath(path));
     
     return { 
       success: true, 

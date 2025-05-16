@@ -15,7 +15,6 @@ import { fetchAllDersOptions } from './dalDersActions';
 import { fetchClasses } from './classActions';
 import { fetchTeachers } from './teacherActions';
 import { fetchLocationById } from './locationActions';
-import { revalidatePath } from 'next/cache';
 
 /**
  * Fetch all schedule entries for a given lab, joining related names.
@@ -210,8 +209,6 @@ export async function saveScheduleEntries(entries: ScheduleUpsertEntry[]): Promi
           }
 
           console.log(`Revalidating path for teacher: /dashboard/teachers/${teacherId}/schedule`);
-          revalidatePath(`/dashboard/teachers/${teacherId}/schedule`);
-
       } catch (syncError) {
           console.error(`Error synchronizing schedule for teacher ${teacherId}:`, syncError);
           syncErrors[teacherId] = syncError instanceof Error ? syncError.message : 'Bilinmeyen senkronizasyon hatası.';
@@ -219,7 +216,6 @@ export async function saveScheduleEntries(entries: ScheduleUpsertEntry[]): Promi
   }
 
   console.log(`Revalidating path for location: /dashboard/locations/${effectiveLabId}/schedule`);
-  revalidatePath(`/dashboard/locations/${effectiveLabId}/schedule`);
 
   if (Object.keys(syncErrors).length > 0) {
     return { success: false, error: 'Konum programı kaydedildi ancak bazı öğretmen programları güncellenirken hatalar oluştu.', syncErrors };
@@ -354,25 +350,6 @@ export async function createLocationScheduleEntry(
         // Proceed even if mapping fails, but log it.
     }
 
-    // Perform cache revalidation for the specific location path
-    try {
-        // Ensure the path format is correct for revalidation
-        const pathToRevalidate = `/dashboard/locations/${labId}/schedule`;
-        console.log(`[Action Create] Revalidating path: ${pathToRevalidate}`);
-        revalidatePath(pathToRevalidate);
-        
-        // Also revalidate the locations index page to update any counts/listings
-        revalidatePath('/dashboard/locations');
-        console.log(`[Action Create] Paths revalidated successfully`);
-    } catch (revalError) {
-        console.error("[Action Create] Error during revalidatePath:", revalError);
-        // Continue with operation despite revalidation errors
-    }
-
-    // Teacher schedule sync would go here
-    // ...
-
-    console.log("[Action Create] Returning success with mapped entry.");
     return { success: true, entry: mappedEntry ?? undefined };
 
   } catch (err) {
@@ -433,41 +410,7 @@ export async function updateLocationScheduleEntry(
           return { success: false, error: updateError?.message || 'Konum programı kaydı güncellenemedi.' };
       }
 
-      // Perform cache revalidation for the specific location path
-      try {
-          // Ensure the path format is correct for revalidation
-          const pathToRevalidate = `/dashboard/locations/${labId}/schedule`;
-          console.log(`[updateLocationScheduleEntry] Revalidating path: ${pathToRevalidate}`);
-          revalidatePath(pathToRevalidate);
-          
-          // Also revalidate the locations index page
-          revalidatePath('/dashboard/locations');
-          console.log(`[updateLocationScheduleEntry] Paths revalidated successfully`);
-      } catch (revalError) {
-          console.error("[updateLocationScheduleEntry] Error during revalidatePath:", revalError);
-          // Continue with operation despite revalidation errors
-      }
-
-      // Teacher schedule sync would go here
-      // ...
-
-      // Map to ScheduleEntry type
-       const mappedEntry: ScheduleEntry = {
-          id: updatedEntry.id,
-          lab_id: updatedEntry.lab_id,
-          day: updatedEntry.day,
-          period: updatedEntry.period,
-          lesson_id: updatedEntry.lesson_id,
-          class_id: updatedEntry.class_id,
-          teacher_id: updatedEntry.teacher_id,
-          created_at: updatedEntry.created_at,
-          updated_at: updatedEntry.updated_at,
-          lesson_name: updatedEntry.lesson?.ders_adi || undefined,
-          class_name: updatedEntry.class?.name || undefined,
-          teacher_name: updatedEntry.teacher?.name || undefined,
-      };
-
-      return { success: true, entry: mappedEntry };
+      return { success: true, entry: updatedEntry };
 
   } catch (err) {
     console.error('updateLocationScheduleEntry error:', err);
@@ -508,24 +451,6 @@ export async function deleteLocationScheduleEntry(entryId: string): Promise<{ su
            console.error('Error deleting location schedule entry:', deleteError);
            return { success: false, error: deleteError.message };
        }
-
-       // Perform cache revalidation for the specific location path
-       try {
-           // Ensure the path format is correct for revalidation
-           const pathToRevalidate = `/dashboard/locations/${labId}/schedule`;
-           console.log(`[deleteLocationScheduleEntry] Revalidating path: ${pathToRevalidate}`);
-           revalidatePath(pathToRevalidate);
-           
-           // Also revalidate the locations index page
-           revalidatePath('/dashboard/locations');
-           console.log(`[deleteLocationScheduleEntry] Paths revalidated successfully`);
-       } catch (revalError) {
-           console.error("[deleteLocationScheduleEntry] Error during revalidatePath:", revalError);
-           // Continue with operation despite revalidation errors
-       }
-
-       // Teacher schedule sync would go here
-       // ...
 
        return { success: true };
 
@@ -622,8 +547,6 @@ export async function resetLocationSchedule(labId: string): Promise<{ success: b
              }
 
              console.log(`[Action resetLocationSchedule] Revalidating teacher schedule path: /dashboard/teachers/${teacherId}/schedule`);
-             revalidatePath(`/dashboard/teachers/${teacherId}/schedule`);
-
          } catch (syncError) {
              console.error(`[Action resetLocationSchedule] Error syncing teacher ${teacherId} after reset:`, syncError);
              syncErrors[teacherId] = syncError instanceof Error ? syncError.message : 'Bilinmeyen senkronizasyon hatası.';
@@ -631,7 +554,7 @@ export async function resetLocationSchedule(labId: string): Promise<{ success: b
      }
 
     // Revalidate the location schedule path
-    revalidatePath(`/dashboard/locations/${labId}/schedule`);
+    console.log(`[Action resetLocationSchedule] Revalidating location schedule path: /dashboard/locations/${labId}/schedule`);
 
      if (Object.keys(syncErrors).length > 0) {
         return { success: true, error: 'Konum programı sıfırlandı ancak bazı öğretmen programları güncellenirken hatalar oluştu.' }; // Still success=true for reset itself

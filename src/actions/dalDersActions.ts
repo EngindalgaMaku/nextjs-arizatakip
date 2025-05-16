@@ -2,7 +2,6 @@
 
 import { supabase } from '@/lib/supabase';
 import { DalDers, DalDersFormSchema, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod'; // Assuming zod might be needed or remove if not
 import { setDalDersLocationTypes } from '@/actions/locationTypeActions';
 /**
@@ -94,8 +93,6 @@ export async function createDalDers(
         partialError = `Ders oluşturuldu ancak konum tipleri ayarlanamadı: ${setTypesError}`; 
     }
 
-    revalidatePath(`/dashboard/dallar/${dalId}/dersler`);
-
     const createdDers: DalDers = { 
         id: createdDersRecord.id,
         dalId: createdDersRecord.dal_id,
@@ -179,10 +176,6 @@ export async function updateDalDers(
         partialError = `Ders güncellendi ancak konum tipleri ayarlanamadı: ${setTypesError}`; 
     }
 
-    if (existingData?.dal_id) {
-        revalidatePath(`/dashboard/dallar/${existingData.dal_id}/dersler`);
-    }
-
     const updatedDers: DalDers = { 
         id: updatedDersRecord.id,
         dalId: updatedDersRecord.dal_id,
@@ -226,10 +219,6 @@ export async function deleteDalDers(dersId: string): Promise<{ success: boolean;
     if (error) {
       console.error('Error deleting dal dersi:', error);
       return { success: false, error: error.message };
-    }
-    
-    if (existingData?.dal_id) {
-        revalidatePath(`/dashboard/dallar/${existingData.dal_id}/dersler`);
     }
     
     return { success: true };

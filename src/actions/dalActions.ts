@@ -2,7 +2,6 @@
 
 import { supabase } from '@/lib/supabase';
 import { Dal, DalFormSchema, DalFormValues } from '@/types/dallar';
-import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
@@ -66,7 +65,6 @@ export async function createDal(payload: DalFormValues): Promise<{ success: bool
       return { success: false, error: error?.message || 'Dal oluşturulamadı.' };
     }
     console.log('[createDal] Dal created successfully:', data.id); // Log success
-    revalidatePath(DALLAR_PATH);
     return { success: true, dal: data as Dal };
   } catch (err: any) { // Catch any error
     console.error('[createDal] Uncaught error:', err); // Log uncaught errors
@@ -103,7 +101,6 @@ export async function updateDal(id: string, payload: DalFormValues): Promise<{ s
       }
       return { success: false, error: error?.message || 'Dal güncellenemedi.' };
     }
-    revalidatePath(DALLAR_PATH);
     return { success: true, dal: data as Dal };
   } catch (err) {
     console.error('updateDal error:', err);
@@ -126,7 +123,6 @@ export async function deleteDal(id: string): Promise<{ success: boolean; error?:
       // TODO: Check for foreign key constraint violation if dal is linked elsewhere
       return { success: false, error: error.message };
     }
-    revalidatePath(DALLAR_PATH);
     return { success: true };
   } catch (err) {
     console.error('deleteDal error:', err);

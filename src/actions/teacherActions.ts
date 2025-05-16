@@ -297,7 +297,7 @@ export async function fetchBranches(): Promise<Branch[]> {
         throw error; 
     }
 
-    let branchesData = (data || []).filter(b => b.id && b.name) as Branch[];
+    const branchesData = (data || []).filter(b => b.id && b.name) as Branch[];
 
     // Client-side sorting to ensure 'Bilişim Teknolojileri' is first
     branchesData.sort((a, b) => {

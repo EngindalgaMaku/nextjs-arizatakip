@@ -66,7 +66,7 @@ export async function optimizeScheduleAction(scheduleId: string): Promise<Optimi
                  const transformedData = rawData.map(([key, value]) => {
                      const parts = key.split('-'); // Original key might be DayName-Hour-LocationId etc.
                      // <<< GÜNCELLEME: Değeri (value) kullanarak öğretmen, gün ve saat bilgisini al >>>
-                     const teacherId = (value as ScheduledEntry)?.teacherId;
+                     const teacherId = (value as ScheduledEntry)?.teacherIds?.[0];
                      const timeSlotDayName = (value as ScheduledEntry)?.timeSlot?.day;
                      const timeSlotHour = (value as ScheduledEntry)?.timeSlot?.hour;
 
@@ -118,12 +118,12 @@ export async function optimizeScheduleAction(scheduleId: string): Promise<Optimi
 
         // Step A: Shift days upwards to start earlier (NEW STEP)
         console.log(`[Optimize Action ${scheduleId}]: Shifting teacher days upwards...`);
-        let { updatedScheduleMap: mapAfterUpwardShift, changes: changesAfterUpwardShift } = shiftTeacherDaysUp(currentScheduleMap, []); // Start with empty changes
+        const { updatedScheduleMap: mapAfterUpwardShift, changes: changesAfterUpwardShift } = shiftTeacherDaysUp(currentScheduleMap, []); // Start with empty changes
         console.log(`[Optimize Action ${scheduleId}]: Upward shift finished. Moves: ${changesAfterUpwardShift.length}`);
 
         // Step B: Reduce intra-day gaps
         // Pass the result of the upward shift to the gap reduction step
-        let { updatedScheduleMap: mapAfterGapReduction, calculatedGaps: gapsAfterReduction, changes: changesAfterGapReduction } = reduceTeacherGaps(mapAfterUpwardShift, changesAfterUpwardShift); 
+        const { updatedScheduleMap: mapAfterGapReduction, calculatedGaps: gapsAfterReduction, changes: changesAfterGapReduction } = reduceTeacherGaps(mapAfterUpwardShift, changesAfterUpwardShift); 
         console.log(`[Optimize Action ${scheduleId}]: Intra-day gap reduction finished. Total Changes accumulated: ${changesAfterGapReduction.length}, Gaps (intermediate): ${gapsAfterReduction}`); 
 
         // Step C: Consolidate days with few lessons
@@ -217,7 +217,7 @@ function reduceTeacherGaps(
              console.warn(`[reduceTeacherGaps]: Skipping invalid key format (less than 3 parts): ${key}`);
              continue;
         }
-        const teacherId = entry.teacherId;
+        const teacherId = entry.teacherIds?.[0];
         const dayIndexStr = parts[parts.length - 2]; 
         const periodIndexStr = parts[parts.length - 1];
         const dayIndex = parseInt(dayIndexStr, 10);
@@ -343,7 +343,7 @@ function calculateTotalGaps(schedule: Schedule): number {
              console.warn(`[calculateTotalGaps]: Skipping invalid key format (less than 3 parts) during grouping: Key=${key}`);
              continue;
         }
-        const teacherId = entry.teacherId; // Use teacherId from entry
+        const teacherId = entry.teacherIds?.[0]; // Use teacherId from entry
         const dayIndexStr = parts[parts.length - 2]; // Day is second to last
         const periodIndexStr = parts[parts.length - 1]; // Period is last
         const dayIndex = parseInt(dayIndexStr, 10);
@@ -447,7 +447,7 @@ function consolidateTeacherDays(
              console.warn(`[consolidateTeacherDays]: Skipping invalid key format (less than 3 parts): ${key}`);
              continue;
         }
-        const teacherId = entry.teacherId;
+        const teacherId = entry.teacherIds?.[0];
         const dayIndexStr = parts[parts.length - 2]; 
         const periodIndexStr = parts[parts.length - 1];
         const dayIndex = parseInt(dayIndexStr, 10);
@@ -503,7 +503,7 @@ function consolidateTeacherDays(
                     continue; // Skip this period
                 }
 
-                let moved = false;
+                const moved = false;
                 // Try to find an empty slot in one of the target days
                 for (const targetDayIndex of targetDays) {
                      // Try finding *any* empty slot on the target day
@@ -599,7 +599,7 @@ function shiftTeacherDaysUp(
     for (const [key, entry] of updatedScheduleMap.entries()) {
         const parts = key.split('-');
         if (parts.length < 3) continue; // Skip invalid keys
-        const teacherId = entry.teacherId;
+        const teacherId = entry.teacherIds?.[0];
         const dayIndexStr = parts[parts.length - 2];
         const periodIndexStr = parts[parts.length - 1];
         const dayIndex = parseInt(dayIndexStr, 10);

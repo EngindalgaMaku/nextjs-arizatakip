@@ -90,6 +90,7 @@ export default function DashboardLayout({
     if (pathname.includes("/teachers")) return "Öğretmenler";
     if (pathname.includes("/reports")) return "Raporlar";
     if (pathname.includes("/settings")) return "Ayarlar";
+    if (pathname.startsWith("/dashboard/tests")) return "Testler";
     return "Dashboard";
   };
 
@@ -242,6 +243,34 @@ export default function DashboardLayout({
               >
                 <ClipboardDocumentListIcon className="mr-3 h-5 w-5" />
                 Arızalar
+              </Link>
+
+              <div className="pt-4 pb-2 px-3">
+                <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Modüller</h4>
+              </div>
+
+              <Link
+                href="/dashboard/business-receipts"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.startsWith("/dashboard/business-receipts")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <ClipboardDocumentListIcon className="mr-3 h-5 w-5" />
+                İşletme Dekontları
+              </Link>
+
+              <Link
+                href="/dashboard/tests"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.startsWith("/dashboard/tests")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <BeakerIcon className="mr-3 h-5 w-5" />
+                Testler
               </Link>
 
               <div className="pt-4 pb-2 px-3">

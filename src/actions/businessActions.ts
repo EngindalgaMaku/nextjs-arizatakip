@@ -8,7 +8,6 @@ import {
   BusinessFormValues, 
   BusinessFormSchema 
 } from '@/types/businesses';
-import { revalidatePath } from 'next/cache';
 
 /**
  * Fetch all businesses, optionally filtered by semester.
@@ -163,7 +162,6 @@ export async function createBusiness(
       return { success: false, error: 'İşletme oluşturuldu ancak veri doğrulanamadı.' };
     }
 
-    revalidatePath('/dashboard/businesses');
     return { success: true, business: finalParse.data };
 
   } catch (err) {
@@ -240,8 +238,6 @@ export async function updateBusiness(
       return { success: false, error: 'İşletme güncellendi ancak veri doğrulanamadı.' };
     }
     
-    revalidatePath('/dashboard/businesses');
-    revalidatePath(`/dashboard/businesses/${id}/edit`); // Also revalidate the edit page
     return { success: true, business: finalParse.data };
 
   } catch (err) {
@@ -286,8 +282,6 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; er
     }
     
     console.log(`[deleteBusiness] Successfully deleted business with ID: ${id} from Supabase (or it didn't exist).`);
-    revalidatePath('/dashboard/businesses');
-    console.log('[deleteBusiness] Path revalidated. Returning success.');
     return { success: true };
 
   } catch (err: any) {

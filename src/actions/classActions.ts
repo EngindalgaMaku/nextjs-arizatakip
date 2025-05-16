@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+// import { revalidatePath } from 'next/cache';
 import { Class, ClassSchema, ClassFormSchema, ClassFormValues } from '@/types/classes';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { z } from 'zod';
@@ -159,8 +159,8 @@ export async function createClass(
             return { success: true, class: formattedClass as unknown as Class };
         }
 
-        revalidatePath(CLASSES_PATH);
-        revalidatePath('/dashboard'); // Also revalidate dashboard if it shows class counts etc.
+        // revalidatePath(CLASSES_PATH);
+        // revalidatePath('/dashboard'); // Also revalidate dashboard if it shows class counts etc.
         return { success: true, class: finalParse.data };
 
     } catch (err) {
@@ -234,8 +234,8 @@ export async function updateClass(
             return { success: true, class: formattedClass as unknown as Class };
         }
 
-        revalidatePath(CLASSES_PATH);
-        revalidatePath(`/dashboard/classes/${id}`); // Revalidate specific class page if exists
+        // revalidatePath(CLASSES_PATH);
+        // revalidatePath(`/dashboard/classes/${id}`); // Revalidate specific class page if exists
         return { success: true, class: finalParse.data };
 
     } catch (err) {
@@ -267,8 +267,8 @@ export async function deleteClass(id: string): Promise<{ success: boolean; error
             return { success: false, error: 'Sınıf silinirken bir veritabanı hatası oluştu.' };
         }
 
-        revalidatePath(CLASSES_PATH);
-        revalidatePath('/dashboard');
+        // revalidatePath(CLASSES_PATH);
+        // revalidatePath('/dashboard');
         return { success: true };
     } catch (err) {
         console.error(`Unexpected error deleting class ${id}:`, err);
@@ -385,7 +385,7 @@ export async function moveClassUp(classId: string): Promise<{ success: boolean; 
        return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 2), geri alma denendi.' };
     }
 
-    revalidatePath('/dashboard/classes');
+    // revalidatePath('/dashboard/classes');
     return { success: true };
 
   } catch (err) {
@@ -452,7 +452,7 @@ export async function moveClassDown(classId: string): Promise<{ success: boolean
        return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 2), geri alma denendi.' };
     }
 
-    revalidatePath('/dashboard/classes');
+    // revalidatePath('/dashboard/classes');
     return { success: true };
 
   } catch (err) {

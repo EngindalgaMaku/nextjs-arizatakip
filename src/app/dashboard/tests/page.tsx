@@ -1,56 +1,162 @@
 'use client';
 
-import React from 'react';
+import { deleteTest, getTests } from '@/actions/testActions';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Test } from '@/types/tests';
 import Link from 'next/link';
-import { getTests } from '@/data/tests';
-import { ClockIcon, AcademicCapIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useTransition } from 'react';
+import { toast } from 'react-hot-toast';
 
-export default function TestsPage() {
-  const tests = getTests();
-  
+interface TestsPageProps {
+  // Eğer Server Component olsaydı:
+  // tests: Test[]; // Bu prop olarak gelecekti
+}
+
+export default function TestsPage({}: TestsPageProps) {
+  const [tests, setTests] = useState<Test[]>([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(true);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [testToDelete, setTestToDelete] = useState<Test | null>(null);
+  const [isDeleting, startTransition] = useTransition();
+  const router = useRouter();
+
+  // Verileri client tarafında çekmek için
+  // Bu kısım Next.js App Router'da Server Component kullanılıyorsa gereksizdir.
+  // Ama 'use client' tepede olduğu için bu şekilde devam ediyoruz.
+  useEffect(() => {
+    async function fetchTests() {
+      setIsLoadingTests(true);
+      try {
+        const fetchedTests = await getTests(); // action'dan çağır
+        setTests(fetchedTests);
+      } catch (error) {
+        console.error("Failed to fetch tests:", error);
+        toast.error('Testler yüklenirken bir hata oluştu.');
+        setTests([]); // Hata durumunda boş dizi
+      } finally {
+        setIsLoadingTests(false);
+      }
+    }
+    fetchTests();
+  }, []); // Dependency array düzeltildi
+
+  const handleDeleteClick = (test: Test) => {
+    setTestToDelete(test);
+    setShowConfirmModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!testToDelete) return;
+
+    startTransition(async () => {
+      const result = await deleteTest(testToDelete.id);
+      if (result.success) {
+        toast.success(`Test "${testToDelete.title}" başarıyla silindi.`);
+        // Test listesini yeniden yükle
+        // Sayfayı yenilemek yerine state'i güncellemek daha iyi olur
+        setTests(prevTests => prevTests.filter(t => t.id !== testToDelete.id));
+        router.refresh(); // Server component'leri ve datayı yeniden doğrulamak için
+      } else {
+        toast.error(result.error || 'Test silinirken bir hata oluştu.');
+      }
+      setShowConfirmModal(false);
+      setTestToDelete(null);
+    });
+  };
+
+  if (isLoadingTests) {
+    return <div className="p-4">Testler yükleniyor...</div>;
+  }
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">Testler</h1>
-          <p className="text-gray-600">Bilgilerinizi test edin ve seviyenizi ölçün.</p>
-        </div>
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Test Yönetimi</h1>
+        <Button asChild>
+          <Link href="/dashboard/tests/new">Yeni Test Ekle</Link>
+        </Button>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tests.map(test => (
-          <div key={test.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-2 line-clamp-2">{test.title}</h2>
-              <p className="text-gray-600 mb-4 text-sm line-clamp-3">{test.description}</p>
-              
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center text-gray-500 text-sm">
-                  <ClockIcon className="w-4 h-4 mr-1" />
-                  <span>{test.timeLimit || 60} dakika</span>
-                </div>
-                <div className="flex items-center text-gray-500 text-sm">
-                  <AcademicCapIcon className="w-4 h-4 mr-1" />
-                  <span>{test.questions.length} soru</span>
-                </div>
-              </div>
-              
-              <Link 
-                href={`/dashboard/tests/${test.slug}`} 
-                className="block w-full text-center py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors"
-              >
-                Teste Başla
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {tests.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Henüz test bulunmuyor</h2>
-          <p className="text-gray-600 mb-4">Daha sonra tekrar kontrol edin.</p>
-        </div>
+
+      {tests.length === 0 ? (
+        <p className="text-center text-gray-500">Henüz test bulunmuyor.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Başlık</TableHead>
+              <TableHead>Slug</TableHead>
+              <TableHead>Soru Sayısı</TableHead>
+              <TableHead>Süre (dk)</TableHead>
+              <TableHead>Durum</TableHead>
+              <TableHead>Eylemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tests.map((test) => (
+              <TableRow key={test.id}>
+                <TableCell className="font-medium">{test.title}</TableCell>
+                <TableCell>{test.slug}</TableCell>
+                <TableCell>{test.questions.length}</TableCell>
+                <TableCell>{test.timeLimit || '-'}</TableCell>
+                <TableCell>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    test.isPublished 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {test.isPublished ? 'Yayında' : 'Taslak'}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/dashboard/tests/${test.slug}`}>Görüntüle</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/dashboard/tests/${test.slug}/edit`}>Düzenle</Link>
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => handleDeleteClick(test)}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting && testToDelete?.id === test.id ? 'Siliniyor...' : 'Sil'}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      {showConfirmModal && testToDelete && (
+        <AlertDialog 
+          title="Testi Silmeyi Onayla"
+          isOpen={showConfirmModal}
+          onConfirm={handleDeleteConfirm}
+          onOpenChange={setShowConfirmModal}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Testi Silmeyi Onayla</AlertDialogTitle>
+              <AlertDialogDescription>
+                "{testToDelete.title}" başlıklı testi kalıcı olarak silmek istediğinizden emin misiniz? 
+                Bu işlem geri alınamaz.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>İptal</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteConfirm} disabled={isDeleting}>
+                {isDeleting ? 'Siliniyor...' : 'Evet, Sil'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
