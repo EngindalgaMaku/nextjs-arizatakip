@@ -1,19 +1,19 @@
 'use client';
 
+import {
+    AcademicCapIcon,
+    ArrowLeftOnRectangleIcon,
+    BookOpenIcon,
+    CalendarDaysIcon,
+    ClipboardDocumentListIcon,
+    Cog6ToothIcon,
+    DocumentTextIcon,
+    ExclamationCircleIcon,
+    HomeIcon,
+    UserGroupIcon
+} from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  HomeIcon, 
-  ExclamationCircleIcon, 
-  UserGroupIcon, 
-  DocumentTextIcon,
-  Cog6ToothIcon,
-  ArrowLeftOnRectangleIcon,
-  BookOpenIcon,
-  AcademicCapIcon,
-  CalendarDaysIcon,
-  ClipboardDocumentListIcon
-} from '@heroicons/react/24/outline';
 
 interface NavItemProps {
   href: string;
@@ -98,6 +98,13 @@ export default function Sidebar() {
           icon={<UserGroupIcon />} 
           label="Kullanıcılar"
           active={pathname.startsWith('/dashboard/users')} 
+        />
+
+        <NavItem
+          href="/teacher/exams"
+          icon={<ClipboardDocumentListIcon />}
+          label="Canlı Sınavlar"
+          active={pathname.startsWith('/teacher/exams')}
         />
 
         <NavItem 
