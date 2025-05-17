@@ -97,7 +97,7 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
 
     const startIndex = (page - 1) * pageSize;
     query = query.range(startIndex, startIndex + pageSize - 1);
-    query = query.order('students.name', { ascending: true, nullsFirst: false }); // Primary sort: student name (A-Z), handle nulls
+    query = query.order('students.name', { ascending: true }); // Primary sort: student name (A-Z)
     query = query.order('year', { ascending: false }); // Secondary sort: year (descending)
     query = query.order('month', { ascending: false }); // Tertiary sort: month (descending)
 
