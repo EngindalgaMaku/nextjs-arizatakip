@@ -1,16 +1,43 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { getTestBySlug } from '@/actions/testActions';
+import { TestQuestion, Test as TestType, TestUserState } from '@/types/tests';
+import { ArrowLeftIcon, ArrowPathIcon, ArrowRightIcon, CheckCircleIcon, CheckIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { getTestBySlug } from '@/data/tests';
-import { TestUserState, TestQuestion } from '@/types/tests';
-import { CheckIcon, XMarkIcon, ArrowLeftIcon, ArrowRightIcon, ArrowPathIcon, ExclamationCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { useEffect, useMemo, useState } from 'react';
 
 type AnswerStatus = 'correct' | 'incorrect' | 'unanswered';
 
-export default function TestPage({ params }: { params: { slug: string } }) {
+export default function TestViewPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
-  const test = useMemo(() => getTestBySlug(params.slug), [params.slug]);
+  
+  // State for fetched test data, loading, and error
+  const [test, setTest] = useState<TestType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // useEffect to fetch test data
+  useEffect(() => {
+    async function fetchTest() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const fetchedTest = await getTestBySlug(params.slug);
+        setTest(fetchedTest);
+        if (!fetchedTest) {
+          // setError('Test bulunamadı veya yüklenirken bir sorun oluştu.'); // Optional: set specific error
+        }
+      } catch (e: any) {
+        console.error("Failed to fetch test:", e);
+        setError(e.message || 'Test yüklenirken bir hata oluştu.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (params.slug) {
+      fetchTest();
+    }
+  }, [params.slug]);
   
   // Soruları karıştırma fonksiyonu (Fisher-Yates shuffle)
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -40,7 +67,33 @@ export default function TestPage({ params }: { params: { slug: string } }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
   
-  // Eğer test bulunamazsa hata göster
+  // Eğer test bulunamazsa veya yükleniyorsa gösterilecekler
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
+        <ArrowPathIcon className="w-16 h-16 text-indigo-600 animate-spin mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800">Test Yükleniyor...</h2>
+      </div>
+    );
+  }
+
+  if (error) {
+     return (
+      <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
+        <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Hata</h2>
+        <p className="text-gray-600 mb-6">{error}</p>
+        <button
+          onClick={() => router.push('/dashboard/tests')}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center"
+        >
+          <ArrowLeftIcon className="w-5 h-5 mr-2" />
+          Testlere Dön
+        </button>
+      </div>
+    );
+  }
+  
   if (!test) {
     return (
       <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
@@ -60,24 +113,47 @@ export default function TestPage({ params }: { params: { slug: string } }) {
   
   const currentQuestion = questionsToDisplay[currentQuestionIndex];
   
+  if (!currentQuestion && questionsToDisplay.length > 0 && currentQuestionIndex >= questionsToDisplay.length) {
+     // Bu durum, sorular yüklendikten sonra index'in dışına çıkılmasıyla oluşabilir.
+     // Kullanıcıyı ilk soruya yönlendirebilir veya bir hata mesajı gösterebiliriz.
+     console.warn("Current question index is out of bounds, resetting to 0.");
+     setCurrentQuestionIndex(0); 
+     // Not: Bu state değişikliği bir sonraki render'da düzelecektir. Hemen return etmek yerine UI'ın bir frame için
+     // eski index ile render olmasını engelleyemeyebiliriz, ancak veri tutarlılığını sağlar.
+     // Eğer hemen bir yükleme/hata göstermek isteniyorsa, bu useEffect içinde yapılmalı.
+  }
+  
   // Eğer questionsToDisplay boşsa veya currentQuestion tanımsızsa (örneğin test yüklenemedi), bir yükleme veya hata durumu göster
+  // test varlığı zaten yukarıda (isLoading, error, !test) kontrol edildi.
+  // Bu nokta, test var ama questionsToDisplay bir şekilde boşsa veya currentQuestion tanımsızsa diye ek bir güvenlik.
   if (!questionsToDisplay || questionsToDisplay.length === 0 || !currentQuestion) {
-    // Testin varlığını zaten yukarıda kontrol etmiştik, !test durumunda return ediyoruz.
-    // Bu nokta, test var ama questionsToDisplay bir şekilde boşsa diye ek bir güvenlik.
-    // Veya test yükleniyor durumu için bir spinner gösterilebilir.
-    // Şimdilik, test yoksa zaten return edildiği için bu durumu basitçe geçebiliriz
-    // ya da daha spesifik bir hata mesajı gösterebiliriz.
-    if (!test) { // Bu kontrol aslında yukarıdakiyle aynı, mantıksal olarak buraya düşmemeli
-      return (
+    if (test && questionsToDisplay.length === 0 && !isLoading) { // Test var ama hiç sorusu yoksa
+       return (
         <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
-          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Test Verisi Yüklenemedi</h2>
-          <p className="text-gray-600">Sorular yüklenirken bir sorun oluştu.</p>
+          <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Test İçeriği Boş</h2>
+          <p className="text-gray-600 mb-6">Bu testte henüz soru bulunmamaktadır.</p>
+           <button
+            onClick={() => router.push('/dashboard/tests')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center"
+          >
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            Testlere Dön
+          </button>
         </div>
       );
     }
-    // Eğer test var ama currentQuestion yoksa (index hatası vb.), bu da bir sorun.
-    // Bu genellikle currentQuestionIndex'in sınırları aşmasıyla olur.
+    // Eğer currentQuestion hala tanımsızsa ve diğer durumlar geçildiyse, bu beklenmedik bir durumdur.
+    // Ya da sorular yükleniyor ama test ana verisi gelmiş olabilir.
+    // Yukarıdaki isLoading zaten bunu kapsamalı.
+    // Bu bir fallback, normalde buraya düşmemeli.
+     return (
+        <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
+          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Test Verisi Yüklenemedi</h2>
+          <p className="text-gray-600">Sorular yüklenirken bir sorun oluştu veya test verisi bozuk.</p>
+        </div>
+      );
   }
   
   // Kullanıcının bir seçenek seçmesini işle

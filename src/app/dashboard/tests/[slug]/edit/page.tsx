@@ -1,9 +1,8 @@
 'use client';
 
-import { updateTest, UpdateTestData } from '@/actions/testActions';
-import { getTestBySlug } from '@/data/tests'; // Test verilerini almak için
+import { getTestBySlug, updateTest, UpdateTestData } from '@/actions/testActions';
 import { baseFormTemplate, createNewOption, createNewQuestion } from '@/types/form-templates';
-import { Test } from '@/types/tests';
+import { Test as TestType } from '@/types/tests';
 import { ArrowLeftIcon, ArrowPathIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
@@ -55,7 +54,7 @@ interface EditTestPageProps {
 export default function EditTestPage({ params }: EditTestPageProps) {
   const router = useRouter();
   const currentSlug = params.slug;
-  const [testData, setTestData] = useState<Test | null>(null);
+  const [testData, setTestData] = useState<TestType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,38 +79,48 @@ export default function EditTestPage({ params }: EditTestPageProps) {
   });
 
   useEffect(() => {
-    if (currentSlug) {
-      const fetchedTest = getTestBySlug(currentSlug as string);
-      if (fetchedTest) {
-        setTestData(fetchedTest);
-        // Formu yüklenen test verileriyle doldur
-        const formValues: TestFormValues = {
-          title: fetchedTest.title,
-          slug: fetchedTest.slug,
-          description: fetchedTest.description || '',
-          passingScore: fetchedTest.passingScore || 70,
-          timeLimit: fetchedTest.timeLimit || 60,
-          randomizeQuestions: fetchedTest.randomizeQuestions || false,
-          randomizeOptions: fetchedTest.randomizeOptions || false,
-          isPublished: fetchedTest.isPublished || false,
-          questions: fetchedTest.questions.map(q => ({
-            id: q.id,
-            text: q.text,
-            options: q.options.map(opt => ({ 
-              id: opt.id, 
-              text: opt.text, 
-              toBeDeleted: false 
-            })),
-            correctOptionIdOrIndex: q.options.findIndex(opt => opt.id === q.correctOptionId),
-            toBeDeleted: false
-          }))
-        };
-        reset(formValues);
-      } else {
-        setSubmissionError('Test bulunamadı.');
+    async function fetchAndSetTestData() {
+      if (currentSlug) {
+        setIsLoading(true);
+        setSubmissionError(null);
+        try {
+          const fetchedTest = await getTestBySlug(currentSlug as string);
+          if (fetchedTest) {
+            setTestData(fetchedTest);
+            const formValues: TestFormValues = {
+              title: fetchedTest.title,
+              slug: fetchedTest.slug,
+              description: fetchedTest.description || '',
+              passingScore: fetchedTest.passingScore || 70,
+              timeLimit: fetchedTest.timeLimit || 60,
+              randomizeQuestions: fetchedTest.randomizeQuestions || false,
+              randomizeOptions: fetchedTest.randomizeOptions || false,
+              isPublished: fetchedTest.isPublished || false,
+              questions: fetchedTest.questions.map(q => ({
+                id: q.id,
+                text: q.text,
+                options: q.options.map(opt => ({ 
+                  id: opt.id, 
+                  text: opt.text, 
+                  toBeDeleted: false 
+                })),
+                correctOptionIdOrIndex: q.options.findIndex(opt => opt.id === q.correctOptionId),
+                toBeDeleted: false
+              }))
+            };
+            reset(formValues);
+          } else {
+            setSubmissionError('Düzenlenecek test bulunamadı.');
+          }
+        } catch (e: any) {
+          console.error("Error fetching test for edit:", e);
+          setSubmissionError(e.message || 'Test yüklenirken bir hata oluştu.');
+        } finally {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     }
+    fetchAndSetTestData();
   }, [currentSlug, reset]);
   
   // Sorulardaki seçenek sayısı değiştiğinde veya bir seçenek silindiğinde correctOptionIdOrIndex'in geçerliliğini kontrol et
@@ -254,15 +263,16 @@ export default function EditTestPage({ params }: EditTestPageProps) {
 
   if (submissionError && !testData) { // Test bulunamadıysa veya yüklenemediyse
     return (
-        <div className="container mx-auto p-6 text-center">
-            <ExclamationTriangleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-semibold text-red-700">Hata</h1>
-            <p className="text-gray-600 mt-2">{submissionError}</p>
+        <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+            <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Hata</h2>
+            <p className="text-gray-600 mb-6">{submissionError}</p>
             <button
                 onClick={() => router.push('/dashboard/tests')}
-                className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center"
             >
-                Test Listesine Geri Dön
+                <ArrowLeftIcon className="w-5 h-5 mr-2" />
+                Test Listesine Dön
             </button>
         </div>
     );

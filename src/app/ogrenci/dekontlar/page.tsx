@@ -177,9 +177,13 @@ function StudentReceiptDashboardContent() {
           setSelectedFile(selectedFileInstance); // If already small enough, use the original file
       }
     } else if (selectedFileInstance.type === 'application/pdf') {
-      // For PDF files, set directly without compression
-      // You might want to add a size check for PDFs here if needed
-      // For example: if (selectedFileInstance.size > 5 * 1024 * 1024) { toast.error('PDF dosyası 5MB'dan büyük olamaz.'); return; }
+      const maxSizePDFMB = 5;
+      if (selectedFileInstance.size > maxSizePDFMB * 1024 * 1024) {
+        toast.error(`PDF dosyası ${maxSizePDFMB}MB boyutundan büyük olamaz. Lütfen daha küçük bir dosya seçin.`);
+        setSelectedFile(null);
+        event.target.value = ''; // Reset file input
+        return;
+      }
       setSelectedFile(selectedFileInstance);
     }
   };

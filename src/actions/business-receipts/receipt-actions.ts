@@ -3,16 +3,14 @@
 // import { createServerActionClient } from '@supabase/auth-helpers-nextjs'; // Old
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // New
 // import { cookies } from 'next/headers'; // No longer needed here
-import { type Database } from '@/lib/database.types';
-import { 
-  UploadReceiptFormSchema, // Keep this for reference to file validation constants if needed, or define them locally
-  UploadReceiptMetadataSchema, // New schema for metadata
-  UploadReceiptFormPayload, 
-  UpdateReceiptFormPayload, 
-  UpdateReceiptFormSchema 
+import {
+    UpdateReceiptFormPayload,
+    UpdateReceiptFormSchema, // New schema for metadata
+    UploadReceiptFormPayload, // Keep this for reference to file validation constants if needed, or define them locally
+    UploadReceiptMetadataSchema
 } from '@/types/schemas/receipt-schema';
-import { getOrCreateStajIsletmesiByName } from './business-actions';
 import { z } from 'zod';
+import { getOrCreateStajIsletmesiByName } from './business-actions';
 
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
 
@@ -52,9 +50,9 @@ export async function uploadReceipt(
   if (file.size > MAX_FILE_SIZE_BYTES) {
     return { data: null, error: `Maksimum dosya boyutu ${MAX_FILE_SIZE_MB}MB olabilir.` };
   }
-  const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg']; // Only JPG/JPEG
+  const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'application/pdf'];
   if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-    return { data: null, error: 'Sadece .jpg ve .jpeg uzantılı dosyalar kabul edilir.' };
+    return { data: null, error: 'Sadece .jpg, .jpeg ve .pdf uzantılı dosyalar kabul edilir.' };
   }
 
   const validatedStudentId = z.string().uuid().safeParse(studentId);
@@ -177,9 +175,9 @@ export async function updateReceipt(
     // 3. Eğer yeni bir dosya yüklendiyse, eskisini sil ve yenisini yükle
     if (file) {
       // Add file type validation for update as well
-      const UPD_ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg']; // Only JPG/JPEG
+      const UPD_ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'application/pdf']; 
       if (!UPD_ACCEPTED_FILE_TYPES.includes(file.type)) {
-        return { data: null, error: 'Sadece .jpg ve .jpeg uzantılı dosyalar kabul edilir.' };
+        return { data: null, error: 'Sadece .jpg, .jpeg ve .pdf uzantılı dosyalar kabul edilir.' };
       }
       // Consider adding size validation here too if not already implicitly handled
 
