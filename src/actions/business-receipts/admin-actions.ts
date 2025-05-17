@@ -19,17 +19,19 @@ export interface AdminReceiptFilter {
 }
 
 export interface AdminReceiptListItem {
-  id: string;
+  receipt_id: string;
+  receipt_month: number;
+  receipt_year: number;
+  receipt_file_path: string;
+  receipt_file_name_original: string | null;
+  receipt_notes: string | null;
+  receipt_uploaded_at: string; // This will be the formatted date string
+  student_id: string | null; // Original FK, if selected in view
+  staj_isletmesi_id: string | null; // Original FK, if selected in view
   student_name: string | null;
   student_school_number: string | null;
   student_class_name: string | null;
   business_name: string | null;
-  month: number;
-  year: number;
-  file_path: string;
-  file_name_original: string | null;
-  notes: string | null;
-  uploaded_at: string; 
 }
 
 export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<{
@@ -37,7 +39,7 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
   error: string | null;
   count: number | null;
 }> {
-  const supabase = createSupabaseServerClient(); // New
+  const supabase = createSupabaseServerClient();
   const { 
     studentName, className, schoolNumber, 
     businessName, month, year, 
@@ -45,89 +47,76 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
   } = filters;
 
   try {
+    // Query the new VIEW
     let query = supabase
-      .from('receipts')
-      .select(`
-        id,
-        month,
-        year,
-        file_path,
-        file_name_original,
-        notes,
-        uploaded_at,
-        students (
-          name,
-          school_number,
-          classes (name)
-        ),
-        staj_isletmeleri (name)
-      `, { count: 'exact' }); 
+      .from('admin_receipts_display') // Use the view name
+      .select('* ', { count: 'exact' }); // Select all columns from the view
 
-    // Add checks for non-null foreign keys when related filters are active
-    if (studentName || schoolNumber || className) {
-        query = query.not('student_id', 'is', null);
-    }
-    if (businessName) {
-        query = query.not('staj_isletmesi_id', 'is', null);
-    }
-
+    // Apply filters using the view's column names
     if (studentName) {
-      query = query.ilike('students.name', `%${studentName}%`);
+      query = query.ilike('student_name', `%${studentName}%`);
     }
     if (schoolNumber) {
-      query = query.eq('students.school_number', schoolNumber);
+      query = query.eq('student_school_number', schoolNumber);
     }
     if (className) {
-      // @ts-ignore: Supabase JS client might not perfectly type nested foreign table queries for ilike
-      query = query.ilike('students.classes.name', `%${className}%`);
+      query = query.ilike('student_class_name', `%${className}%`);
     }
     if (businessName) {
-      query = query.ilike('staj_isletmeleri.name', `%${businessName}%`);
+      query = query.ilike('business_name', `%${businessName}%`);
     }
 
-    // Revised Date Filtering Logic
-    if (year && month) { // Specific year and specific month
-        query = query.eq('year', year).eq('month', month);
-    } else if (year && !month) { // Specific year, but month is undefined (e.g., "All Months")
-        query = query.eq('year', year); // Filter only by the selected year
-    } else if (!year && month) { // Specific month, but year is undefined (e.g., "All Years")
-        query = query.eq('month', month); // Filter only by the selected month (across all years)
+    // Date filters using view column names (e.g., receipt_month, receipt_year)
+    if (year && month) {
+      query = query.eq('receipt_year', year).eq('receipt_month', month);
+    } else if (year && !month) { // Specific year, "All Months"
+      query = query.eq('receipt_year', year);
+    } else if (!year && month) { // Specific month, "All Years"
+      query = query.eq('receipt_month', month);
     }
-    // If both year and month are undefined, no date-specific filters are applied.
 
     const startIndex = (page - 1) * pageSize;
     query = query.range(startIndex, startIndex + pageSize - 1);
-    query = query.order('year', { ascending: false }); // Sort by year (descending)
-    query = query.order('month', { ascending: false }); // Then by month (descending)
-    // As a fallback primary sort, or if no student sort is critical, 
-    // you might revert to uploaded_at or add another receipt-level field.
-    // For now, it will be year, then month.
+    
+    // Sorting using the view's column names - THIS SHOULD NOW WORK RELIABLY
+    query = query.order('student_name', { ascending: true, nullsFirst: false }); // student_name from view
+    query = query.order('receipt_year', { ascending: false }); // receipt_year from view
+    query = query.order('receipt_month', { ascending: false }); // receipt_month from view
 
-    const { data, error, count } = await query;
+    const { data: viewData, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching receipts for admin:', error);
+      console.error('Error fetching from admin_receipts_display view:', error);
       return { data: null, error: 'Dekontlar alınırken bir hata oluştu: ' + error.message, count: null };
     }
 
-    const formattedData: AdminReceiptListItem[] = data.map((item: any) => ({
-      id: item.id,
-      student_name: item.students?.name || null,
-      student_school_number: item.students?.school_number || null,
-      student_class_name: item.students?.classes?.name || null,
-      business_name: item.staj_isletmeleri?.name || null,
-      month: item.month,
-      year: item.year,
-      file_path: item.file_path,
-      file_name_original: item.file_name_original || null,
-      notes: item.notes || null,
-      uploaded_at: new Date(item.uploaded_at).toLocaleDateString('tr-TR'),
+    if (!viewData) {
+      return { data: [], error: null, count: 0 }; // Return empty array if viewData is null
+    }
+
+    // Map data from the view to AdminReceiptListItem
+    // The columns from the view should directly map to AdminReceiptListItem fields
+    const formattedData: AdminReceiptListItem[] = viewData.map((item: any) => ({
+      receipt_id: item.receipt_id,
+      receipt_month: item.receipt_month,
+      receipt_year: item.receipt_year,
+      receipt_file_path: item.receipt_file_path,
+      receipt_file_name_original: item.receipt_file_name_original,
+      receipt_notes: item.receipt_notes,
+      // Format uploaded_at if it's a raw timestamp from the view
+      receipt_uploaded_at: new Date(item.receipt_uploaded_at).toLocaleDateString('tr-TR'), 
+      student_id: item.student_id, 
+      staj_isletmesi_id: item.staj_isletmesi_id,
+      student_name: item.student_name,
+      student_school_number: item.student_school_number,
+      student_class_name: item.student_class_name,
+      business_name: item.business_name,
     }));
 
     return { data: formattedData, error: null, count };
 
   } catch (e: any) {
-    console.error('Unexpected error in getReceiptsForAdmin:', e);
+    console.error('Unexpected error in getReceiptsForAdmin querying view:', e);
     return { data: null, error: 'Dekontlar alınırken beklenmedik bir hata oluştu: ' + e.message, count: null };
   }
 }
