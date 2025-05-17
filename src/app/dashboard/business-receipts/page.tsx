@@ -478,21 +478,18 @@ function AdminBusinessReceiptsContent() {
                 </Pagination>
             )}
 
-            <AlertDialog 
+            <AlertDialog
                 isOpen={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen} 
                 title="Dekont Sil"
                 description="Bu dekontu ve ilişkili dosyayı kalıcı olarak silmek istediğinizden emin misiniz?"
                 onConfirm={() => {
                     if (receiptToDelete) {
                         deleteReceiptMutation.mutate({ receiptId: receiptToDelete.id, filePath: receiptToDelete.file_path });
                     }
-                    setIsDeleteDialogOpen(false);
                 }}
                 onCancel={() => setIsDeleteDialogOpen(false)}
-                confirmLabel="Sil"
-                cancelLabel="İptal"
-                isLoading={deleteReceiptMutation.isPending}
+                isLoading={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === receiptToDelete?.id}
             />
             <EditReceiptModal
                 isOpen={isEditModalOpen}

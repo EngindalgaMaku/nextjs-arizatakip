@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
 
-interface AdminReceiptFilter {
+export interface AdminReceiptFilter {
   studentName?: string;
   className?: string;
   schoolNumber?: string;
