@@ -1,32 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter, usePathname } from "next/navigation";
-import { ChevronDownIcon, LogOutIcon } from "lucide-react";
+import { fetchSemesters } from '@/actions/semesterActions';
+import { loadUserData, signOut } from "@/lib/supabase";
+import { useSemesterStore } from '@/stores/useSemesterStore';
+import { Semester } from '@/types/semesters';
 import {
-  HomeIcon,
-  ClipboardDocumentListIcon,
-  UserGroupIcon,
-  DocumentChartBarIcon,
-  Cog6ToothIcon,
-  MapPinIcon,
   AcademicCapIcon,
   BookOpenIcon,
-  BeakerIcon,
   BuildingLibraryIcon,
-  ComputerDesktopIcon,
-  ClockIcon,
+  BuildingOffice2Icon,
   CalendarDaysIcon,
-  TagIcon,
-  BuildingOffice2Icon
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  ComputerDesktopIcon,
+  DocumentChartBarIcon,
+  MapPinIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
-import { signOut, loadUserData } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { useSemesterStore } from '@/stores/useSemesterStore';
-import { fetchSemesters } from '@/actions/semesterActions';
-import { Semester } from '@/types/semesters';
+import { ChevronDownIcon, LogOutIcon } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
 
 export default function DashboardLayout({
   children,
@@ -252,7 +248,7 @@ export default function DashboardLayout({
               <Link
                 href="/dashboard/business-receipts"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.startsWith("/dashboard/business-receipts")
+                  pathname.includes("/dashboard/business-receipts")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
@@ -262,15 +258,15 @@ export default function DashboardLayout({
               </Link>
 
               <Link
-                href="/dashboard/tests"
+                href="/dashboard/live-exams"
                 className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.startsWith("/dashboard/tests")
+                  pathname.startsWith("/dashboard/live-exams")
                     ? "bg-blue-700 text-white"
                     : "text-gray-100 hover:bg-blue-700 hover:text-white"
                 }`}
               >
-                <BeakerIcon className="mr-3 h-5 w-5" />
-                Testler
+                <BookOpenIcon className="mr-3 h-5 w-5" />
+                Sınavlar
               </Link>
 
               <div className="pt-4 pb-2 px-3">

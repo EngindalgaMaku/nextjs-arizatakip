@@ -61,6 +61,31 @@ export default function Sidebar() {
           active={pathname.startsWith('/dashboard/issues')} 
         />
         
+        <div className="pt-4 pb-2 px-3">
+          <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">MODÜLLER</h4>
+        </div>
+
+        <NavItem 
+          href="/dashboard/business-receipts"
+          icon={<ClipboardDocumentListIcon />}
+          label="İşletme Dekontları"
+          active={pathname.startsWith('/dashboard/business-receipts')}
+        />
+
+        <NavItem
+          href="/dashboard/tests" 
+          icon={<DocumentTextIcon />} 
+          label="Testler"
+          active={pathname.startsWith('/dashboard/tests')}
+        />
+
+        <NavItem
+          href="/dashboard/live-exams"
+          icon={<ClipboardDocumentListIcon />} 
+          label="Canlı Sınavlar"
+          active={pathname.startsWith('/dashboard/live-exams')}
+        />
+        
         <NavItem 
           href="/dashboard/classes" 
           icon={<AcademicCapIcon />} 
@@ -74,28 +99,6 @@ export default function Sidebar() {
           label="Raporlar"
           active={pathname.startsWith('/dashboard/reports')} 
         />
-        
-        <NavItem 
-          href="/dashboard/business-receipts" 
-          icon={<ClipboardDocumentListIcon />} 
-          label="İşletme Dekontları"
-          active={pathname.startsWith('/dashboard/business-receipts')} 
-        />
-        
-        <div className="pt-4 pb-2 px-3">
-          <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Modüller</h4>
-        </div>
-
-        <NavItem
-          href="/dashboard/live-exams"
-          icon={<ClipboardDocumentListIcon />}
-          label="Canlı Sınavlar"
-          active={pathname.startsWith('/dashboard/live-exams')}
-        />
-        
-        <div className="pt-4 pb-2 px-3">
-          <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Yönetimsel İşlemler</h4>
-        </div>
         
         <NavItem 
           href="/dashboard/settings" 
