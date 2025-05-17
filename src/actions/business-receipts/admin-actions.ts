@@ -97,9 +97,11 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
 
     const startIndex = (page - 1) * pageSize;
     query = query.range(startIndex, startIndex + pageSize - 1);
-    query = query.order('students.name', { ascending: true }); // Primary sort: student name (A-Z)
-    query = query.order('year', { ascending: false }); // Secondary sort: year (descending)
-    query = query.order('month', { ascending: false }); // Tertiary sort: month (descending)
+    query = query.order('year', { ascending: false }); // Sort by year (descending)
+    query = query.order('month', { ascending: false }); // Then by month (descending)
+    // As a fallback primary sort, or if no student sort is critical, 
+    // you might revert to uploaded_at or add another receipt-level field.
+    // For now, it will be year, then month.
 
     const { data, error, count } = await query;
 
