@@ -3,9 +3,6 @@
 import { AdminReceiptListItem, getReceiptDownloadUrl, getReceiptsForAdmin, updateAdminReceipt, type UpdateAdminReceiptPayload } from '@/actions/business-receipts/admin-actions';
 import { deleteReceiptAndFile } from '@/actions/business-receipts/receipt-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-    AlertDialog
-} from '@/components/ui/alert-dialog';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -325,8 +322,6 @@ function AdminBusinessReceiptsContent() {
     const currentYear = new Date().getFullYear();
     const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [receiptToDelete, setReceiptToDelete] = useState<AdminReceiptListItem | null>(null);
     const [isDownloading, setIsDownloading] = useState<Record<string, boolean>>({});
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -418,11 +413,16 @@ function AdminBusinessReceiptsContent() {
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="destructive" size="sm" onClick={() => {
-                                                setReceiptToDelete(r);
-                                                setIsDeleteDialogOpen(true);
-                                            }} title="Sil" disabled={deleteReceiptMutation.isPending}>
-                                                {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.id ? <span className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent rounded-full" role="status" aria-label="loading"></span> : <TrashIcon className="h-4 w-4" />}
+                                            <Button 
+                                                variant="destructive" 
+                                                size="sm" 
+                                                onClick={() => handleDeleteReceipt(r.id, r.file_path)}
+                                                title="Sil" 
+                                                disabled={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.id}
+                                            >
+                                                {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.id 
+                                                    ? <span className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent rounded-full" role="status" aria-label="loading"></span> 
+                                                    : <TrashIcon className="h-4 w-4" />}
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -478,19 +478,6 @@ function AdminBusinessReceiptsContent() {
                 </Pagination>
             )}
 
-            <AlertDialog
-                isOpen={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen} 
-                title="Dekont Sil"
-                description="Bu dekontu ve ilişkili dosyayı kalıcı olarak silmek istediğinizden emin misiniz?"
-                onConfirm={() => {
-                    if (receiptToDelete) {
-                        deleteReceiptMutation.mutate({ receiptId: receiptToDelete.id, filePath: receiptToDelete.file_path });
-                    }
-                }}
-                onCancel={() => setIsDeleteDialogOpen(false)}
-                isLoading={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === receiptToDelete?.id}
-            />
             <EditReceiptModal
                 isOpen={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
