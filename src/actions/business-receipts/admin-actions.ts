@@ -4,6 +4,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // New
 // import { cookies } from 'next/headers'; // No longer needed here
 import { z } from 'zod';
+import { getOrCreateStajIsletmesiByName } from './business-actions'; // Import the helper
 
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
 
@@ -156,6 +157,7 @@ const updateReceiptSchema = z.object({
   month: z.number().min(1, "Ay 1-12 arasında olmalıdır.").max(12, "Ay 1-12 arasında olmalıdır."),
   year: z.number().min(2000, "Yıl 2000'den büyük olmalıdır.").max(2100, "Yıl 2100'den küçük olmalıdır."),
   notes: z.string().max(500, "Notlar 500 karakterden fazla olamaz.").nullable().optional(),
+  businessName: z.string().min(2, "İşletme adı en az 2 karakter olmalıdır.").max(255, "İşletme adı çok uzun."),
 });
 
 export type UpdateAdminReceiptPayload = z.infer<typeof updateReceiptSchema>;
@@ -170,20 +172,28 @@ export async function updateAdminReceipt(
     return { data: null, error: validation.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { receiptId, month, year, notes } = validation.data;
+  const { receiptId, month, year, notes, businessName } = validation.data;
 
   try {
+    // 1. Get or Create Staj Isletmesi (Business)
+    const stajIsletmesiResult = await getOrCreateStajIsletmesiByName(businessName.trim());
+    if (stajIsletmesiResult.error || !stajIsletmesiResult.data) {
+      return { data: null, error: stajIsletmesiResult.error || 'Staj işletmesi işlenemedi.' };
+    }
+    const stajIsletmesiId = stajIsletmesiResult.data.id;
+
+    // 2. Update the receipt with the new staj_isletmesi_id and other fields
     const { data, error } = await supabase
       .from('receipts')
       .update({
         month,
         year,
-        notes: notes,
-        // updated_at is usually handled by the database automatically
+        notes: notes, // Ensure notes is explicitly set (can be null)
+        staj_isletmesi_id: stajIsletmesiId, // Update the foreign key for the business
       })
       .eq('id', receiptId)
       .select('id')
-      .single(); // Expect a single record to be updated and returned
+      .single();
 
     if (error) {
       console.error('Error updating receipt:', error);

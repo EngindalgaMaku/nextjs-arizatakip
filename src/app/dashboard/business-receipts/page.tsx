@@ -59,6 +59,7 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
   const [month, setMonth] = useState<string>("");
   const [year, setYear] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [businessName, setBusinessName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,15 +69,16 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
 
   useEffect(() => {
     if (receiptData) {
-      setMonth(receiptData.month.toString());
-      setYear(receiptData.year.toString());
-      setNotes(receiptData.notes || "");
-      setError(null); // Clear previous errors when new data is loaded
+      setMonth(receiptData.receipt_month.toString());
+      setYear(receiptData.receipt_year.toString());
+      setNotes(receiptData.receipt_notes || "");
+      setBusinessName(receiptData.business_name || "");
+      setError(null);
     } else {
-      // Reset form if no receipt data (e.g., modal closed and reopened without selection)
       setMonth("");
       setYear("");
       setNotes("");
+      setBusinessName("");
       setError(null);
     }
   }, [receiptData]);
@@ -94,12 +96,18 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
       setIsLoading(false);
       return;
     }
+    if (!businessName.trim()) {
+        setError("İşletme adı boş olamaz.");
+        setIsLoading(false);
+        return;
+    }
 
     const payload: UpdateAdminReceiptPayload = {
-      receiptId: receiptData.id,
+      receiptId: receiptData.receipt_id,
       month: parsedMonth,
       year: parsedYear,
       notes: notes.trim() === "" ? null : notes.trim(),
+      businessName: businessName.trim(),
     };
 
     const result = await updateAdminReceipt(payload);
@@ -110,8 +118,8 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
       toast.error(`Dekont güncellenemedi: ${result.error}`);
     } else {
       toast.success("Dekont başarıyla güncellendi!");
-      onOpenChange(false); // Close modal on success
-      onReceiptUpdate(); // Trigger data refresh
+      onOpenChange(false);
+      onReceiptUpdate();
     }
   };
 
@@ -120,10 +128,10 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
-        // Reset form state if dialog is closed by clicking outside or X button
-        setMonth(receiptData?.month.toString() || "");
-        setYear(receiptData?.year.toString() || "");
-        setNotes(receiptData?.notes || "");
+        setMonth(receiptData?.receipt_month.toString() || "");
+        setYear(receiptData?.receipt_year.toString() || "");
+        setNotes(receiptData?.receipt_notes || "");
+        setBusinessName(receiptData?.business_name || "");
         setError(null);
       }
       onOpenChange(open);
@@ -165,6 +173,18 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="businessName" className="text-right">
+              İşletme Adı
+            </Label>
+            <Input
+              id="businessName"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              className="col-span-3"
+              placeholder="İşletme adı"
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="notes" className="text-right">
@@ -395,16 +415,16 @@ function AdminBusinessReceiptsContent() {
                             </TableHeader>
                             <TableBody>
                                 {receipts.length > 0 ? receipts.map((r) => (
-                                    <TableRow key={r.id}>
+                                    <TableRow key={r.receipt_id}>
                                         <TableCell>{r.student_name || '-'}</TableCell>
                                         <TableCell>{r.student_school_number || '-'}</TableCell>
                                         <TableCell>{r.student_class_name || '-'}</TableCell>
                                         <TableCell>{r.business_name || '-'}</TableCell>
-                                        <TableCell>{monthNames[r.month]} {r.year}</TableCell>
-                                        <TableCell>{r.uploaded_at}</TableCell>
-                                        <TableCell className="max-w-[150px] truncate" title={r.notes || undefined}>{r.notes || '-'}</TableCell>
+                                        <TableCell>{monthNames[r.receipt_month]} {r.receipt_year}</TableCell>
+                                        <TableCell>{r.receipt_uploaded_at}</TableCell>
+                                        <TableCell className="max-w-[150px] truncate" title={r.receipt_notes || undefined}>{r.receipt_notes || '-'}</TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            <Button variant="outline" size="sm" onClick={() => handleDownload(r.file_path, r.file_name_original)} title="İndir">
+                                            <Button variant="outline" size="sm" onClick={() => handleDownload(r.receipt_file_path, r.receipt_file_name_original)} title="İndir">
                                                 <ArrowDownTrayIcon className="h-4 w-4" />
                                             </Button>
                                             <Button
@@ -415,18 +435,18 @@ function AdminBusinessReceiptsContent() {
                                                     setEditingReceipt(r);
                                                     setIsEditModalOpen(true);
                                                 }}
-                                                aria-label={`Dekont düzenle ${r.id}`}
+                                                aria-label={`Dekont düzenle ${r.receipt_id}`}
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </Button>
                                             <Button 
                                                 variant="destructive" 
                                                 size="sm" 
-                                                onClick={() => handleDeleteReceipt(r.id, r.file_path)}
+                                                onClick={() => handleDeleteReceipt(r.receipt_id, r.receipt_file_path)}
                                                 title="Sil" 
-                                                disabled={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.id}
+                                                disabled={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.receipt_id}
                                             >
-                                                {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.id 
+                                                {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.receipt_id 
                                                     ? <span className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent rounded-full" role="status" aria-label="loading"></span> 
                                                     : <TrashIcon className="h-4 w-4" />}
                                             </Button>
@@ -489,9 +509,8 @@ function AdminBusinessReceiptsContent() {
                 onOpenChange={setIsEditModalOpen}
                 receiptData={editingReceipt}
                 onReceiptUpdate={() => {
-                    const currentParams = new URLSearchParams(window.location.search);
-                    currentParams.set('_refresh', Date.now().toString());
-                    router.push(`${window.location.pathname}?${currentParams.toString()}`);
+                    queryClient.invalidateQueries({ queryKey: ['adminReceipts', currentPage, filters] });
+                    fetchAdminReceipts(currentPage, filters);
                 }}
             />
         </div>
