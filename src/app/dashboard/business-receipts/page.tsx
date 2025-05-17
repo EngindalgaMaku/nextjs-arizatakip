@@ -1,6 +1,6 @@
 'use client';
 
-import { AdminReceiptListItem, getReceiptDownloadUrl, getReceiptsForAdmin, updateAdminReceipt, type UpdateAdminReceiptPayload } from '@/actions/business-receipts/admin-actions';
+import { AdminReceiptListItem, getReceiptDownloadUrl, getReceiptsForAdmin, updateAdminReceipt, type AdminReceiptFilter, type UpdateAdminReceiptPayload } from '@/actions/business-receipts/admin-actions';
 import { deleteReceiptAndFile } from '@/actions/business-receipts/receipt-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -234,14 +234,20 @@ function AdminBusinessReceiptsContent() {
         setIsLoading(true);
         setError(null);
         try {
-            const apiFilters = {
-                ...currentFilters,
-                month: currentFilters.month ? parseInt(currentFilters.month) : undefined,
-                year: currentFilters.year ? parseInt(currentFilters.year) : undefined,
+            const apiFilters: any = { // Using any temporarily for flexibility, will match AdminReceiptFilter
+                studentName: currentFilters.studentName || undefined,
+                schoolNumber: currentFilters.schoolNumber || undefined,
+                className: currentFilters.className || undefined,
+                businessName: currentFilters.businessName || undefined,
+                month: currentFilters.month && currentFilters.month !== 'all' ? parseInt(currentFilters.month) : undefined,
+                year: currentFilters.year && currentFilters.year !== 'all' ? parseInt(currentFilters.year) : undefined,
                 page,
                 pageSize: ITEMS_PER_PAGE,
             };
-            const result = await getReceiptsForAdmin(apiFilters);
+            // Remove undefined keys to avoid sending them if not set
+            Object.keys(apiFilters).forEach(key => apiFilters[key] === undefined && delete apiFilters[key]);
+
+            const result = await getReceiptsForAdmin(apiFilters as AdminReceiptFilter);
             if (result.error || !result.data) {
                 setError(result.error || 'Dekontlar alınamadı.');
                 setReceipts([]);

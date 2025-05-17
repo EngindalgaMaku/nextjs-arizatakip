@@ -100,6 +100,30 @@ function StudentReceiptDashboardContent() {
     }
   }, [currentYearParam, studentId, studentName, studentClassName, router]);
 
+  useEffect(() => {
+    if (formState && typeof formState.month === 'number') {
+      const month = formState.month;
+      const academicStartYear = selectedYear; // selectedYear is the start of the academic session, e.g., 2024 for 2024-2025
+      let newYear = formState.year;
+
+      if (month >= 1 && month <= 6) { // Jan to June (typically second half of academic year)
+        newYear = academicStartYear + 1;
+      } else if (month >= 9 && month <= 12) { // Sept to Dec (typically first half of academic year)
+        newYear = academicStartYear;
+      } else {
+        // Months 7 and 8 (July, August) are typically summer break, behavior might be different
+        // For now, let's assume they fall into the second half or keep the current year if it's one of these
+        // Or, if these months are not selectable, this branch isn't strictly needed.
+        // Defaulting to keep formState.year or academicStartYear + 1 as a sensible default for summer.
+        newYear = academicStartYear + 1; 
+      }
+
+      if (newYear !== formState.year) {
+        setFormState(prevState => prevState ? { ...prevState, year: newYear } : null);
+      }
+    }
+  }, [formState?.month, selectedYear]); // Watch for changes in selected month within the form and the overall selectedYear
+
   const handleYearChange = (newYearStr: string) => {
     const newYear = parseInt(newYearStr);
     setSelectedYear(newYear);

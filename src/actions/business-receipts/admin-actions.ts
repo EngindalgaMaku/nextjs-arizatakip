@@ -77,15 +77,15 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
       query = query.ilike('staj_isletmeleri.name', `%${businessName}%`);
     }
 
-    // Academic Year and Specific Month/Year Filtering Logic
-    if (year && !month) { // Year is selected, but no specific month (interpret as academic year)
-      query = query.or(`and(month.gte.9,month.lte.12,year.eq.${year}),and(month.gte.1,month.lte.6,year.eq.${year + 1})`);
-    } else if (year && month) { // Specific year and month are selected
-      query = query.eq('year', year).eq('month', month);
-    } else if (month) { // Only month is selected (filters by this month across all years - current behavior if year not set)
-      query = query.eq('month', month);
+    // Revised Date Filtering Logic
+    if (year && month) { // Specific year and specific month
+        query = query.eq('year', year).eq('month', month);
+    } else if (year && !month) { // Specific year, but month is undefined (e.g., "All Months")
+        query = query.eq('year', year); // Filter only by the selected year
+    } else if (!year && month) { // Specific month, but year is undefined (e.g., "All Years")
+        query = query.eq('month', month); // Filter only by the selected month (across all years)
     }
-    // If neither year nor month is selected, no date filtering is applied (fetches all)
+    // If both year and month are undefined, no date-specific filters are applied.
 
     const startIndex = (page - 1) * pageSize;
     query = query.range(startIndex, startIndex + pageSize - 1);
