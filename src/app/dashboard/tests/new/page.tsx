@@ -245,7 +245,7 @@ export default function NewTestPage() {
                 <input
                   type="number"
                   id="passingScore"
-                  {...register('passingScore')}
+                  {...register('passingScore', { valueAsNumber: true })}
                   className={`mt-1 block w-full px-3 py-2 border ${errors.passingScore ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                 />
                 {errors.passingScore && <p className="mt-1 text-xs text-red-600">{errors.passingScore.message}</p>}
@@ -255,7 +255,7 @@ export default function NewTestPage() {
                 <input
                   type="number"
                   id="timeLimit"
-                  {...register('timeLimit')}
+                  {...register('timeLimit', { valueAsNumber: true })}
                   className={`mt-1 block w-full px-3 py-2 border ${errors.timeLimit ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                 />
                 {errors.timeLimit && <p className="mt-1 text-xs text-red-600">{errors.timeLimit.message}</p>}
