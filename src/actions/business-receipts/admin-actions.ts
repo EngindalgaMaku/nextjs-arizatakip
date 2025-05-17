@@ -3,7 +3,6 @@
 // import { createServerActionClient } from '@supabase/auth-helpers-nextjs'; // Old
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // New
 // import { cookies } from 'next/headers'; // No longer needed here
-import { type Database } from '@/lib/database.types';
 import { z } from 'zod';
 
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
@@ -77,12 +76,16 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
     if (businessName) {
       query = query.ilike('staj_isletmeleri.name', `%${businessName}%`);
     }
-    if (month) {
+
+    // Academic Year and Specific Month/Year Filtering Logic
+    if (year && !month) { // Year is selected, but no specific month (interpret as academic year)
+      query = query.or(`and(month.gte.9,month.lte.12,year.eq.${year}),and(month.gte.1,month.lte.6,year.eq.${year + 1})`);
+    } else if (year && month) { // Specific year and month are selected
+      query = query.eq('year', year).eq('month', month);
+    } else if (month) { // Only month is selected (filters by this month across all years - current behavior if year not set)
       query = query.eq('month', month);
     }
-    if (year) {
-      query = query.eq('year', year);
-    }
+    // If neither year nor month is selected, no date filtering is applied (fetches all)
 
     const startIndex = (page - 1) * pageSize;
     query = query.range(startIndex, startIndex + pageSize - 1);
