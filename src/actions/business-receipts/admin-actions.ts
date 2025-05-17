@@ -147,4 +147,56 @@ export async function getReceiptDownloadUrl(
     console.error('Unexpected error in getReceiptDownloadUrl:', e);
     return { data: null, error: 'İndirme linki oluşturulurken beklenmedik bir hata oluştu: ' + e.message };
   }
+}
+
+// Schema for validating receipt update data
+const updateReceiptSchema = z.object({
+  receiptId: z.string().min(1, "Dekont ID gereklidir."),
+  month: z.number().min(1, "Ay 1-12 arasında olmalıdır.").max(12, "Ay 1-12 arasında olmalıdır."),
+  year: z.number().min(2000, "Yıl 2000'den büyük olmalıdır.").max(2100, "Yıl 2100'den küçük olmalıdır."),
+  notes: z.string().max(500, "Notlar 500 karakterden fazla olamaz.").nullable().optional(),
+});
+
+export type UpdateAdminReceiptPayload = z.infer<typeof updateReceiptSchema>;
+
+export async function updateAdminReceipt(
+  payload: UpdateAdminReceiptPayload
+): Promise<{ data: { id: string } | null; error: string | null }> {
+  const supabase = createSupabaseServerClient();
+  const validation = updateReceiptSchema.safeParse(payload);
+
+  if (!validation.success) {
+    return { data: null, error: validation.error.errors.map(e => e.message).join(', ') };
+  }
+
+  const { receiptId, month, year, notes } = validation.data;
+
+  try {
+    const { data, error } = await supabase
+      .from('receipts')
+      .update({
+        month,
+        year,
+        notes: notes,
+        // updated_at is usually handled by the database automatically
+      })
+      .eq('id', receiptId)
+      .select('id')
+      .single(); // Expect a single record to be updated and returned
+
+    if (error) {
+      console.error('Error updating receipt:', error);
+      return { data: null, error: 'Dekont güncellenirken bir hata oluştu: ' + error.message };
+    }
+
+    if (!data) {
+      return { data: null, error: 'Dekont bulunamadı veya güncellenemedi.' };
+    }
+
+    return { data: { id: data.id }, error: null };
+
+  } catch (e: any) {
+    console.error('Unexpected error in updateAdminReceipt:', e);
+    return { data: null, error: 'Dekont güncellenirken beklenmedik bir hata oluştu: ' + e.message };
+  }
 } 

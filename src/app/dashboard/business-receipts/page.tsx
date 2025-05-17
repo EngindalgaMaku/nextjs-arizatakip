@@ -1,19 +1,34 @@
 'use client';
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { getReceiptsForAdmin, getReceiptDownloadUrl, AdminReceiptListItem } from '@/actions/business-receipts/admin-actions';
+import { AdminReceiptListItem, getReceiptDownloadUrl, getReceiptsForAdmin, updateAdminReceipt, type UpdateAdminReceiptPayload } from '@/actions/business-receipts/admin-actions';
 import { deleteReceiptAndFile } from '@/actions/business-receipts/receipt-actions';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+    AlertDialog
+} from '@/components/ui/alert-dialog';
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { ArrowDownTrayIcon, FunnelIcon, XCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowDownTrayIcon, FunnelIcon, TrashIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Edit, Loader2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
 const ITEMS_PER_PAGE = 10;
 const monthNames: { [key: number]: string } = {
@@ -29,6 +44,160 @@ interface FiltersState {
     month?: string; // string for select compatibility
     year?: string;  // string for select compatibility
 }
+
+interface AdminBusinessReceiptsContentProps {
+  initialReceipts?: AdminReceiptListItem[];
+  initialCount?: number;
+  initialError?: string | null;
+}
+
+interface EditReceiptModalProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  receiptData: AdminReceiptListItem | null;
+  onReceiptUpdate: () => void;
+}
+
+const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChange, receiptData, onReceiptUpdate }) => {
+  const [month, setMonth] = useState<string>("");
+  const [year, setYear] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentAcademicYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => (currentAcademicYear + 2) - i); // Future years for receipts
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  useEffect(() => {
+    if (receiptData) {
+      setMonth(receiptData.month.toString());
+      setYear(receiptData.year.toString());
+      setNotes(receiptData.notes || "");
+      setError(null); // Clear previous errors when new data is loaded
+    } else {
+      // Reset form if no receipt data (e.g., modal closed and reopened without selection)
+      setMonth("");
+      setYear("");
+      setNotes("");
+      setError(null);
+    }
+  }, [receiptData]);
+
+  const handleSubmit = async () => {
+    if (!receiptData) return;
+    setError(null);
+    setIsLoading(true);
+
+    const parsedMonth = parseInt(month, 10);
+    const parsedYear = parseInt(year, 10);
+
+    if (isNaN(parsedMonth) || isNaN(parsedYear)) {
+      setError("Ay ve Yıl geçerli sayılar olmalıdır.");
+      setIsLoading(false);
+      return;
+    }
+
+    const payload: UpdateAdminReceiptPayload = {
+      receiptId: receiptData.id,
+      month: parsedMonth,
+      year: parsedYear,
+      notes: notes.trim() === "" ? null : notes.trim(),
+    };
+
+    const result = await updateAdminReceipt(payload);
+    setIsLoading(false);
+
+    if (result.error) {
+      setError(result.error);
+      toast.error(`Dekont güncellenemedi: ${result.error}`);
+    } else {
+      toast.success("Dekont başarıyla güncellendi!");
+      onOpenChange(false); // Close modal on success
+      onReceiptUpdate(); // Trigger data refresh
+    }
+  };
+
+  if (!isOpen || !receiptData) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        // Reset form state if dialog is closed by clicking outside or X button
+        setMonth(receiptData?.month.toString() || "");
+        setYear(receiptData?.year.toString() || "");
+        setNotes(receiptData?.notes || "");
+        setError(null);
+      }
+      onOpenChange(open);
+    }}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Dekont Düzenle</DialogTitle>
+          <DialogDescription>
+            Dekont bilgilerini güncelleyin: {receiptData.student_name} (Okul No: {receiptData.student_school_number})
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="month" className="text-right">
+              Ay
+            </Label>
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger id="month" className="col-span-3">
+                <SelectValue placeholder="Ay seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(m => (
+                  <SelectItem key={m} value={m.toString()}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="year" className="text-right">
+              Yıl
+            </Label>
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger id="year" className="col-span-3">
+                <SelectValue placeholder="Yıl seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map(y => (
+                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">
+              Notlar
+            </Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="col-span-3"
+              placeholder="Dekont ile ilgili notlar (isteğe bağlı)"
+            />
+          </div>
+          {error && (
+            <p className="col-span-4 text-sm text-red-600 dark:text-red-500 text-center">{error}</p>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">İptal</Button>
+          </DialogClose>
+          <Button type="button" onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Kaydet
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 function AdminBusinessReceiptsContent() {
     const router = useRouter();
@@ -156,6 +325,13 @@ function AdminBusinessReceiptsContent() {
     const currentYear = new Date().getFullYear();
     const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [receiptToDelete, setReceiptToDelete] = useState<AdminReceiptListItem | null>(null);
+    const [isDownloading, setIsDownloading] = useState<Record<string, boolean>>({});
+
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingReceipt, setEditingReceipt] = useState<AdminReceiptListItem | null>(null);
+
     return (
         <div className="container mx-auto p-4 md:p-6">
             <h1 className="text-3xl font-bold mb-6">İşletme Dekontları Yönetimi</h1>
@@ -230,7 +406,22 @@ function AdminBusinessReceiptsContent() {
                                             <Button variant="outline" size="sm" onClick={() => handleDownload(r.file_path, r.file_name_original)} title="İndir">
                                                 <ArrowDownTrayIcon className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="destructive" size="sm" onClick={() => handleDeleteReceipt(r.id, r.file_path)} title="Sil" disabled={deleteReceiptMutation.isPending}>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0"
+                                                onClick={() => {
+                                                    setEditingReceipt(r);
+                                                    setIsEditModalOpen(true);
+                                                }}
+                                                aria-label={`Dekont düzenle ${r.id}`}
+                                            >
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="destructive" size="sm" onClick={() => {
+                                                setReceiptToDelete(r);
+                                                setIsDeleteDialogOpen(true);
+                                            }} title="Sil" disabled={deleteReceiptMutation.isPending}>
                                                 {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.id ? <span className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent rounded-full" role="status" aria-label="loading"></span> : <TrashIcon className="h-4 w-4" />}
                                             </Button>
                                         </TableCell>
@@ -286,6 +477,33 @@ function AdminBusinessReceiptsContent() {
                     </PaginationContent>
                 </Pagination>
             )}
+
+            <AlertDialog 
+                isOpen={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+                title="Dekont Sil"
+                description="Bu dekontu ve ilişkili dosyayı kalıcı olarak silmek istediğinizden emin misiniz?"
+                onConfirm={() => {
+                    if (receiptToDelete) {
+                        deleteReceiptMutation.mutate({ receiptId: receiptToDelete.id, filePath: receiptToDelete.file_path });
+                    }
+                    setIsDeleteDialogOpen(false);
+                }}
+                onCancel={() => setIsDeleteDialogOpen(false)}
+                confirmLabel="Sil"
+                cancelLabel="İptal"
+                isLoading={deleteReceiptMutation.isPending}
+            />
+            <EditReceiptModal
+                isOpen={isEditModalOpen}
+                onOpenChange={setIsEditModalOpen}
+                receiptData={editingReceipt}
+                onReceiptUpdate={() => {
+                    const currentParams = new URLSearchParams(window.location.search);
+                    currentParams.set('_refresh', Date.now().toString());
+                    router.push(`${window.location.pathname}?${currentParams.toString()}`);
+                }}
+            />
         </div>
     );
 }
