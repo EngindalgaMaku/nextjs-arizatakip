@@ -6,7 +6,7 @@ import { getStudentReceiptsDashboard } from '@/actions/business-receipts/student
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -466,11 +466,9 @@ function StudentReceiptDashboardContent() {
             </div>
           </form>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button type="submit" form="receipt-form" disabled={isFormLoading}>
-                {isFormLoading ? 'İşlem yapılıyor...' : (formState?.receiptId ? 'Dekont Güncelle' : 'Dekont Ekle')}
-              </Button>
-            </DialogClose>
+            <Button type="submit" form="receipt-form" disabled={isFormLoading}>
+              {isFormLoading ? 'İşlem yapılıyor...' : (formState?.receiptId ? 'Dekont Güncelle' : 'Dekont Ekle')}
+            </Button>
           </DialogFooter>
         </DialogContent>
 
