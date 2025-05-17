@@ -3,7 +3,6 @@
 // import { createServerActionClient } from '@supabase/auth-helpers-nextjs'; // Old
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // New
 // import { cookies } from 'next/headers'; // No longer needed here as createSupabaseServerClient handles it.
-import { type Database } from '@/lib/database.types'; // Projenizdeki database types yolu
 import { z } from 'zod';
 
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
@@ -136,10 +135,8 @@ export async function getStudentReceiptsDashboard(
         staj_isletmeleri ( name )
       `)
       .eq('student_id', validation.data.studentId)
-      .eq('year', validation.data.year) // İlk yıl Eylül-Aralık
-      // .in('month', months) // Bu şekilde tüm ayları getirir, sonra filtreleyebiliriz veya iki ayrı sorgu yapılır.
-      // VEYA daha karmaşık bir sorgu ile Eylül-Aralık YYYY ve Ocak-Haziran YYYY+1 için.
-      // Şimdilik sadece belirtilen yıldaki tüm dekontları alıp, client tarafında aylara göre düzenleyeceğiz.
+      .or(`and(month.gte.9,month.lte.12,year.eq.${validation.data.year}),and(month.gte.1,month.lte.6,year.eq.${validation.data.year + 1})`)
+      // .eq('year', validation.data.year) // This line will be replaced by the .or() condition above
 
     if (error) {
       console.error('Error fetching student receipts:', error);
