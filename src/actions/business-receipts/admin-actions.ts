@@ -63,6 +63,14 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
         staj_isletmeleri (name)
       `, { count: 'exact' }); 
 
+    // Add checks for non-null foreign keys when related filters are active
+    if (studentName || schoolNumber || className) {
+        query = query.not('student_id', 'is', null);
+    }
+    if (businessName) {
+        query = query.not('staj_isletmesi_id', 'is', null);
+    }
+
     if (studentName) {
       query = query.ilike('students.name', `%${studentName}%`);
     }
@@ -89,7 +97,9 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
 
     const startIndex = (page - 1) * pageSize;
     query = query.range(startIndex, startIndex + pageSize - 1);
-    query = query.order('uploaded_at', { ascending: false });
+    query = query.order('students.name', { ascending: true, nullsFirst: false }); // Primary sort: student name (A-Z), handle nulls
+    query = query.order('year', { ascending: false }); // Secondary sort: year (descending)
+    query = query.order('month', { ascending: false }); // Tertiary sort: month (descending)
 
     const { data, error, count } = await query;
 
