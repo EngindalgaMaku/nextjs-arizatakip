@@ -16,12 +16,14 @@ function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row'])
         questionsArray = parsedQuestions.map((q: any): TestQuestion => ({
           id: q.id, 
           text: q.text,
-          options: q.options && typeof q.options === 'object' && !Array.isArray(q.options)
-            ? Object.entries(q.options).map(([key, value]): TestOption => ({
-                id: key, 
-                text: String(value),
-              }))
-            : [], 
+          options: Array.isArray(q.options) // Önce array mi diye kontrol et
+            ? q.options.map((opt: any) => ({ id: String(opt.id), text: String(opt.text) }))
+            : q.options && typeof q.options === 'object' // Sonra obje mi diye kontrol et (eski format için)
+              ? Object.entries(q.options).map(([key, value]): TestOption => ({
+                  id: key, 
+                  text: String(value),
+                }))
+              : [], // İkisi de değilse veya tanımsızsa boş array
           correctOptionId: q.correctOptionId,
           question_type: q.question_type || 'multiple_choice_single_answer',
           points: q.points === undefined ? 1 : q.points,
@@ -36,12 +38,14 @@ function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row'])
     questionsArray = (row.questions as any[]).map((q: any): TestQuestion => ({
       id: q.id, 
       text: q.text,
-      options: q.options && typeof q.options === 'object' && !Array.isArray(q.options)
-        ? Object.entries(q.options).map(([key, value]): TestOption => ({
-            id: key,
-            text: String(value),
-          }))
-        : [],
+      options: Array.isArray(q.options) // Önce array mi diye kontrol et
+        ? q.options.map((opt: any) => ({ id: String(opt.id), text: String(opt.text) }))
+        : q.options && typeof q.options === 'object' && !Array.isArray(q.options) // Sonra obje mi diye kontrol et (eski format için)
+          ? Object.entries(q.options).map(([key, value]): TestOption => ({
+              id: key,
+              text: String(value),
+            }))
+          : [], // İkisi de değilse veya tanımsızsa boş array
       correctOptionId: q.correctOptionId,
       question_type: q.question_type || 'multiple_choice_single_answer',
       points: q.points === undefined ? 1 : q.points,
@@ -55,11 +59,13 @@ function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row'])
     slug: row.slug,
     description: row.description || '',
     questions: questionsArray, 
+    category: row.category || undefined,
     passingScore: row.passing_score === null ? undefined : row.passing_score,
     timeLimit: row.time_limit === null ? undefined : row.time_limit,
     randomizeQuestions: row.randomize_questions === null ? false : row.randomize_questions,
     randomizeOptions: row.randomize_options === null ? false : row.randomize_options,
     isPublished: row.is_published === null ? false : row.is_published,
+    isPublicViewable: row.is_public_viewable === null ? false : row.is_public_viewable,
     createdAt: row.created_at ? new Date(row.created_at) : new Date(),
     updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
   };
@@ -102,6 +108,39 @@ export async function getTestById(id: string): Promise<Test | null> {
   return data ? mapSupabaseRowToTest(data) : null;
 }
 
+// --- Herkese Açık Testler İçin Fonksiyonlar ---
+
+export async function getPublicTests(): Promise<Test[]> {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select('*')
+    .eq('is_public_viewable', true)
+    .eq('is_published', true) // Genellikle public testlerin aynı zamanda yayınlanmış olması beklenir
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching public tests:', error);
+    return [];
+  }
+  return data ? data.map(mapSupabaseRowToTest) : [];
+}
+
+export async function getPublicTestBySlug(slug: string): Promise<Test | null> {
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select('*')
+    .eq('slug', slug)
+    .eq('is_public_viewable', true)
+    .eq('is_published', true) // Yayınlanmış ve public ise getir
+    .maybeSingle();
+
+  if (error) {
+    console.error(`Error fetching public test by slug ${slug}:`, error);
+    return null;
+  }
+  return data ? mapSupabaseRowToTest(data) : null;
+}
+
 // --- CRUD Fonksiyonları ---
 
 // NewTestData arayüzü client tarafındaki formdan gelen veriyi temsil eder.
@@ -109,6 +148,7 @@ export interface NewTestData {
   title: string;
   slug?: string;
   description: string;
+  category?: string;
   passingScore: number;
   timeLimit: number;
   randomizeQuestions: boolean;
@@ -172,6 +212,7 @@ export async function addTest(testData: NewTestData): Promise<Test | { error: st
       title: testData.title,
       slug: slugToSave,
       description: testData.description,
+      category: testData.category || null,
       passing_score: testData.passingScore,
       time_limit: testData.timeLimit,
       randomize_questions: testData.randomizeQuestions,
@@ -207,11 +248,13 @@ export interface UpdateTestData {
   title?: string;
   slug?: string;
   description?: string;
+  category?: string;
   passingScore?: number;
   timeLimit?: number;
   randomizeQuestions?: boolean;
   randomizeOptions?: boolean;
   isPublished?: boolean;
+  isPublicViewable?: boolean;
   questions?: Array<{
     id?: number; // Varolan sorular için ID, yeni sorular için tanımsız
     text: string;
@@ -288,19 +331,22 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
             });
     }
 
-    const updatePayload: Database['public']['Tables']['tests']['Update'] = {};
-    if (updates.title) updatePayload.title = updates.title;
-    if (slugToSave) updatePayload.slug = slugToSave;
-    if (updates.description !== undefined) updatePayload.description = updates.description;
-    if (updates.passingScore !== undefined) updatePayload.passing_score = updates.passingScore;
-    if (updates.timeLimit !== undefined) updatePayload.time_limit = updates.timeLimit;
-    if (updates.randomizeQuestions !== undefined) updatePayload.randomize_questions = updates.randomizeQuestions;
-    if (updates.randomizeOptions !== undefined) updatePayload.randomize_options = updates.randomizeOptions;
-    if (updates.isPublished !== undefined) updatePayload.is_published = updates.isPublished;
-    if (processedQuestions) updatePayload.questions = processedQuestions as any; // JSONB
-    updatePayload.updated_at = new Date().toISOString(); // DB trigger'ı varsa bu gereksiz
+    const updateData: Partial<Database['public']['Tables']['tests']['Row']> = {};
 
-    if (Object.keys(updatePayload).length === 1 && updatePayload.updated_at) {
+    if (updates.title) updateData.title = updates.title;
+    if (slugToSave) updateData.slug = slugToSave;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.category !== undefined) updateData.category = updates.category;
+    if (updates.passingScore !== undefined) updateData.passing_score = updates.passingScore;
+    if (updates.timeLimit !== undefined) updateData.time_limit = updates.timeLimit;
+    if (updates.randomizeQuestions !== undefined) updateData.randomize_questions = updates.randomizeQuestions;
+    if (updates.randomizeOptions !== undefined) updateData.randomize_options = updates.randomizeOptions;
+    if (updates.isPublished !== undefined) updateData.is_published = updates.isPublished;
+    if (updates.isPublicViewable !== undefined) updateData.is_public_viewable = updates.isPublicViewable;
+    if (processedQuestions) updateData.questions = processedQuestions as any; // JSONB
+    updateData.updated_at = new Date().toISOString(); // DB trigger'ı varsa bu gereksiz
+
+    if (Object.keys(updateData).length === 1 && updateData.updated_at) {
         // Sadece updated_at güncelleniyorsa (yani formda değişiklik yoksa) DB'ye gitme
         const currentTest = await getTestById(testId);
         return currentTest || { error: 'Test bulunamadı ama değişiklik de yoktu.' };
@@ -308,7 +354,7 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
 
     const { data: updatedData, error: updateError } = await supabase
       .from(TABLE_NAME)
-      .update(updatePayload)
+      .update(updateData)
       .eq('id', testId)
       .select()
       .single();

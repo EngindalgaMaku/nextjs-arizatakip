@@ -26,6 +26,8 @@ export interface Test {
   randomizeQuestions?: boolean;
   randomizeOptions?: boolean;
   isPublished?: boolean;
+  isPublicViewable?: boolean;
+  category?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -107,7 +109,8 @@ export enum ParticipantStatus {
   IN_PROGRESS = 'in_progress',  // Sınav devam ediyor
   COMPLETED = 'completed',      // Tamamlandı
   TIMED_OUT = 'timed_out',      // Süre doldu
-  DISQUALIFIED = 'disqualified' // Diskalifiye edildi (kopya vb.)
+  DISQUALIFIED = 'disqualified', // Diskalifiye edildi (kopya vb.)
+  ABANDONED = 'abandoned'      // Terk edildi
 }
 
 export interface LiveExamCreationParams {

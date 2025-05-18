@@ -1,6 +1,7 @@
 'use client';
 
 import { getTestBySlug, updateTest, UpdateTestData } from '@/actions/testActions';
+import { Switch } from '@/components/ui/switch';
 import { baseFormTemplate, createNewOption, createNewQuestion } from '@/types/form-templates';
 import { Test as TestType } from '@/types/tests';
 import { ArrowLeftIcon, ArrowPathIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -32,11 +33,13 @@ const testSchema = z.object({
   title: z.string().min(1, { message: 'Test başlığı boş olamaz.' }),
   slug: z.string().optional(),
   description: z.string(),
+  category: z.string().optional(),
   passingScore: z.coerce.number().min(0).max(100),
   timeLimit: z.coerce.number().min(1),
   randomizeQuestions: z.boolean(),
   randomizeOptions: z.boolean(),
   isPublished: z.boolean(),
+  isPublicViewable: z.boolean().optional(),
   questions: z.array(questionSchema).min(1, { message: 'Test en az bir soru içermelidir.' }),
 }).required();
 
@@ -44,7 +47,8 @@ type TestFormValues = z.infer<typeof testSchema>;
 
 // Default values for the form
 const defaultValues: TestFormValues = {
-  ...baseFormTemplate
+  ...baseFormTemplate,
+  isPublicViewable: false,
 };
 
 interface EditTestPageProps {
@@ -91,11 +95,13 @@ export default function EditTestPage({ params }: EditTestPageProps) {
               title: fetchedTest.title,
               slug: fetchedTest.slug,
               description: fetchedTest.description || '',
+              category: fetchedTest.category || '',
               passingScore: fetchedTest.passingScore || 70,
               timeLimit: fetchedTest.timeLimit || 60,
               randomizeQuestions: fetchedTest.randomizeQuestions || false,
               randomizeOptions: fetchedTest.randomizeOptions || false,
               isPublished: fetchedTest.isPublished || false,
+              isPublicViewable: fetchedTest.isPublicViewable || false,
               questions: fetchedTest.questions.map(q => ({
                 id: parseInt(q.id, 10),
                 text: q.text,
@@ -160,11 +166,13 @@ export default function EditTestPage({ params }: EditTestPageProps) {
       title: data.title,
       slug: data.slug,
       description: data.description,
+      category: data.category,
       passingScore: Number(data.passingScore),
       timeLimit: Number(data.timeLimit),
       randomizeQuestions: data.randomizeQuestions,
       randomizeOptions: data.randomizeOptions,
       isPublished: data.isPublished,
+      isPublicViewable: data.isPublicViewable,
       questions: data.questions.map(q => {
         const liveOptions = q.options.filter(opt => !opt.toBeDeleted);
         let correctOptIdOrIdx: string | number;
@@ -313,10 +321,17 @@ export default function EditTestPage({ params }: EditTestPageProps) {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
+                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                <input type="text" id="category" {...register('category')} className={`mt-1 block w-full px-3 py-2 border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
+                {errors.category && <p className="mt-1 text-xs text-red-600">{errors.category.message}</p>}
+              </div>
+              <div>
                 <label htmlFor="passingScore" className="block text-sm font-medium text-gray-700 mb-1">Geçme Puanı (%)</label>
                 <input type="number" id="passingScore" {...register('passingScore')} className={`mt-1 block w-full px-3 py-2 border ${errors.passingScore ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
                 {errors.passingScore && <p className="mt-1 text-xs text-red-600">{errors.passingScore.message}</p>}
               </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="timeLimit" className="block text-sm font-medium text-gray-700 mb-1">Süre Limiti (dakika)</label>
                 <input type="number" id="timeLimit" {...register('timeLimit')} className={`mt-1 block w-full px-3 py-2 border ${errors.timeLimit ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`} />
@@ -325,9 +340,10 @@ export default function EditTestPage({ params }: EditTestPageProps) {
             </div>
             <div className="space-y-3 pt-2">
                 <h3 className="text-md font-medium text-gray-700">Test Seçenekleri</h3>
-              <div className="flex items-center"><input id="randomizeQuestions" type="checkbox" {...register('randomizeQuestions')} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" /><label htmlFor="randomizeQuestions" className="ml-2 block text-sm text-gray-900">Soruları Karıştır</label></div>
-              <div className="flex items-center"><input id="randomizeOptions" type="checkbox" {...register('randomizeOptions')} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" /><label htmlFor="randomizeOptions" className="ml-2 block text-sm text-gray-900">Seçenekleri Karıştır</label></div>
-              <div className="flex items-center"><input id="isPublished" type="checkbox" {...register('isPublished')} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" /><label htmlFor="isPublished" className="ml-2 block text-sm text-gray-900">Test Yayında Olsun</label></div>
+              <div className="flex items-center"><Controller name="randomizeQuestions" control={control} render={({ field }) => <Switch id="randomizeQuestions" checked={field.value} onCheckedChange={field.onChange} />} /><label htmlFor="randomizeQuestions" className="ml-2 block text-sm text-gray-900">Soruları Karıştır</label></div>
+              <div className="flex items-center"><Controller name="randomizeOptions" control={control} render={({ field }) => <Switch id="randomizeOptions" checked={field.value} onCheckedChange={field.onChange} />} /><label htmlFor="randomizeOptions" className="ml-2 block text-sm text-gray-900">Seçenekleri Karıştır</label></div>
+              <div className="flex items-center"><Controller name="isPublished" control={control} render={({ field }) => <Switch id="isPublished" checked={field.value} onCheckedChange={field.onChange} />} /><label htmlFor="isPublished" className="ml-2 block text-sm text-gray-900">Test Yayında Olsun</label></div>
+              <div className="flex items-center"><Controller name="isPublicViewable" control={control} render={({ field }) => <Switch id="isPublicViewable" checked={field.value} onCheckedChange={field.onChange} />} /><label htmlFor="isPublicViewable" className="ml-2 block text-sm text-gray-900">Herkese Açık Görüntülenebilir</label></div>
             </div>
         </div>
 

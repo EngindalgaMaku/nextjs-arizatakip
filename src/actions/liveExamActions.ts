@@ -198,14 +198,21 @@ export async function createLiveExam(
       .single();
       
     if (error) {
-      console.error('Error creating live exam:', error);
-      return { error: `Canlı sınav oluşturulurken bir hata oluştu: ${error.message}` };
+      console.error('Error creating live exam (full error object):', JSON.stringify(error, null, 2));
+      const errorMessage = error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Bilinmeyen bir veritabanı hatası.';
+      return { error: `Canlı sınav oluşturulurken bir hata oluştu: ${errorMessage}` };
+    }
+    
+    if (!data) {
+      console.error('Error creating live exam: No data returned from Supabase after insert but no explicit error.');
+      return { error: 'Canlı sınav oluşturuldu ancak veritabanından yanıt alınamadı.' };
     }
     
     return mapSupabaseRowToLiveExam(data);
-  } catch (error) {
-    console.error('createLiveExam error:', error);
-    return { error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
+  } catch (e) {
+    console.error('createLiveExam catch error:', JSON.stringify(e, null, 2));
+    const errorMessage = e instanceof Error ? e.message : 'İşlem sırasında bilinmeyen bir hata oluştu.';
+    return { error: `Canlı sınav oluşturma başarısız: ${errorMessage}` };
   }
 }
 
@@ -372,17 +379,16 @@ export async function registerStudentForExam(
     // Yeni deneme numarasını belirle
     const attemptNumber = existingParticipants ? existingParticipants.length + 1 : 1;
     
-    const newParticipant = {
-      exam_id: examId,
+    const newParticipantData = {
+      live_exam_id: examId,
       student_id: studentId,
       status: ParticipantStatus.REGISTERED,
       progress: 0,
-      attempt_number: attemptNumber
     };
     
     const { data, error } = await supabase
       .from(PARTICIPANTS_TABLE)
-      .insert(newParticipant)
+      .insert(newParticipantData)
       .select()
       .single();
       

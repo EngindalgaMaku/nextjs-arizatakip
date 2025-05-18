@@ -6,6 +6,7 @@ export const TESTS: Test[] = [
     title: 'Bölüm 7: Uygulama Katmanı Testi',
     slug: 'osi-application-layer',
     description: 'OSI modelinin 7. katmanı olan Uygulama Katmanı hakkında 50 soruluk çoktan seçmeli test.',
+    category: 'Ağ Temelleri',
     questions: [
       {
         id: "1",
@@ -571,6 +572,7 @@ export const TESTS: Test[] = [
     title: 'Bölüm 8: Nmap Port Tarama Teknikleri Testi',
     slug: 'nmap-port-scanning-techniques',
     description: 'Nmap kullanarak çeşitli port tarama teknikleri hakkında 50 soruluk çoktan seçmeli test.',
+    category: 'Siber Güvenlik',
     questions: [
       // Nmap ve port tarama teknikleri ile ilgili sorular eklenecek
     ],

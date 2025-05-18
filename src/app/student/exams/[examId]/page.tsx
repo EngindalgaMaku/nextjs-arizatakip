@@ -1,522 +1,322 @@
 'use client';
 
-import { getLiveExamById, registerStudentForExam, startExamForStudent, submitExamForStudent, updateStudentAnswers } from "@/actions/liveExamActions";
-import { getTestById } from "@/actions/testActions";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
-import { LiveExam, LiveExamParticipant, LiveExamStatus, ParticipantStatus, Test, TestQuestion } from "@/types/tests";
-import { addMinutes, differenceInSeconds } from "date-fns";
-import { InfoIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/supabaseClient";
+import { LiveExam, LiveExamStatus, Test, TestQuestion } from "@/types/tests";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
-export default function TakeExamPage({ params }: { params: { examId: string } }) {
+// Helper function to map Supabase live_exam row to our LiveExam type
+function mapSupabaseRowToLiveExamPage(row: any): LiveExam { // Using 'any' for row for simplicity, consider Database type from supabase.ts
+  if (!row) {
+    // Handle the case where row is null or undefined, perhaps return null or throw an error
+    // For now, returning a structure that might highlight issues, or you could return null
+    // and ensure the calling code handles it.
+    console.error("mapSupabaseRowToLiveExamPage received null or undefined row");
+    return null as unknown as LiveExam; // Or a more specific error/default handling
+  }
+  return {
+    id: String(row.id || ''), // Ensure string and provide fallback
+    testId: String(row.test_id || ''), // snake_case to camelCase
+    title: String(row.title || ''),
+    description: row.description || undefined,
+    timeLimit: Number(row.time_limit || 0),
+    scheduledStartTime: new Date(row.scheduled_start_time || Date.now()), // Fallback to now if undefined
+    scheduledEndTime: new Date(row.scheduled_end_time || Date.now()),     // Fallback to now if undefined
+    actualStartTime: row.actual_start_time ? new Date(row.actual_start_time) : undefined,
+    actualEndTime: row.actual_end_time ? new Date(row.actual_end_time) : undefined,
+    status: row.status as LiveExamStatus, // Type assertion
+    createdBy: String(row.created_by || ''), // Handle possible null
+    createdAt: new Date(row.created_at || Date.now()),
+    updatedAt: new Date(row.updated_at || Date.now()),
+    studentIds: row.student_ids || undefined,
+    classIds: row.class_ids || undefined,
+    autoPublishResults: Boolean(row.auto_publish_results),
+    allowLateSubmissions: Boolean(row.allow_late_submissions),
+    maxAttempts: Number(row.max_attempts || 1),
+    randomizeQuestions: Boolean(row.randomize_questions),
+    randomizeOptions: Boolean(row.randomize_options),
+  };
+}
+
+// Helper function to map Supabase test row to our Test type
+function mapSupabaseRowToTestPage(row: any): Test { // Using 'any' for row for simplicity
+  if (!row) {
+    console.error("mapSupabaseRowToTestPage received null or undefined row");
+    return null as unknown as Test;
+  }
+  let questionsArray: TestQuestion[] = [];
+  const rawQuestions = row.questions;
+
+  if (rawQuestions && Array.isArray(rawQuestions)) {
+    questionsArray = rawQuestions.map((q: any): TestQuestion => ({
+      id: String(q.id || `gen-q-${Date.now()}-${Math.random()}`), 
+      text: String(q.text || ''),
+      options: Array.isArray(q.options)
+        ? q.options.map((opt: any) => ({ 
+            id: String(opt.id || `gen-opt-${Date.now()}-${Math.random()}`), 
+            text: String(opt.text || '') 
+          }))
+        : [],
+      correctOptionId: String(q.correctOptionId || ''),
+      question_type: q.question_type || 'multiple_choice_single_answer',
+      points: q.points === undefined || q.points === null ? 1 : Number(q.points),
+      explanation: q.explanation || null,
+    }));
+  } else if (typeof rawQuestions === 'string') {
+    try {
+      const parsedQuestions = JSON.parse(rawQuestions);
+      if (Array.isArray(parsedQuestions)) {
+         questionsArray = parsedQuestions.map((q: any): TestQuestion => ({
+            id: String(q.id || `gen-q-${Date.now()}-${Math.random()}`),
+            text: String(q.text || ''),
+            options: Array.isArray(q.options)
+                ? q.options.map((opt: any) => ({ 
+                    id: String(opt.id || `gen-opt-${Date.now()}-${Math.random()}`), 
+                    text: String(opt.text || '') 
+                  }))
+                : [],
+            correctOptionId: String(q.correctOptionId || ''),
+            question_type: q.question_type || 'multiple_choice_single_answer',
+            points: q.points === undefined || q.points === null ? 1 : Number(q.points),
+            explanation: q.explanation || null,
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to parse questions JSON string for Test:', error);
+    }
+  }
+
+  return {
+    id: String(row.id || ''),
+    title: String(row.title || ''),
+    slug: String(row.slug || ''),
+    description: String(row.description || ''),
+    questions: questionsArray,
+    category: row.category || undefined,
+    passingScore: row.passing_score === null || row.passing_score === undefined ? undefined : Number(row.passing_score),
+    timeLimit: row.time_limit === null || row.time_limit === undefined ? undefined : Number(row.time_limit),
+    randomizeQuestions: row.randomize_questions === null ? false : Boolean(row.randomize_questions),
+    randomizeOptions: row.randomize_options === null ? false : Boolean(row.randomize_options),
+    isPublished: row.is_published === null ? false : Boolean(row.is_published),
+    createdAt: row.created_at ? new Date(row.created_at) : undefined, // Prefer undefined over Date.now() if truly optional
+    updatedAt: row.updated_at ? new Date(row.updated_at) : undefined, // Prefer undefined over Date.now() if truly optional
+  };
+}
+
+export default function TakeExamPage() {
   const router = useRouter();
-  const examId = params.examId;
-  
-  const [exam, setExam] = useState<LiveExam | null>(null);
+  const searchParams = useSearchParams();
+  const params = useParams();
+  const examId = params.examId as string;
+  const studentId = searchParams.get('studentId');
+
+  const [liveExam, setLiveExam] = useState<LiveExam | null>(null);
   const [test, setTest] = useState<Test | null>(null);
-  const [questions, setQuestions] = useState<TestQuestion[]>([]);
-  const [participant, setParticipant] = useState<LiveExamParticipant | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [progressInterval, setProgressInterval] = useState<NodeJS.Timeout | null>(null);
-  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
-  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Gerçek uygulamada bu değer kimlik doğrulama ve kullanıcı oturumundan alınacak
-  const studentId = "current-student-id"; // TODO: Gerçek kimlik ile değiştirilecek
   
   useEffect(() => {
-    // Sınav ve test bilgilerini yükle
-    const fetchData = async () => {
+    if (!examId) {
+      setError("Sınav ID'si URL'de bulunamadı.");
+      setIsLoading(false);
+      return;
+    }
+    if (!studentId) {
+      setError("Öğrenci ID'si URL'de bulunamadı.");
+      toast.error("Öğrenci kimliği URL'de bulunamadı. Lütfen öğrenci seçimi yaparak tekrar deneyin.");
+      setIsLoading(false);
+      return;
+    }
+          
+    const fetchExamDetails = async () => {
       setIsLoading(true);
-      try {
-        // Sınav bilgisini al
-        const examData = await getLiveExamById(examId);
-        if (!examData) {
-          toast.error('Sınav bulunamadı.');
-          router.push('/student/exams');
-          return;
-        }
-        
-        setExam(examData);
-        
-        // Sınavın durumunu kontrol et
-        if (examData.status !== LiveExamStatus.ACTIVE) {
-          if (examData.status === LiveExamStatus.COMPLETED) {
-            router.push(`/student/exams/${examId}/results`);
-            return;
-          }
-          
-          toast.error('Bu sınav şu anda aktif değil.');
-          router.push('/student/exams');
-          return;
-        }
-        
-        // Test bilgisini al
-        const testData = await getTestById(examData.testId);
-        if (!testData) {
-          toast.error('Test bilgisi alınamadı.');
-          router.push('/student/exams');
-          return;
-        }
-        
-        setTest(testData);
-        
-        // Soruları işle
-        let processedQuestions = [...testData.questions];
-        
-        // Eğer sorular karıştırılacaksa
-        if (examData.randomizeQuestions) {
-          processedQuestions = shuffleArray([...processedQuestions]);
-        }
-        
-        // Eğer seçenekler karıştırılacaksa
-        if (examData.randomizeOptions) {
-          processedQuestions = processedQuestions.map(q => ({
-            ...q,
-            options: shuffleArray([...q.options])
-          }));
-        }
-        
-        setQuestions(processedQuestions);
-        
-        // Öğrenciyi sınava kaydet veya mevcut kaydını al
-        let participantData: LiveExamParticipant | { error: string };
-        participantData = await registerStudentForExam(examId, studentId);
-        
-        // Eğer sınavı başlatmak gerekiyorsa
-        if (!('error' in participantData) && participantData.status === ParticipantStatus.REGISTERED) {
-          participantData = await startExamForStudent(
-            examId, 
-            studentId, 
-            window.location.hostname, // IP yerine hostname
-            navigator.userAgent // Cihaz bilgisi
-          );
-        }
-        
-        if ('error' in participantData) {
-          toast.error(participantData.error);
-          router.push('/student/exams');
-          return;
-        }
-        
-        setParticipant(participantData);
-        
-        // Mevcut cevapları al
-        if (participantData.answers) {
-          setAnswers(participantData.answers);
-        }
-        
-        // Sınav süresini başlat
-        if (participantData.startTime) {
-          const startTime = new Date(participantData.startTime);
-          const endTime = addMinutes(startTime, examData.timeLimit);
-          const remainingSeconds = Math.max(0, differenceInSeconds(endTime, new Date()));
-          setTimeLeft(remainingSeconds);
-          
-          // Süre takip intervalı
-          const interval = setInterval(() => {
-            setTimeLeft(prevTime => {
-              if (prevTime === null || prevTime <= 0) {
-                clearInterval(interval);
-                handleTimeUp();
-                return 0;
-              }
-              return prevTime - 1;
-            });
-          }, 1000);
-          
-          setTimerInterval(interval);
-        }
-        
-        // İlerleme takip intervalı
-        const progressInterval = setInterval(() => {
-          updateProgress();
-        }, 30000); // 30 saniyede bir ilerlemeyi kaydet
-        
-        setProgressInterval(progressInterval);
-      } catch (error) {
-        console.error('Error loading exam:', error);
-        toast.error('Sınav yüklenirken bir hata oluştu.');
-        router.push('/student/exams');
-      } finally {
+      setError(null);
+      setLiveExam(null);
+      setTest(null);
+      
+      const { data: liveExamData, error: liveExamError } = await supabase
+        .from('live_exams')
+        .select('*, test_id')
+        .eq('id', examId)
+        .single();
+
+      if (liveExamError) {
+        console.error("Error fetching live exam record:", liveExamError);
+        setError(`Canlı sınav kaydı getirilemedi: ${liveExamError.message}`);
+        toast.error(`Canlı sınav kaydı getirilemedi: ${liveExamError.message}`);
         setIsLoading(false);
+        return;
       }
-    };
-    
-    fetchData();
-    
-    // Component unmount olduğunda intervalleri temizle
-    return () => {
-      if (timerInterval) clearInterval(timerInterval);
-      if (progressInterval) clearInterval(progressInterval);
-    };
-  }, [examId, router, studentId]);
-  
-  // İlerlemeyi sunucuya gönder
-  const updateProgress = async () => {
-    if (!participant || !exam) return;
-    
-    try {
-      // İlerleme yüzdesini hesapla
-      const answeredCount = Object.keys(answers).length;
-      const totalQuestions = questions.length;
-      const progress = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+      if (!liveExamData) {
+        setError("Belirtilen ID ile canlı sınav bulunamadı.");
+        toast.error("Belirtilen ID ile canlı sınav bulunamadı.");
+        setIsLoading(false);
+        return;
+      }
       
-      // Sunucuya gönder
-      const result = await updateStudentAnswers(examId, studentId, answers, progress);
-      
-      if ('error' in result) {
-        console.error('Error updating progress:', result.error);
+      setLiveExam(mapSupabaseRowToLiveExamPage(liveExamData));
+
+      const { data: testDataFromDb, error: testError } = await supabase
+        .from('tests') 
+        .select('*')
+        .eq('id', liveExamData.test_id)
+        .single();
+
+      if (testError) {
+        console.error("Error fetching test details:", testError);
+        setError(`Test detayları getirilemedi: ${testError.message}`);
+        toast.error(`Test detayları getirilemedi: ${testError.message}`);
+      } else if (testDataFromDb) {
+        const mappedTest = mapSupabaseRowToTestPage(testDataFromDb);
+        setTest(mappedTest);
+        // Use liveExam from state, which is now the mapped version
+        const currentLiveExam = mapSupabaseRowToLiveExamPage(liveExamData); // Re-map or use state if race conditions are not an issue
+        if (currentLiveExam) {
+            const timeLimitToUse = currentLiveExam.timeLimit ?? mappedTest?.timeLimit;
+            if (timeLimitToUse) {
+              setTimeLeft(timeLimitToUse * 60);
+            }
+        } else if (mappedTest?.timeLimit) { // Fallback if liveExam somehow null but test isn't
+             setTimeLeft(mappedTest.timeLimit * 60);
+        }
       } else {
-        setParticipant(result);
+        setError("Sınava ait test (sorular) bulunamadı.");
+        toast.error("Sınava ait test (sorular) bulunamadı.");
       }
-    } catch (error) {
-      console.error('Error updating progress:', error);
-    }
+      setIsLoading(false);
+    };
+
+    fetchExamDetails();
+  }, [examId, studentId]);
+
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prevTime => (prevTime ? prevTime - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const handleAnswerChange = (questionId: string | number, optionId: string) => {
+    setAnswers(prev => ({ ...prev, [String(questionId)]: optionId }));
   };
-  
-  // Süre dolduğunda
-  const handleTimeUp = async () => {
-    toast.error('Süreniz doldu! Cevaplarınız otomatik olarak gönderiliyor.');
-    await handleSubmitExam(false);
-  };
-  
-  // Cevap seçme
-  const handleAnswerSelect = (questionId: string, optionId: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: optionId
-    }));
-  };
-  
-  // Bir sonraki soruya geç
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
-  
-  // Bir önceki soruya dön
-  const handlePrevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
-  
-  // Belirli bir soruya git
-  const handleGotoQuestion = (index: number) => {
-    if (index >= 0 && index < questions.length) {
-      setCurrentQuestionIndex(index);
-    }
-  };
-  
-  // Sınavı bitir
-  const handleSubmitExam = async (showConfirmation = true) => {
-    if (showConfirmation) {
-      setConfirmSubmitOpen(true);
+
+  const handleSubmitExam = async () => {
+    if (!studentId || !liveExam?.id || !test?.id || !test.questions) {
+      toast.error("Sınav gönderimi için gerekli bilgiler eksik: Öğrenci, canlı sınav veya test detayları bulunamadı.");
+      console.error("Submission failed due to missing data:", { studentId, liveExamId: liveExam?.id, testId: test?.id, questionsAvailable: !!test?.questions });
       return;
     }
     
-    setIsSubmitting(true);
-    
-    try {
-      // Son kez ilerlemeyi güncelle
-      await updateProgress();
-      
-      // Sınavı bitir
-      const result = await submitExamForStudent(examId, studentId, answers);
-      
-      if ('error' in result) {
-        toast.error(result.error);
-      } else {
-        toast.success('Sınavınız başarıyla tamamlandı!');
-        router.push(`/student/exams/${examId}/results`);
+    let score = 0;
+    test.questions.forEach(q => {
+      if (q.correctOptionId && answers[String(q.id)] === q.correctOptionId) {
+        score++;
       }
-    } catch (error) {
-      console.error('Error submitting exam:', error);
-      toast.error('Sınav gönderilirken bir hata oluştu.');
-    } finally {
-      setIsSubmitting(false);
-      setConfirmSubmitOpen(false);
+    });
+
+    const percentage = test.questions.length > 0 ? (score / test.questions.length) * 100 : 0;
+
+    const submissionData = {
+      student_id: studentId,
+      live_exam_id: liveExam.id, // Guarded by the check above
+      test_id: test.id,         // Guarded by the check above
+      score: percentage,
+      answers: answers, 
+      submitted_at: new Date().toISOString(),
+    };
+
+    console.log("Submitting exam with data:", submissionData); // For debugging
+
+    const { error: submissionError } = await supabase
+      .from('student_exam_results') 
+      .insert(submissionData);
+
+    if (submissionError) {
+      toast.error(`Sınav sonucu kaydedilirken bir hata oluştu: ${submissionError.message}`);
+      console.error("Error submitting exam:", submissionError);
+    } else {
+      toast.success(`Sınav tamamlandı! Puanınız: ${percentage.toFixed(2)}%`);
+      router.push(`/student/results?liveExamId=${liveExam.id}&studentId=${studentId}`); 
     }
   };
   
-  // Cevapların genel durumu
-  const getAnswerStats = () => {
-    const answeredCount = Object.keys(answers).length;
-    const totalQuestions = questions.length;
-    const unansweredCount = totalQuestions - answeredCount;
-    const progress = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
-    
-    return { answeredCount, unansweredCount, totalQuestions, progress };
-  };
+  if (isLoading) return <div className="flex justify-center items-center h-screen"><p>Sınav yükleniyor...</p></div>;
+  if (error) return <div className="flex justify-center items-center h-screen text-red-500"><p>Hata: {error}</p></div>;
   
-  // Yükleme durumu
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-10">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center">
-            <div className="text-lg font-medium mb-2">Yükleniyor</div>
-            <div className="text-sm text-gray-500">Sınav hazırlanıyor...</div>
-          </div>
-        </div>
-      </div>
-    );
+  if (!test || !test.questions || test.questions.length === 0) {
+    return <div className="flex justify-center items-center h-screen"><p>Sınav için sorular bulunamadı veya yüklenemedi.</p></div>;
   }
-  
-  // Sınav veya test bulunamadıysa
-  if (!exam || !test || !questions.length || !participant) {
-    return (
-      <div className="container mx-auto py-10">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center">
-            <div className="text-lg font-medium mb-2">Sınav Bulunamadı</div>
-            <div className="text-sm text-gray-500 mb-4">İstediğiniz sınav bulunamadı veya erişim izniniz yok.</div>
-            <Button onClick={() => router.push('/student/exams')}>Sınavlara Dön</Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  const currentQuestion = questions[currentQuestionIndex];
-  const { answeredCount, unansweredCount, totalQuestions, progress } = getAnswerStats();
-  
-  // Kalan süreyi formatla
-  const formatRemainingTime = () => {
-    if (timeLeft === null) return '--:--';
-    
-    const hours = Math.floor(timeLeft / 3600);
-    const minutes = Math.floor((timeLeft % 3600) / 60);
-    const seconds = timeLeft % 60;
-    
-    return `${hours > 0 ? `${hours}:` : ''}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  const currentQuestion = test.questions[currentQuestionIndex];
+
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return "Süresiz";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h > 0 ? h + 's ' : ''}${m}d ${s}s`;
   };
+
+  if (timeLeft === 0 && timeLeft !== null) {
+    handleSubmitExam(); 
+    return <div className="flex justify-center items-center h-screen"><p>Süre doldu! Sınavınız gönderiliyor...</p></div>;
+  }
   
   return (
-    <div className="container mx-auto py-10">
-      {/* Üst Bilgi Alanı */}
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">{exam.title}</h1>
-          <p className="text-gray-500">{test.title}</p>
-        </div>
-        
-        <div className="mt-4 md:mt-0 flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-sm font-medium mb-1">Kalan Süre</div>
-            <div className={`text-xl font-mono ${timeLeft && timeLeft < 300 ? 'text-red-500' : ''}`}>
-              {formatRemainingTime()}
-            </div>
-          </div>
-          
-          <Button 
-            variant="destructive" 
-            onClick={() => handleSubmitExam()} 
-            disabled={isSubmitting}
-          >
-            Sınavı Bitir
-          </Button>
-        </div>
-      </div>
-      
-      {/* İlerleme Durumu */}
-      <Card className="mb-6">
-        <CardContent className="py-4">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-2">
-            <div className="flex items-center gap-4 mb-2 md:mb-0">
-              <div>
-                <span className="font-medium">{currentQuestionIndex + 1}</span> / {totalQuestions}. soru
-              </div>
-              <div>
-                <span className="font-medium text-green-600">{answeredCount}</span> cevaplanan
-              </div>
-              <div>
-                <span className="font-medium text-red-600">{unansweredCount}</span> boş
-              </div>
-            </div>
-            
-            <div className="w-full md:w-64">
-              <Progress value={progress} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Soru Kartı */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Soru Listesi (Mobilde gizli) */}
-        <div className="hidden md:block">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Sorular</CardTitle>
-              <CardDescription>Soruya gitmek için tıklayın</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-5 gap-2">
-                {questions.map((q, index) => (
+    <div className="container mx-auto p-4 flex flex-col items-center">
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle>{liveExam?.title || test.title}</CardTitle>
+          {timeLeft !== null && <CardDescription>Kalan Süre: {formatTime(timeLeft)}</CardDescription>}
+        </CardHeader>
+        <CardContent>
+          {currentQuestion ? (
+            <div>
+              <h2 className="text-lg font-semibold mb-2">Soru {currentQuestionIndex + 1} / {test.questions.length}</h2>
+              <p className="mb-4">{currentQuestion.text}</p>
+              <div className="space-y-2">
+                {currentQuestion.options.map(option => (
                   <Button
-                    key={q.id}
-                    variant={currentQuestionIndex === index ? "default" : answers[q.id] ? "outline" : "ghost"}
-                    className={`h-10 w-10 p-0 ${answers[q.id] ? "border-green-500" : ""}`}
-                    onClick={() => handleGotoQuestion(index)}
+                    key={option.id}
+                    variant={answers[String(currentQuestion.id)] === option.id ? "default" : "outline"}
+                    onClick={() => handleAnswerChange(currentQuestion.id, option.id)}
+                    className="w-full justify-start text-left h-auto whitespace-normal"
                   >
-                    {index + 1}
+                    {option.text}
                   </Button>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Aktif Soru */}
-        <div className="md:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Soru {currentQuestionIndex + 1}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-6" dangerouslySetInnerHTML={{ __html: currentQuestion.text }} />
-              
-              <div className="space-y-3">
-                {currentQuestion.options.map(option => (
-                  <div
-                    key={option.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      answers[currentQuestion.id] === option.id
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "hover:bg-gray-50"
-                    }`}
-                    onClick={() => handleAnswerSelect(currentQuestion.id, option.id)}
-                  >
-                    {option.text}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={handlePrevQuestion}
-                disabled={currentQuestionIndex === 0}
-              >
-                Önceki Soru
-              </Button>
-              
-              <div className="md:hidden">
+              <div className="mt-6 flex justify-between">
                 <Button
-                  variant="secondary"
-                  onClick={() => document.getElementById('question-nav-dialog')?.click()}
+                  onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                  disabled={currentQuestionIndex === 0}
                 >
-                  {currentQuestionIndex + 1} / {totalQuestions}
+                  Önceki
                 </Button>
-                
-                <Dialog>
-                  <Button id="question-nav-dialog" className="hidden">Open</Button>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Sorular</DialogTitle>
-                      <DialogDescription>
-                        Gitmek istediğiniz soruyu seçin
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid grid-cols-5 gap-2 py-4">
-                      {questions.map((q, index) => (
-                        <Button
-                          key={q.id}
-                          variant={currentQuestionIndex === index ? "default" : answers[q.id] ? "outline" : "ghost"}
-                          className={`h-10 w-10 p-0 ${answers[q.id] ? "border-green-500" : ""}`}
-                          onClick={() => {
-                            handleGotoQuestion(index);
-                            document.querySelector('[data-state="open"][data-type="dialog"]')?.dispatchEvent(
-                              new KeyboardEvent('keydown', {
-                                key: 'Escape',
-                                bubbles: true
-                              })
-                            );
-                          }}
-                        >
-                          {index + 1}
-                        </Button>
-                      ))}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              
-              <Button
-                variant="outline"
-                onClick={handleNextQuestion}
-                disabled={currentQuestionIndex === questions.length - 1}
-              >
-                Sonraki Soru
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
-      
-      {/* Teslim Onay Dialogu */}
-      <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sınavı Tamamla</DialogTitle>
-            <DialogDescription>
-              Sınavı tamamlamak üzeresiniz. Bu işlem geri alınamaz.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <Alert>
-              <InfoIcon className="h-4 w-4" />
-              <AlertTitle>Dikkat</AlertTitle>
-              <AlertDescription>
-                {answeredCount === totalQuestions ? (
-                  'Tüm soruları cevapladınız.'
+                {currentQuestionIndex < test.questions.length - 1 ? (
+                  <Button onClick={() => setCurrentQuestionIndex(prev => Math.min(test.questions.length - 1, prev + 1))}>
+                    Sonraki
+                  </Button>
                 ) : (
-                  <>
-                    {unansweredCount} soruyu boş bıraktınız. 
-                    Sınavı tamamladığınızda boş bıraktığınız sorulara daha sonra dönemezsiniz.
-                  </>
+                  <Button onClick={handleSubmitExam} variant="secondary">
+                    Sınavı Bitir
+                  </Button>
                 )}
-              </AlertDescription>
-            </Alert>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmSubmitOpen(false)}>
-              İptal
-            </Button>
-            <Button 
-              onClick={() => handleSubmitExam(false)} 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'İşleniyor...' : 'Sınavı Tamamla'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </div>
+            </div>
+          ) : (
+            <p>Sorular yüklenemedi.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-}
-
-// Diziyi karıştırmak için yardımcı fonksiyon
-function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
 } 

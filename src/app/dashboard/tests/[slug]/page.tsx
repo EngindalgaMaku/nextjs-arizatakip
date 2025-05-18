@@ -22,6 +22,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 export default function TestViewPage({ params }: { params: { slug: string } }) {
   // 1. All Hooks at the top level
   const router = useRouter();
+  console.log("TestViewPage params:", params); // Log params to check its value
   const { slug } = params;
   
   const [test, setTest] = useState<TestType | null>(null);
@@ -453,25 +454,25 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
           {/* {console.log('Current Question ID:', currentQuestion.id, 'Type of Options:', typeof currentQuestion.options)} */}
           {/* ---- DEBUG BİTİŞ ---- */}
           <div className="space-y-3">
-            {currentQuestion.options && Object.entries(currentQuestion.options).map(([optionKey, optionText]) => (
+            {currentQuestion.options && Array.isArray(currentQuestion.options) && currentQuestion.options.map((option, index) => (
               <div
-                key={optionKey}
-                onClick={() => handleOptionSelect(currentQuestion.id, optionKey)}
+                key={option.id}
+                onClick={() => handleOptionSelect(currentQuestion.id, option.id)}
                 className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                  testState.answers[currentQuestion.id] === optionKey
+                  testState.answers[currentQuestion.id] === option.id
                     ? 'border-indigo-500 bg-indigo-50'
                     : 'border-gray-300 hover:border-indigo-300 hover:bg-indigo-50/50'
                 }`}
               >
                 <div className="flex items-center">
                   <div className={`w-6 h-6 flex items-center justify-center rounded-full border mr-3 ${
-                    testState.answers[currentQuestion.id] === optionKey
+                    testState.answers[currentQuestion.id] === option.id
                       ? 'border-indigo-500 bg-indigo-500 text-white'
                       : 'border-gray-400'
                   }`}>
-                    {optionKey.toUpperCase()}
+                    {String.fromCharCode(65 + index)}
                   </div>
-                  <span>{optionText.text}</span>
+                  <span>{option.text}</span>
                 </div>
               </div>
             ))}

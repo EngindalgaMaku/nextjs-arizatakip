@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { Edit3, Eye, PlusCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -123,11 +123,11 @@ export default function AdminTestsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Başlık</TableHead>
-              <TableHead>Açıklama</TableHead>
-              <TableHead>Oluşturulma Tarihi</TableHead>
-              <TableHead>Soru Sayısı</TableHead>
-              <TableHead>İşlemler</TableHead>
+              <TableHead className="font-semibold">Başlık</TableHead>
+              <TableHead className="font-semibold">Açıklama</TableHead>
+              <TableHead className="font-semibold">Kategori</TableHead>
+              <TableHead className="font-semibold">Soru Sayısı</TableHead>
+              <TableHead className="font-semibold">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -137,15 +137,19 @@ export default function AdminTestsPage() {
                 <TableCell className="max-w-sm truncate" title={test.description || undefined}>
                   {test.description || '-'}
                 </TableCell>
-                <TableCell>{test.createdAt ? formatDate(test.createdAt) : 'Tarih Yok'}</TableCell>
+                <TableCell>{test.category || '-'}</TableCell>
                 <TableCell>{test.questions?.length || 0}</TableCell>
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/tests/${test.slug}`}>Görüntüle</Link>
+                    <Button variant="outline" size="sm" asChild title="Görüntüle">
+                      <Link href={`/dashboard/tests/${test.slug}`} className="flex items-center">
+                        <Eye className="h-4 w-4" />
+                      </Link>
                     </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/tests/${test.slug}/edit`}>Düzenle</Link>
+                    <Button variant="outline" size="sm" asChild title="Düzenle">
+                      <Link href={`/dashboard/tests/${test.slug}/edit`} className="flex items-center">
+                        <Edit3 className="h-4 w-4" />
+                      </Link>
                     </Button>
                     <Button
                       variant="ghost"

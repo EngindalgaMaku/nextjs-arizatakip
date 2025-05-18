@@ -5,25 +5,26 @@ import { getTests } from "@/actions/testActions";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 import type { LiveExamCreationParams, Test } from "@/types/tests";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,8 +38,8 @@ import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-// TODO: Bu adminUserId gerçek bir kimlik doğrulama sistemiyle değiştirilmeli
-const ADMIN_USER_ID_PLACEHOLDER = "admin-user-placeholder-id";
+// ADMIN_USER_ID_PLACEHOLDER artık kullanılmayacak.
+// const ADMIN_USER_ID_PLACEHOLDER = "admin-user-placeholder-id";
 
 const liveExamSchema = z.object({
   testId: z.string().min(1, "Lütfen bir test seçin."),
@@ -113,12 +114,30 @@ export default function CreateLiveExamPage() {
   const onSubmit: SubmitHandler<LiveExamFormValues> = async (data) => {
     setIsSubmitting(true);
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        toast.error("Kullanıcı oturumu bulunamadı. Lütfen tekrar giriş yapın.");
+        console.error("Error getting user session:", userError);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!user.id) {
+        toast.error("Kullanıcı kimliği alınamadı. Lütfen destek ile iletişime geçin.");
+        console.error("User ID is missing from user object:", user);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const teacherId = user.id; // Gerçek kullanıcı ID'si alındı
+
       const creationParams: LiveExamCreationParams = {
         ...data,
         // scheduledStartTime ve scheduledEndTime zaten Date objesi olduğu için direkt kullanılabilir.
       };
       
-      const result = await createLiveExam(ADMIN_USER_ID_PLACEHOLDER, creationParams);
+      const result = await createLiveExam(teacherId, creationParams); // ADMIN_USER_ID_PLACEHOLDER yerine teacherId kullanıldı
 
       if ('id' in result && result.id) {
         toast.success(`Canlı sınav "${result.title}" başarıyla oluşturuldu.`);

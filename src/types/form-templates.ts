@@ -1,4 +1,3 @@
-
 // Base option template with required id
 export const baseOptionTemplate = {
   id: `temp_${Date.now()}`, // Geçici benzersiz ID
@@ -23,11 +22,13 @@ export const baseFormTemplate = {
   title: '',
   slug: '',
   description: '',
+  category: '',
   passingScore: 70,
   timeLimit: 60,
   randomizeQuestions: false,
   randomizeOptions: false,
   isPublished: false,
+  isPublicViewable: false,
   questions: []
 };
 
