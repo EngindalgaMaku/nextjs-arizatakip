@@ -80,6 +80,44 @@ function generateSlug(title: string): string {
     .replace(/^-+|-+$/g, ''); // Başta ve sonda olabilecek tireleri kaldır
 }
 
+// Helper function to call the revalidate API
+async function triggerRevalidation(pathsToRevalidate: string[], slug?: string) {
+  const revalidateUrl = new URL('/api/revalidate', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+  // NEXT_PUBLIC_APP_URL ortam değişkenini .env.local dosyanızda tanımlamanız gerekir.
+  // Örneğin: NEXT_PUBLIC_APP_URL=http://localhost:3000 (geliştirme için)
+  // veya NEXT_PUBLIC_APP_URL=https://atsis.husniyeozdilek.k12.tr (canlı site için)
+  
+  const revalidateSecret = process.env.REVALIDATE_SECRET_TOKEN;
+  if (!revalidateSecret) {
+    console.warn('REVALIDATE_SECRET_TOKEN is not set. Skipping revalidation.');
+    return;
+  }
+
+  for (const singlePath of pathsToRevalidate) {
+    // Eğer slug varsa ve path dinamikse, slug'ı path'e ekle
+    const actualPath = slug && singlePath.includes('[slug]') ? singlePath.replace('[slug]', slug) : singlePath;
+    try {
+      const res = await fetch(revalidateUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-revalidate-secret': revalidateSecret,
+        },
+        body: JSON.stringify({ path: actualPath }), // Şimdilik sadece path ile revalidate edelim
+      });
+
+      const result = await res.json();
+      if (res.ok && result.revalidated) {
+        console.log(`Successfully revalidated: ${actualPath}`, result);
+      } else {
+        console.error(`Failed to revalidate ${actualPath}:`, result);
+      }
+    } catch (error) {
+      console.error(`Error triggering revalidation for ${actualPath}:`, error);
+    }
+  }
+}
+
 // --- Veri Çekme Fonksiyonları ---
 export async function getTests(): Promise<Test[]> {
   const { data, error } = await supabase.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
@@ -272,9 +310,7 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
         const potentialNewSlug = generateSlug(updates.title);
         const { data: existingTestWithSlug } = await supabase.from(TABLE_NAME).select('id').eq('slug', potentialNewSlug).not('id', 'eq', testId).maybeSingle();
         if (existingTestWithSlug) {
-            // Slug zaten başkası tarafından kullanılıyor, kullanıcıya hata döndür veya slug'ı boş bırak
-            // Şimdilik, eğer kullanıcı slug belirtmediyse ve üretilen slug başkası tarafından kullanılıyorsa, eski slug'ı koruyalım.
-            // Eğer kullanıcı slug belirttiyse ve o slug başkası tarafından kullanılıyorsa, hata döndürülmeli.
+            // Slug zaten başkası tarafından kullanılıyor
         } else {
             slugToSave = potentialNewSlug;
         }
@@ -287,12 +323,9 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
 
     let processedQuestions: TestQuestion[] | undefined = undefined;
     if (updates.questions) {
-        // const existingTest = await getTestById(testId); // Bu satıra bu mantıkta ihtiyaç kalmıyor
-        let nextQuestionId = 1; // Varsayılan başlangıç
-
-        // Formdan gelen güncellemelerdeki mevcut sayısal ID'lerin en büyüğünü bul
+        let nextQuestionId = 1; 
         const numericIdsInUpdate = updates.questions
-            .map(qUpd => qUpd.id) // qUpd.id number | undefined
+            .map(qUpd => qUpd.id) 
             .filter((id): id is number => typeof id === 'number' && id > 0);
 
         if (numericIdsInUpdate.length > 0) {
@@ -312,7 +345,7 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
                 let correctOptionIdToSet: string;
                 if (typeof qUpdate.correctOptionIdOrIndex === 'string') {
                     correctOptionIdToSet = qUpdate.correctOptionIdOrIndex;
-                } else { // number (index)
+                } else { 
                     if (qUpdate.correctOptionIdOrIndex < 0 || qUpdate.correctOptionIdOrIndex >= liveOptions.length) {
                         throw new Error(`Soru "${qUpdate.text.substring(0,20)}..." için geçersiz doğru seçenek indeksi.`);
                     }
@@ -323,11 +356,11 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
                 }
 
                 return {
-                    id: String(qUpdate.id || nextQuestionId++), // YENİ ID'Yİ STRING'E ÇEVİR
+                    id: String(qUpdate.id || nextQuestionId++), 
                     text: qUpdate.text,
                     options: liveOptions,
                     correctOptionId: correctOptionIdToSet,
-                } as TestQuestion; // Tip zorlaması eklendi
+                } as TestQuestion; 
             });
     }
 
@@ -343,11 +376,10 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
     if (updates.randomizeOptions !== undefined) updateData.randomize_options = updates.randomizeOptions;
     if (updates.isPublished !== undefined) updateData.is_published = updates.isPublished;
     if (updates.isPublicViewable !== undefined) updateData.is_public_viewable = updates.isPublicViewable;
-    if (processedQuestions) updateData.questions = processedQuestions as any; // JSONB
-    updateData.updated_at = new Date().toISOString(); // DB trigger'ı varsa bu gereksiz
+    if (processedQuestions) updateData.questions = processedQuestions as any; 
+    updateData.updated_at = new Date().toISOString(); 
 
     if (Object.keys(updateData).length === 1 && updateData.updated_at) {
-        // Sadece updated_at güncelleniyorsa (yani formda değişiklik yoksa) DB'ye gitme
         const currentTest = await getTestById(testId);
         return currentTest || { error: 'Test bulunamadı ama değişiklik de yoktu.' };
     }
@@ -366,6 +398,20 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
     if (!updatedData) {
         return { error: 'Test güncellendi ancak veritabanından geri alınamadı.' };
     }
+
+    // Revalidation trigger
+    const pathsToRevalidate = ['/tests']; // Her zaman test listeleme sayfasını revalidate et
+    // Eğer slug değiştiyse eski slug sayfasını da (varsa) revalidate etmek gerekebilir, ama bu daha karmaşık.
+    // Şimdilik güncel slug'ı ve genel listeyi revalidate edelim.
+    if (updatedData.slug) {
+        pathsToRevalidate.push(`/tests/[slug]`); // Dinamik yolu template olarak ver
+        await triggerRevalidation(pathsToRevalidate, updatedData.slug);
+    } else {
+        await triggerRevalidation(pathsToRevalidate);
+    }
+    
+    // Admin dashboard için de revalidation gerekebilir
+    // await triggerRevalidation([`/dashboard/tests/${updatedData.slug}/edit`, '/dashboard/tests']);
 
     return mapSupabaseRowToTest(updatedData);
   } catch (error) {
