@@ -192,6 +192,7 @@ export interface NewTestData {
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
   isPublished: boolean;
+  isPublicViewable: boolean;
   questions: {
     id?: number; // Opsiyonel ID alanı eklendi
     text: string;
@@ -256,6 +257,7 @@ export async function addTest(testData: NewTestData): Promise<Test | { error: st
       randomize_questions: testData.randomizeQuestions,
       randomize_options: testData.randomizeOptions,
       is_published: testData.isPublished,
+      is_public_viewable: testData.isPublicViewable,
       questions: processedQuestions as any, // JSONB alanı, Supabase any kabul eder
       // created_at ve updated_at DB tarafından otomatik ayarlanacak
     };
@@ -273,6 +275,19 @@ export async function addTest(testData: NewTestData): Promise<Test | { error: st
     if (!insertedData) {
         return { error: 'Test eklendi ancak veritabanından geri alınamadı.' };
     }
+
+    // Revalidation trigger for addTest
+    const pathsToRevalidate = ['/tests']; 
+    if (insertedData.is_public_viewable && insertedData.is_published && insertedData.slug) {
+        // Eğer test public ve yayınlanmışsa, slug sayfasını da revalidate et
+        pathsToRevalidate.push(`/tests/[slug]`);
+        await triggerRevalidation(pathsToRevalidate, insertedData.slug);
+    } else {
+        await triggerRevalidation(pathsToRevalidate);
+    }
+
+    // Admin dashboard için de revalidation gerekebilir
+    // await triggerRevalidation([`/dashboard/tests/${insertedData.slug}/edit`, '/dashboard/tests']);
 
     return mapSupabaseRowToTest(insertedData);
   } catch (error) {

@@ -39,7 +39,7 @@ const testSchema = z.object({
   randomizeQuestions: z.boolean(),
   randomizeOptions: z.boolean(),
   isPublished: z.boolean(),
-  isPublicViewable: z.boolean().optional(),
+  isPublicViewable: z.boolean(),
   questions: z.array(questionSchema).min(1, { message: 'Test en az bir soru içermelidir.' }),
 }).required();
 

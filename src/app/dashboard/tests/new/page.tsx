@@ -31,6 +31,7 @@ const testSchema = z.object({
   randomizeQuestions: z.boolean(),
   randomizeOptions: z.boolean(),
   isPublished: z.boolean(),
+  isPublicViewable: z.boolean(),
   questions: z.array(questionSchema)
     .min(1, { message: 'Test en az bir soru içermelidir.' })
 });
@@ -45,6 +46,7 @@ type TestFormValues = {
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
   isPublished: boolean;
+  isPublicViewable: boolean;
   questions: {
     text: string;
     options: { text: string }[];
@@ -60,6 +62,7 @@ const defaultValues: TestFormValues = {
   randomizeQuestions: false,
   randomizeOptions: false,
   isPublished: false,
+  isPublicViewable: false,
   questions: []
 };
 
@@ -302,6 +305,15 @@ export default function NewTestPage() {
                   className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
                 <label htmlFor="isPublished" className="ml-2 block text-sm text-gray-900">Test Yayında Olsun</label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  id="isPublicViewable"
+                  type="checkbox"
+                  {...register('isPublicViewable')}
+                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <label htmlFor="isPublicViewable" className="ml-2 block text-sm text-gray-900">Herkes Görebilsin</label>
               </div>
             </div>
         </div>
