@@ -1,6 +1,9 @@
-import { getPublicTestBySlug } from '@/actions/testActions'; // Adjusted import path
-import { Test, TestQuestion } from '@/types/tests'; // Adjusted import path. Assuming Test type is also needed here.
+'use client';
+
+import { getPublicTestBySlug } from '@/actions/testActions';
+import { Test, TestQuestion } from '@/types/tests';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 interface TestViewPageProps {
   params: {
@@ -8,50 +11,326 @@ interface TestViewPageProps {
   };
 }
 
-// Basit Question component\'i
-function QuestionDisplay({ question, index }: { question: TestQuestion; index: number }) {
+interface QuestionDisplayProps {
+  question: TestQuestion;
+  index: number;
+  selectedAnswer?: string | null;
+  onAnswerSelect: (questionId: string, optionId: string) => void;
+  showResults?: boolean;
+  isIndividuallyRevealed?: boolean;
+  onRevealAnswer: (questionId: string) => void;
+}
+
+const questionCardStyle = {
+  border: '1px solid #e0e0e0',
+  padding: '20px',
+  marginBottom: '20px',
+  borderRadius: '8px',
+  backgroundColor: '#fff',
+};
+
+const questionTextStyle = {
+  fontSize: '1.1rem',
+  fontWeight: '600',
+  marginBottom: '15px',
+};
+
+const optionButtonStyle = {
+  display: 'block',
+  width: '100%',
+  padding: '12px 15px',
+  marginBottom: '10px',
+  border: '1px solid #ccc',
+  borderRadius: '6px',
+  textAlign: 'left' as const,
+  cursor: 'pointer',
+  backgroundColor: '#f9f9f9',
+  transition: 'background-color 0.2s, border-color 0.2s',
+};
+
+const selectedOptionStyle = {
+  ...optionButtonStyle,
+  borderColor: '#007bff',
+  backgroundColor: '#e7f3ff',
+  fontWeight: 'bold',
+};
+
+const correctOptionStyle = {
+  ...optionButtonStyle,
+  borderColor: '#28a745',
+  backgroundColor: '#d4edda',
+  color: '#155724',
+  fontWeight: 'bold',
+};
+
+const incorrectOptionStyle = {
+  ...optionButtonStyle,
+  borderColor: '#dc3545',
+  backgroundColor: '#f8d7da',
+  color: '#721c24',
+};
+
+const commonButtonStyles = {
+  padding: '10px 20px',
+  borderRadius: '6px',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: '1rem',
+  fontWeight: '500',
+  transition: 'background-color 0.2s',
+};
+
+const primaryButtonStyle = {
+  ...commonButtonStyles,
+  backgroundColor: '#007bff',
+  color: 'white',
+  marginRight: '10px',
+};
+
+const secondaryButtonStyle = {
+  ...commonButtonStyles,
+  backgroundColor: '#6c757d',
+  color: 'white',
+};
+
+const revealButtonStyle = {
+  ...commonButtonStyles,
+  backgroundColor: '#ffc107', // Warning color for reveal
+  color: 'black',
+  padding: '6px 12px',
+  fontSize: '0.9rem',
+  marginTop: '10px',
+};
+
+function getOptionLabel(index: number): string {
+  return String.fromCharCode(65 + index) + ')'; // A), B), C)...
+}
+
+function QuestionDisplay({
+  question,
+  index,
+  selectedAnswer,
+  onAnswerSelect,
+  showResults,
+  isIndividuallyRevealed,
+  onRevealAnswer,
+}: QuestionDisplayProps) {
   return (
-    <div style={{ border: '1px solid #eee', padding: '12px', marginBottom: '12px', borderRadius: '4px' }}>
-      <h4>Soru {index + 1}: {question.text}</h4>
-      {question.options && question.options.length > 0 && (
-        <ul style={{ listStyleType: 'alpha', paddingLeft: '20px' }}>
-          {question.options.map(option => (
-            <li key={option.id}>{option.text}</li>
-          ))}
-        </ul>
+    <div style={questionCardStyle}>
+      <h4 style={questionTextStyle}>
+        Soru {index + 1}: {question.text}
+      </h4>
+      <div>
+        {question.options.map((option, optionIndex) => {
+          let style = { ...optionButtonStyle }; // Start with a copy to allow modifications
+          const isCorrect = option.id === question.correctOptionId;
+          const isSelected = option.id === selectedAnswer;
+
+          if (showResults) {
+            if (isCorrect) {
+              style = correctOptionStyle;
+            } else if (isSelected && !isCorrect) {
+              style = incorrectOptionStyle;
+            } else {
+              style.cursor = 'not-allowed';
+              style.backgroundColor = '#f0f0f0';
+            }
+          } else if (isIndividuallyRevealed) {
+            if (isCorrect) {
+              style = { ...correctOptionStyle, cursor: 'not-allowed' };
+            } else {
+              style.cursor = 'not-allowed';
+              style.backgroundColor = '#f0f0f0';
+            }
+          } else if (isSelected) {
+            style = selectedOptionStyle;
+          }
+
+          return (
+            <button
+              key={option.id}
+              style={style}
+              onClick={() => 
+                !showResults && 
+                !isIndividuallyRevealed && 
+                onAnswerSelect(String(question.id), option.id)
+              }
+              disabled={showResults || isIndividuallyRevealed}
+            >
+              {getOptionLabel(optionIndex)} {option.text}
+            </button>
+          );
+        })}
+      </div>
+      {!showResults && !isIndividuallyRevealed && (
+        <button 
+          style={revealButtonStyle} 
+          onClick={() => onRevealAnswer(String(question.id))}
+        >
+          Doğru Cevabı Göster
+        </button>
       )}
-      {/* Public view\'da doğru cevap veya puan gösterilmemeli */}
+      {showResults && selectedAnswer && !(selectedAnswer === question.correctOptionId) && question.explanation && (
+        <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px', border: '1px solid #f5c6cb'}}>
+            <strong>Açıklama:</strong> {question.explanation}
+        </div>
+      )}
+       {showResults && (selectedAnswer === question.correctOptionId) && question.explanation && (
+        <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '4px', border: '1px solid #c3e6cb'}}>
+            <strong>Açıklama:</strong> {question.explanation}
+        </div>
+      )}
     </div>
   );
 }
 
-export default async function PublicTestViewPage({ params }: TestViewPageProps) {
+export default function PublicTestViewPage({ params }: TestViewPageProps) {
   const { slug } = params;
-  const test: Test | null = await getPublicTestBySlug(slug); // Explicitly type `test`
+  const [test, setTest] = useState<Test | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+  const [showResults, setShowResults] = useState(false);
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({}); // State for individually revealed answers
+
+  useEffect(() => {
+    async function fetchTest() {
+      setIsLoading(true);
+      setError(null);
+      setTest(null);
+      setSelectedAnswers({});
+      setShowResults(false);
+      setRevealedAnswers({}); // Reset revealed answers on new test
+      try {
+        const fetchedTest = await getPublicTestBySlug(slug);
+        if (fetchedTest) {
+          setTest(fetchedTest);
+        } else {
+          setError('Aradığınız test bulunamadı veya herkese açık değil.');
+        }
+      } catch (e) {
+        console.error(e);
+        setError('Test yüklenirken bir hata oluştu.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (slug) {
+      fetchTest();
+    }
+  }, [slug]);
+
+  const handleAnswerSelect = (questionId: string, optionId: string) => {
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [questionId]: optionId,
+    }));
+  };
+
+  const handleRevealAnswer = (questionId: string) => {
+    setRevealedAnswers(prev => ({
+      ...prev,
+      [questionId]: true,
+    }));
+  };
+
+  const handleSubmitOrShowResults = () => {
+    setShowResults(true);
+  };
+
+  const handleReset = () => {
+    setSelectedAnswers({});
+    setShowResults(false);
+    setRevealedAnswers({}); // Reset revealed answers on full reset
+  }
+
+  if (isLoading) {
+    return <div style={{ textAlign: 'center', marginTop: '50px', fontSize: '1.2rem' }}>Test yükleniyor...</div>;
+  }
+
+  if (error) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: '50px' }}>
+        <h1>Hata</h1>
+        <p>{error}</p>
+        <Link href="/tests">
+          <button style={{ ...primaryButtonStyle, marginTop: '20px' }}>Tüm Testlere Geri Dön</button>
+        </Link>
+      </div>
+    );
+  }
 
   if (!test) {
     return (
       <div style={{ textAlign: 'center', marginTop: '50px' }}>
         <h1>Test Bulunamadı</h1>
-        <p>Aradığınız test bulunamadı veya herkese açık değil.</p>
-        <Link href="/tests"><button style={{ marginTop: '20px' }}>Tüm Testlere Geri Dön</button></Link>
+        <Link href="/tests">
+          <button style={{ ...primaryButtonStyle, marginTop: '20px' }}>Tüm Testlere Geri Dön</button>
+        </Link>
       </div>
     );
   }
+  
+  let score = 0;
+  let totalPoints = 0;
+  if(showResults && test.questions){
+      test.questions.forEach(q => {
+        totalPoints += q.points || 1; 
+        if(selectedAnswers[String(q.id)] === q.correctOptionId){
+            score += q.points || 1;
+        }
+      });
+  }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-      <Link href="/tests"><button style={{ marginBottom: '20px' }}>&larr; Tüm Testler</button></Link>
-      <h1 style={{ borderBottom: '1px solid #eee', paddingBottom: '10px' }}>{test.title}</h1>
-      <p style={{ marginTop: '10px', marginBottom: '20px' }}>{test.description || 'Açıklama bulunmuyor.'}</p>
-      
-      <h2>Sorular</h2>
+    <div style={{ maxWidth: '800px', margin: '20px auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <Link href="/tests">
+        <button style={{ ...secondaryButtonStyle, marginBottom: '20px' }}>&larr; Tüm Testler</button>
+      </Link>
+      <div style={{ backgroundColor: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
+        <h1 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '15px', marginBottom: '15px', fontSize: '1.8rem' }}>
+          {test.title}
+        </h1>
+        <p style={{ fontSize: '1rem', color: '#555' }}>{test.description || 'Açıklama bulunmuyor.'}</p>
+      </div>
+
       {test.questions && test.questions.length > 0 ? (
         test.questions.map((question, index) => (
-          <QuestionDisplay key={question.id || index} question={question} index={index} />
+          <QuestionDisplay
+            key={String(question.id) || index}
+            question={question}
+            index={index}
+            selectedAnswer={selectedAnswers[String(question.id)]}
+            onAnswerSelect={handleAnswerSelect}
+            showResults={showResults}
+            isIndividuallyRevealed={revealedAnswers[String(question.id)] || false}
+            onRevealAnswer={handleRevealAnswer}
+          />
         ))
       ) : (
-        <p>Bu test için soru bulunmamaktadır.</p>
+        <p style={{ textAlign: 'center', fontSize: '1.1rem' }}>Bu test için soru bulunmamaktadır.</p>
+      )}
+
+      {test.questions && test.questions.length > 0 && (
+          <div style={{ marginTop: '30px', textAlign: 'center' }}>
+            {!showResults ? (
+              <button style={primaryButtonStyle} onClick={handleSubmitOrShowResults}>
+                Cevapları Kontrol Et
+              </button>
+            ) : (
+              <button style={secondaryButtonStyle} onClick={handleReset}>
+                Sıfırla ve Tekrar Dene
+              </button>
+            )}
+          </div>
+      )}
+      
+      {showResults && test.questions && test.questions.length > 0 && (
+          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#e9ecef', borderRadius: '8px', textAlign: 'center'}}>
+              <h3 style={{fontSize: '1.5rem', marginBottom: '10px'}}>Sonucunuz</h3>
+              <p style={{fontSize: '1.2rem'}}>Toplam {totalPoints} puandan {score} puan aldınız.</p>
+              <p style={{fontSize: '1.2rem'}}>Başarı Oranı: {totalPoints > 0 ? ((score / totalPoints) * 100).toFixed(2) : 0}%</p>
+          </div>
       )}
     </div>
   );
