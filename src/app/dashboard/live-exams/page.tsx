@@ -10,15 +10,11 @@ import { getTests } from "@/actions/testActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LiveExam, LiveExamCreationParams, LiveExamStatus, Test } from "@/types/tests";
 import { format } from "date-fns";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -240,11 +236,17 @@ export default function AdminLiveExamsPage() {
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Sınav Yönetimi</h1>
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-2">
           <Button variant="outline" onClick={() => router.push('/dashboard/tests')}>
             Testleri Yönet
           </Button>
-          <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { 
+          <Button asChild> 
+            <Link href="/dashboard/live-exams/new">
+              {/* <PlusCircle className="mr-2 h-5 w-5" /> */}
+              Canlı Sınav Oluştur
+            </Link>
+          </Button>
+          {/* <Dialog open={isDialogOpen} onOpenChange={(isOpen) => { 
             setIsDialogOpen(isOpen);
             if (!isOpen) resetForm(); // Reset form when dialog closes
           }}>
@@ -253,83 +255,161 @@ export default function AdminLiveExamsPage() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Yeni Canlı Sınav</DialogTitle>
+                <DialogTitle>Yeni Canlı Sınav Oluştur</DialogTitle>
                 <DialogDescription>
-                  Yeni bir canlı sınav oluşturmak için aşağıdaki bilgileri doldurun.
+                  Canlı sınavınız için detayları girin.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="test" className="text-right">Test Seçin</Label>
-                  <Select value={formState.testId || ''} onValueChange={(value) => setFormState(prev => ({ ...prev, testId: value }))}>
-                    <SelectTrigger className="col-span-3"><SelectValue placeholder="Test seçin" /></SelectTrigger>
-                    <SelectContent>{tests.map(test => (<SelectItem key={test.id} value={test.id}>{test.title}</SelectItem>))}</SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="title" className="text-right">Başlık</Label>
-                  <Input id="title" placeholder="Varsayılan: Test başlığı" value={formState.title || ''} onChange={(e) => setFormState(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="description" className="text-right">Açıklama</Label>
-                  <Input id="description" placeholder="Varsayılan: Test açıklaması" value={formState.description || ''} onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="timeLimit" className="text-right">Süre (dakika)</Label>
-                  <Input id="timeLimit" type="number" min="1" value={formState.timeLimit || 60} onChange={(e) => setFormState(prev => ({ ...prev, timeLimit: parseInt(e.target.value) || 60 }))} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="startTime" className="text-right">Başlangıç</Label>
-                  <Input id="startTime" type="datetime-local" value={formState.scheduledStartTime ? format(formState.scheduledStartTime, "yyyy-MM-dd'T'HH:mm") : ''} onChange={(e) => handleDateChange('scheduledStartTime', e.target.value)} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="endTime" className="text-right">Bitiş</Label>
-                  <Input id="endTime" type="datetime-local" value={formState.scheduledEndTime ? format(formState.scheduledEndTime, "yyyy-MM-dd'T'HH:mm") : ''} onChange={(e) => handleDateChange('scheduledEndTime', e.target.value)} className="col-span-3" />
-                </div>
-                {/* StudentIDs and ClassIDs fields can be added here if admins need to assign exams directly */}
-                {/* For simplicity, these are omitted for now, assuming exams created by admin are general or use other assignment methods */}
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="maxAttempts" className="text-right">Maks. Deneme</Label>
-                  <Select value={formState.maxAttempts?.toString() || "1"} onValueChange={(value) => setFormState(prev => ({ ...prev, maxAttempts: parseInt(value) }))}>
-                    <SelectTrigger className="col-span-3"><SelectValue placeholder="Maksimum deneme sayısı" /></SelectTrigger>
+                  <Label htmlFor="testId" className="text-right">
+                    Test
+                  </Label>
+                  <Select
+                    value={formState.testId}
+                    onValueChange={(value) => setFormState(prev => ({ ...prev, testId: value }))}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Bir test seçin" />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">1 (Tek deneme)</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                      <SelectItem value="3">3</SelectItem>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
+                      {tests.map(test => (
+                        <SelectItem key={test.id} value={test.id}>
+                          {test.title}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <div className="text-right">Ayarlar</div>
-                  <div className="col-span-3 space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="autoPublish" checked={!!formState.autoPublishResults} onCheckedChange={(checked: boolean) => setFormState(prev => ({ ...prev, autoPublishResults: checked }))} />
-                      <Label htmlFor="autoPublish">Sonuçları otomatik yayınla</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="lateSubs" checked={!!formState.allowLateSubmissions} onCheckedChange={(checked: boolean) => setFormState(prev => ({ ...prev, allowLateSubmissions: checked }))} />
-                      <Label htmlFor="lateSubs">Geç gönderime izin ver</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="randomizeQuestions" checked={!!formState.randomizeQuestions} onCheckedChange={(checked: boolean) => setFormState(prev => ({ ...prev, randomizeQuestions: checked }))} />
-                      <Label htmlFor="randomizeQuestions">Soruları karıştır</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="randomizeOptions" checked={!!formState.randomizeOptions} onCheckedChange={(checked: boolean) => setFormState(prev => ({ ...prev, randomizeOptions: checked }))} />
-                      <Label htmlFor="randomizeOptions">Seçenekleri karıştır</Label>
-                    </div>
-                  </div>
+                  <Label htmlFor="title" className="text-right">
+                    Sınav Başlığı
+                  </Label>
+                  <Input 
+                    id="title" 
+                    value={formState.title || ''} 
+                    onChange={(e) => setFormState(prev => ({ ...prev, title: e.target.value }))} 
+                    className="col-span-3" 
+                    placeholder="Örn: 1. Dönem Matematik Sınavı"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="description" className="text-right">
+                    Açıklama
+                  </Label>
+                  <Input 
+                    id="description" 
+                    value={formState.description || ''} 
+                    onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))} 
+                    className="col-span-3" 
+                    placeholder="(Opsiyonel)"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="scheduledStartTime" className="text-right">
+                    Başlangıç Zamanı
+                  </Label>
+                  <Input 
+                    id="scheduledStartTime" 
+                    type="datetime-local" 
+                    value={formState.scheduledStartTime ? format(formState.scheduledStartTime, "yyyy-MM-dd'T'HH:mm") : ''} 
+                    onChange={(e) => handleDateChange('scheduledStartTime', e.target.value)} 
+                    className="col-span-3" 
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="scheduledEndTime" className="text-right">
+                    Bitiş Zamanı
+                  </Label>
+                  <Input 
+                    id="scheduledEndTime" 
+                    type="datetime-local" 
+                    value={formState.scheduledEndTime ? format(formState.scheduledEndTime, "yyyy-MM-dd'T'HH:mm") : ''} 
+                    onChange={(e) => handleDateChange('scheduledEndTime', e.target.value)} 
+                    className="col-span-3" 
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="timeLimit" className="text-right">
+                    Süre (dakika)
+                  </Label>
+                  <Input 
+                    id="timeLimit" 
+                    type="number" 
+                    value={formState.timeLimit || 60} 
+                    onChange={(e) => setFormState(prev => ({ ...prev, timeLimit: parseInt(e.target.value, 10) }))} 
+                    className="col-span-3" 
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="maxAttempts" className="text-right">
+                    Max Deneme Sayısı
+                  </Label>
+                  <Input 
+                    id="maxAttempts" 
+                    type="number" 
+                    value={formState.maxAttempts || 1} 
+                    onChange={(e) => setFormState(prev => ({ ...prev, maxAttempts: parseInt(e.target.value, 10) || 1 }))} 
+                    className="col-span-3" 
+                  />
+                </div>
+                <div className="flex items-center justify-between col-span-4 px-1">
+                    <Label htmlFor="autoPublishResults" className="flex flex-col space-y-1">
+                        <span>Sonuçları Otomatik Yayınla</span>
+                        <span className="font-normal leading-snug text-muted-foreground">
+                            Sınav bitince sonuçlar öğrencilere gösterilsin mi?
+                        </span>
+                    </Label>
+                    <Switch 
+                        id="autoPublishResults" 
+                        checked={formState.autoPublishResults} 
+                        onCheckedChange={(checked) => setFormState(prev => ({ ...prev, autoPublishResults: checked }))} 
+                    />
+                </div>
+                 <div className="flex items-center justify-between col-span-4 px-1">
+                    <Label htmlFor="allowLateSubmissions" className="flex flex-col space-y-1">
+                        <span>Geç Gönderime İzin Ver</span>
+                        <span className="font-normal leading-snug text-muted-foreground">
+                            Süre bittikten sonra gönderime izin verilsin mi?
+                        </span>
+                    </Label>
+                    <Switch 
+                        id="allowLateSubmissions" 
+                        checked={formState.allowLateSubmissions} 
+                        onCheckedChange={(checked) => setFormState(prev => ({ ...prev, allowLateSubmissions: checked }))} 
+                    />
+                </div>
+                 <div className="flex items-center justify-between col-span-4 px-1">
+                    <Label htmlFor="randomizeQuestions" className="flex flex-col space-y-1">
+                        <span>Soruları Karıştır</span>
+                    </Label>
+                    <Switch 
+                        id="randomizeQuestions" 
+                        checked={formState.randomizeQuestions} 
+                        onCheckedChange={(checked) => setFormState(prev => ({ ...prev, randomizeQuestions: checked }))} 
+                    />
+                </div>
+                 <div className="flex items-center justify-between col-span-4 px-1">
+                    <Label htmlFor="randomizeOptions" className="flex flex-col space-y-1">
+                        <span>Seçenekleri Karıştır</span>
+                    </Label>
+                    <Switch 
+                        id="randomizeOptions" 
+                        checked={formState.randomizeOptions} 
+                        onCheckedChange={(checked) => setFormState(prev => ({ ...prev, randomizeOptions: checked }))} 
+                    />
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" onClick={handleCreateExam} disabled={isCreating}>
+                <Button variant="outline" onClick={() => {setIsDialogOpen(false); resetForm();}}>
+                  İptal
+                </Button>
+                <Button onClick={handleCreateExam} disabled={isCreating}>
                   {isCreating ? 'Oluşturuluyor...' : 'Sınavı Oluştur'}
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+          </Dialog> */}
         </div>
       </div>
       

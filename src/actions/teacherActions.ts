@@ -2,17 +2,16 @@
 
 import { supabase } from '@/lib/supabase';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Teacher, TeacherFormValues, TeacherFormSchema, TeacherRole } from '@/types/teachers';
-import { z } from 'zod';
 import { BranchFormSchema, BranchFormValues } from '@/types/branches';
+import { Teacher, TeacherFormSchema, TeacherFormValues, TeacherRole, TeacherSchema } from '@/types/teachers';
 import { revalidatePath } from 'next/cache';
-import { TeacherSchema } from '@/types/teachers';
+import { z } from 'zod';
 
 /**
  * Fetch all teachers, optionally filtered by semester.
  */
 export async function fetchTeachers(semesterId?: string): Promise<Teacher[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   let query = supabase
     .from('teachers')
     .select('id, name, birth_date, role, phone, branch_id, created_at, updated_at, is_active, semester_id'); // Include semester_id
@@ -85,7 +84,7 @@ export async function createTeacher(payload: TeacherFormValues, semesterId: stri
     semester_id: semesterId, // Add semester ID
   };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     const { data: newTeacherData, error } = await supabase
       .from('teachers')
@@ -149,7 +148,7 @@ export async function updateTeacher(id: string, payload: TeacherFormValues): Pro
     // Do not update is_active here, use updateTeacherActiveStatus
   };
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
    try {
     const { data: updatedTeacherData, error } = await supabase
       .from('teachers')
@@ -219,7 +218,7 @@ export async function deleteTeacher(id: string): Promise<{ success: boolean; err
  */
 export async function fetchTeacherById(id: string): Promise<Teacher | null> {
    if (!id) return null;
-   const supabase = createSupabaseServerClient();
+   const supabase = await createSupabaseServerClient();
    const { data, error } = await supabase
     .from('teachers')
     // Select ALL fields defined in TeacherSchema (using snake_case), including semester_id
@@ -352,6 +351,7 @@ export async function updateTeacherActiveStatus(teacherId: string, isActive: boo
 
   console.log(`[TeacherAction] Updating active status for ${teacherId} to ${isActive}`);
 
+  const supabase = await createSupabaseServerClient();
   try {
     const { error } = await supabase
       .from('teachers')

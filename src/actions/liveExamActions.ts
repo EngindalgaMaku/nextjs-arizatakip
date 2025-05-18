@@ -474,7 +474,7 @@ export async function startExamForStudent(
 export async function updateStudentAnswers(
   examId: string,
   studentId: string,
-  answers: Record<number, string>,
+  answers: Record<string, string>,
   progress: number
 ): Promise<LiveExamParticipant | { error: string }> {
   try {
@@ -527,7 +527,7 @@ export async function updateStudentAnswers(
 export async function submitExamForStudent(
   examId: string,
   studentId: string,
-  answers: Record<number, string>
+  answers: Record<string, string>
 ): Promise<LiveExamParticipant | { error: string }> {
   try {
     const exam = await getLiveExamById(examId);
@@ -608,7 +608,7 @@ export async function submitExamForStudent(
 // --- Yardımcı Fonksiyonlar ---
 
 // Cevapları değerlendirip puan hesapla
-function calculateScore(test: Test, answers: Record<number, string>): { score: number; isPassed: boolean } {
+function calculateScore(test: Test, answers: Record<string, string>): { score: number; isPassed: boolean } {
   const totalQuestions = test.questions.length;
   let correctAnswers = 0;
   

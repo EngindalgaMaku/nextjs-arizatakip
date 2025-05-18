@@ -23,7 +23,7 @@ export default function TakeExamPage({ params }: { params: { examId: string } })
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [participant, setParticipant] = useState<LiveExamParticipant | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [progressInterval, setProgressInterval] = useState<NodeJS.Timeout | null>(null);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
@@ -192,7 +192,7 @@ export default function TakeExamPage({ params }: { params: { examId: string } })
   };
   
   // Cevap seçme
-  const handleAnswerSelect = (questionId: number, optionId: string) => {
+  const handleAnswerSelect = (questionId: string, optionId: string) => {
     setAnswers(prev => ({
       ...prev,
       [questionId]: optionId

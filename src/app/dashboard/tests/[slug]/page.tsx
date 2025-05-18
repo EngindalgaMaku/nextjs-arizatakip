@@ -8,24 +8,47 @@ import { useEffect, useMemo, useState } from 'react';
 
 type AnswerStatus = 'correct' | 'incorrect' | 'unanswered';
 
+// Moved shuffleArray outside or wrap with useCallback if it uses component scope
+const shuffleArray = <T,>(array: T[]): T[] => {
+  if (!array) return [];
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 export default function TestViewPage({ params }: { params: { slug: string } }) {
+  // 1. All Hooks at the top level
   const router = useRouter();
+  const { slug } = params;
   
-  // State for fetched test data, loading, and error
   const [test, setTest] = useState<TestType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [testState, setTestState] = useState<TestUserState>({
+    answers: {},
+    startTime: new Date(),
+    isSubmitted: false
+  });
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [showResults, setShowResults] = useState(false);
 
-  // useEffect to fetch test data
   useEffect(() => {
     async function fetchTest() {
+      if (typeof slug !== 'string' || !slug) {
+        setIsLoading(false);
+        setError('Geçersiz test kimliği.'); // Set an error if slug is invalid
+        return;
+      }
       setIsLoading(true);
       setError(null);
       try {
-        const fetchedTest = await getTestBySlug(params.slug);
+        const fetchedTest = await getTestBySlug(slug);
         setTest(fetchedTest);
         if (!fetchedTest) {
-          // setError('Test bulunamadı veya yüklenirken bir sorun oluştu.'); // Optional: set specific error
+          setError('Test bulunamadı.');
         }
       } catch (e: any) {
         console.error("Failed to fetch test:", e);
@@ -34,40 +57,50 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
         setIsLoading(false);
       }
     }
-    if (params.slug) {
-      fetchTest();
-    }
-  }, [params.slug]);
+    fetchTest();
+  }, [slug]);
   
-  // Soruları karıştırma fonksiyonu (Fisher-Yates shuffle)
-  const shuffleArray = <T,>(array: T[]): T[] => {
-    if (!array) return [];
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-  };
-
-  // Test sorularını, randomizeQuestions true ise karıştır
   const questionsToDisplay = useMemo(() => {
-    if (test && test.randomizeQuestions) {
+    if (test && test.questions && test.randomizeQuestions) {
       return shuffleArray(test.questions);
     }
-    return test ? test.questions : [];
+    return test && test.questions ? test.questions : [];
   }, [test]);
 
-  const [testState, setTestState] = useState<TestUserState>({
-    answers: {},
-    startTime: new Date(),
-    isSubmitted: false
-  });
-  
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showResults, setShowResults] = useState(false);
-  
-  // Eğer test bulunamazsa veya yükleniyorsa gösterilecekler
+  const testResults = useMemo(() => {
+    if (!test || !questionsToDisplay || questionsToDisplay.length === 0) {
+      return {
+        totalQuestions: 0,
+        answered: 0,
+        correct: 0,
+        incorrect: 0,
+        unanswered: 0,
+        score: 0,
+        hasPassed: false
+      };
+    }
+    const totalQuestions = questionsToDisplay.length;
+    const answered = Object.keys(testState.answers).length;
+    const correct = questionsToDisplay.filter(
+      q => testState.answers[q.id] === q.correctOptionId
+    ).length;
+    const incorrect = answered - correct;
+    const unanswered = totalQuestions - answered;
+    const score = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
+    const hasPassed = score >= (test.passingScore || 70); // test is guaranteed to be non-null here
+    
+    return {
+      totalQuestions,
+      answered,
+      correct,
+      incorrect,
+      unanswered,
+      score,
+      hasPassed
+    };
+  }, [test, testState.answers, questionsToDisplay]);
+
+  // 2. Conditional returns after all Hooks
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
@@ -94,12 +127,13 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
     );
   }
   
+  // If test is still null after loading and no error, it means not found or slug was invalid initially
   if (!test) {
     return (
       <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
         <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Test Bulunamadı</h2>
-        <p className="text-gray-600 mb-6">İstediğiniz test mevcut değil veya kaldırılmış olabilir.</p>
+        <p className="text-gray-600 mb-6">İstediğiniz test mevcut değil veya geçersiz bir kimlik ile istendi.</p>
         <button
           onClick={() => router.push('/dashboard/tests')}
           className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center"
@@ -111,29 +145,41 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
     );
   }
   
+  // From this point, 'test' is guaranteed to be non-null.
+  // However, questionsToDisplay might be empty if test.questions is empty.
+
   const currentQuestion = questionsToDisplay[currentQuestionIndex];
   
-  if (!currentQuestion && questionsToDisplay.length > 0 && currentQuestionIndex >= questionsToDisplay.length) {
-     // Bu durum, sorular yüklendikten sonra index'in dışına çıkılmasıyla oluşabilir.
-     // Kullanıcıyı ilk soruya yönlendirebilir veya bir hata mesajı gösterebiliriz.
-     console.warn("Current question index is out of bounds, resetting to 0.");
-     setCurrentQuestionIndex(0); 
-     // Not: Bu state değişikliği bir sonraki render'da düzelecektir. Hemen return etmek yerine UI'ın bir frame için
-     // eski index ile render olmasını engelleyemeyebiliriz, ancak veri tutarlılığını sağlar.
-     // Eğer hemen bir yükleme/hata göstermek isteniyorsa, bu useEffect içinde yapılmalı.
+  // This condition handles if the test has no questions.
+  if (questionsToDisplay.length === 0) { 
+     return (
+      <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
+        <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Test İçeriği Boş</h2>
+        <p className="text-gray-600 mb-6">Bu testte henüz soru bulunmamaktadır.</p>
+         <button
+          onClick={() => router.push('/dashboard/tests')}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center"
+        >
+          <ArrowLeftIcon className="w-5 h-5 mr-2" />
+          Testlere Dön
+        </button>
+      </div>
+    );
   }
-  
-  // Eğer questionsToDisplay boşsa veya currentQuestion tanımsızsa (örneğin test yüklenemedi), bir yükleme veya hata durumu göster
-  // test varlığı zaten yukarıda (isLoading, error, !test) kontrol edildi.
-  // Bu nokta, test var ama questionsToDisplay bir şekilde boşsa veya currentQuestion tanımsızsa diye ek bir güvenlik.
-  if (!questionsToDisplay || questionsToDisplay.length === 0 || !currentQuestion) {
-    if (test && questionsToDisplay.length === 0 && !isLoading) { // Test var ama hiç sorusu yoksa
-       return (
+
+  // This handles if currentQuestionIndex is somehow out of bounds after questions are loaded.
+  // Should ideally not happen if navigation logic is correct, but as a safeguard.
+  if (!currentQuestion) {
+     console.warn("Current question is undefined, possibly out of bounds. Resetting or showing error.");
+     // Depending on desired behavior, you could reset index or show a generic error.
+     // For now, let's show a generic error to avoid infinite loops if reset logic is flawed.
+     return (
         <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
-          <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Test İçeriği Boş</h2>
-          <p className="text-gray-600 mb-6">Bu testte henüz soru bulunmamaktadır.</p>
-           <button
+          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Soru Yükleme Hatası</h2>
+          <p className="text-gray-600">Güncel soru yüklenemedi. Lütfen testlere dönüp tekrar deneyin.</p>
+          <button
             onClick={() => router.push('/dashboard/tests')}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center"
           >
@@ -142,22 +188,10 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
           </button>
         </div>
       );
-    }
-    // Eğer currentQuestion hala tanımsızsa ve diğer durumlar geçildiyse, bu beklenmedik bir durumdur.
-    // Ya da sorular yükleniyor ama test ana verisi gelmiş olabilir.
-    // Yukarıdaki isLoading zaten bunu kapsamalı.
-    // Bu bir fallback, normalde buraya düşmemeli.
-     return (
-        <div className="container mx-auto p-6 flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
-          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Test Verisi Yüklenemedi</h2>
-          <p className="text-gray-600">Sorular yüklenirken bir sorun oluştu veya test verisi bozuk.</p>
-        </div>
-      );
   }
   
   // Kullanıcının bir seçenek seçmesini işle
-  const handleOptionSelect = (questionId: number, optionId: string) => {
+  const handleOptionSelect = (questionId: string, optionId: string) => {
     setTestState(prev => ({
       ...prev,
       answers: {
@@ -218,29 +252,6 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
     
     return userAnswer === question.correctOptionId ? 'correct' : 'incorrect';
   };
-  
-  // Test sonucu istatistiklerini hesapla
-  const testResults = useMemo(() => {
-    const totalQuestions = questionsToDisplay.length;
-    const answered = Object.keys(testState.answers).length;
-    const correct = questionsToDisplay.filter(
-      q => testState.answers[q.id] === q.correctOptionId
-    ).length;
-    const incorrect = answered - correct;
-    const unanswered = totalQuestions - answered;
-    const score = Math.round((correct / totalQuestions) * 100);
-    const hasPassed = score >= (test.passingScore || 70);
-    
-    return {
-      totalQuestions,
-      answered,
-      correct,
-      incorrect,
-      unanswered,
-      score,
-      hasPassed
-    };
-  }, [test, testState.answers]);
   
   // Test sonuçları görünümü
   if (showResults) {
@@ -328,6 +339,7 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
               {questionsToDisplay.map((question, index) => {
                 const status = getAnswerStatus(question);
                 const userAnswer = testState.answers[question.id];
+                const correctOption = question.options?.find(opt => opt.id === question.correctOptionId);
                 
                 return (
                   <div 
@@ -343,13 +355,17 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
                       <div>
                         <p className="font-medium">{question.text}</p>
                         <div className="mt-3 space-y-2">
-                          {question.options.map(option => {
-                            const isUserSelection = userAnswer === option.id;
-                            const isCorrect = option.id === question.correctOptionId;
+                          {/* ---- DEBUG BAŞLANGIÇ ---- */}
+                          {/* {console.log(`Result Question ${index} ID: ${question.id}, Options:`, question.options)} */}
+                          {/* {console.log(`Result Question ${index} ID: ${question.id}, Type of Options:`, typeof question.options)} */}
+                          {/* ---- DEBUG BİTİŞ ---- */}
+                          {question.options && Object.entries(question.options).map(([optionKey, optionText]) => {
+                            const isUserSelection = userAnswer === optionKey;
+                            const isCorrect = optionKey === question.correctOptionId;
                             
                             return (
                               <div 
-                                key={option.id}
+                                key={optionKey}
                                 className={`flex items-center p-2 rounded ${
                                   isCorrect ? 'bg-green-100 text-green-800' : 
                                   isUserSelection && !isCorrect ? 'bg-red-100 text-red-800' : 
@@ -357,9 +373,9 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
                                 }`}
                               >
                                 <span className="w-6 mr-2">
-                                  {option.id.toUpperCase()}.
+                                  {optionKey.toUpperCase()}.
                                 </span>
-                                <span>{option.text}</span>
+                                <span>{optionText.text}</span>
                                 {isUserSelection && !isCorrect && (
                                   <XMarkIcon className="w-5 h-5 ml-auto text-red-600" />
                                 )}
@@ -373,11 +389,11 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
                       </div>
                     </div>
                     
-                    {status === 'incorrect' && (
+                    {status === 'incorrect' && correctOption && (
                       <div className="mt-2 ml-6 pl-2 border-l-4 border-red-400">
                         <p className="text-sm text-red-700">
                           Cevabınız yanlış. Doğru cevap: <span className="font-semibold">
-                            {question.correctOptionId.toUpperCase()}
+                            {question.correctOptionId.toUpperCase()}. {correctOption.text}
                           </span>
                         </p>
                       </div>
@@ -432,26 +448,30 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
         
         <div className="mb-6">
           <h2 className="text-lg font-medium text-gray-800 mb-4">{currentQuestion.text}</h2>
+          {/* ---- DEBUG BAŞLANGIÇ ---- */}
+          {/* {console.log('Current Question ID:', currentQuestion.id, 'Options:', currentQuestion.options)} */}
+          {/* {console.log('Current Question ID:', currentQuestion.id, 'Type of Options:', typeof currentQuestion.options)} */}
+          {/* ---- DEBUG BİTİŞ ---- */}
           <div className="space-y-3">
-            {currentQuestion.options.map(option => (
+            {currentQuestion.options && Object.entries(currentQuestion.options).map(([optionKey, optionText]) => (
               <div
-                key={option.id}
-                onClick={() => handleOptionSelect(currentQuestion.id, option.id)}
+                key={optionKey}
+                onClick={() => handleOptionSelect(currentQuestion.id, optionKey)}
                 className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                  testState.answers[currentQuestion.id] === option.id
+                  testState.answers[currentQuestion.id] === optionKey
                     ? 'border-indigo-500 bg-indigo-50'
                     : 'border-gray-300 hover:border-indigo-300 hover:bg-indigo-50/50'
                 }`}
               >
                 <div className="flex items-center">
                   <div className={`w-6 h-6 flex items-center justify-center rounded-full border mr-3 ${
-                    testState.answers[currentQuestion.id] === option.id
+                    testState.answers[currentQuestion.id] === optionKey
                       ? 'border-indigo-500 bg-indigo-500 text-white'
                       : 'border-gray-400'
                   }`}>
-                    {option.id.toUpperCase()}
+                    {optionKey.toUpperCase()}
                   </div>
-                  <span>{option.text}</span>
+                  <span>{optionText.text}</span>
                 </div>
               </div>
             ))}

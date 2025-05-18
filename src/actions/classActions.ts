@@ -1,8 +1,8 @@
 'use server';
 
 // import { revalidatePath } from 'next/cache';
-import { Class, ClassSchema, ClassFormSchema, ClassFormValues } from '@/types/classes';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { Class, ClassFormSchema, ClassFormValues, ClassSchema } from '@/types/classes';
 import { z } from 'zod';
 
 // Define table name and revalidation path
@@ -14,7 +14,7 @@ const CLASSES_PATH = '/dashboard/classes'; // Revalidate this path after CUD ope
  * Orders classes by grade_level then by name.
  */
 export async function fetchClasses(semesterId?: string): Promise<Class[]> {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     
     // Sınıfları getir
     let query = supabase
@@ -125,7 +125,7 @@ export async function createClass(
 
     console.log('Database insert payload:', dbData);
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     try {
         const { data: newClass, error } = await supabase
             .from(CLASSES_TABLE)
@@ -199,7 +199,7 @@ export async function updateClass(
 
     console.log('Database update payload:', dbData);
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     try {
         const { data: updatedClass, error } = await supabase
             .from(CLASSES_TABLE)
@@ -249,10 +249,10 @@ export async function updateClass(
  */
 export async function deleteClass(id: string): Promise<{ success: boolean; error?: string }> {
     if (!z.string().uuid().safeParse(id).success) {
-        return { success: false, error: 'Geçersiz sınıf ID formatı.' };
+        return { success: false, error: 'Geçersiz sınıf IDsi.' };
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     try {
         const { error } = await supabase
             .from(CLASSES_TABLE)
@@ -281,11 +281,11 @@ export async function deleteClass(id: string): Promise<{ success: boolean; error
  */
 export async function fetchClassById(id: string): Promise<Class | null> {
     if (!id || !z.string().uuid().safeParse(id).success) {
-        console.warn('fetchClassById called with invalid or missing ID.');
+        console.warn('fetchClassById: Invalid or missing ID provided.');
         return null;
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
         .from(CLASSES_TABLE)
         .select('*')
@@ -325,138 +325,144 @@ export async function fetchClassById(id: string): Promise<Class | null> {
  * Moves a class one position up in the display order.
  */
 export async function moveClassUp(classId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createSupabaseServerClient();
-  try {
-    // Get the current class's order and the order of the class above it
-    const { data: currentClass, error: fetchError } = await supabase
-      .from('classes')
-      .select('id, display_order')
-      .eq('id', classId)
-      .single();
-
-    if (fetchError || !currentClass) {
-      console.error('Error fetching class to move up:', fetchError);
-      return { success: false, error: 'Sınıf bulunamadı.' };
+    if (!z.string().uuid().safeParse(classId).success) {
+        return { success: false, error: 'Geçersiz sınıf IDsi.' };
     }
+    const supabase = await createSupabaseServerClient();
+    try {
+        // Get the current class's order and the order of the class above it
+        const { data: currentClass, error: fetchError } = await supabase
+          .from('classes')
+          .select('id, display_order')
+          .eq('id', classId)
+          .single();
 
-    const currentOrder = currentClass.display_order;
-    if (currentOrder <= 1) {
-      return { success: true }; // Already at the top
+        if (fetchError || !currentClass) {
+          console.error('Error fetching class to move up:', fetchError);
+          return { success: false, error: 'Sınıf bulunamadı.' };
+        }
+
+        const currentOrder = currentClass.display_order;
+        if (currentOrder <= 1) {
+          return { success: true }; // Already at the top
+        }
+
+        // Find the class directly above
+        const { data: previousClass, error: fetchPrevError } = await supabase
+           .from('classes')
+           .select('id, display_order')
+           .eq('display_order', currentOrder - 1)
+           .single();
+           
+        if (fetchPrevError || !previousClass) {
+           console.error('Error fetching previous class:', fetchPrevError); 
+           // This might happen if orders are not sequential, try finding nearest lower
+           // For simplicity now, assume sequential or return error
+           return { success: false, error: 'Üstteki sınıf bulunamadı veya sıra numaralarında tutarsızlık var.' };
+        }
+
+        // Swap the display_order values using a transaction if possible,
+        // otherwise perform sequential updates (less safe if one fails)
+        // Using sequential updates for now:
+        const { error: updateCurrentError } = await supabase
+           .from('classes')
+           .update({ display_order: previousClass.display_order })
+           .eq('id', currentClass.id);
+
+        if (updateCurrentError) {
+          console.error('Error updating current class order (up):', updateCurrentError);
+          // Attempt to revert? Risky without transaction.
+          return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 1).' };
+        }
+        
+        const { error: updatePreviousError } = await supabase
+          .from('classes')
+          .update({ display_order: currentOrder })
+          .eq('id', previousClass.id);
+          
+        if (updatePreviousError) {
+           console.error('Error updating previous class order (up):', updatePreviousError);
+           // CRITICAL: Need to revert the first update here!
+           // Rollback manually (attempt to set currentClass back to currentOrder)
+           await supabase.from('classes').update({ display_order: currentOrder }).eq('id', currentClass.id); 
+           return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 2), geri alma denendi.' };
+        }
+
+        // revalidatePath('/dashboard/classes');
+        return { success: true };
+
+    } catch (err) {
+        console.error('moveClassUp error:', err);
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
-
-    // Find the class directly above
-    const { data: previousClass, error: fetchPrevError } = await supabase
-       .from('classes')
-       .select('id, display_order')
-       .eq('display_order', currentOrder - 1)
-       .single();
-       
-    if (fetchPrevError || !previousClass) {
-       console.error('Error fetching previous class:', fetchPrevError); 
-       // This might happen if orders are not sequential, try finding nearest lower
-       // For simplicity now, assume sequential or return error
-       return { success: false, error: 'Üstteki sınıf bulunamadı veya sıra numaralarında tutarsızlık var.' };
-    }
-
-    // Swap the display_order values using a transaction if possible,
-    // otherwise perform sequential updates (less safe if one fails)
-    // Using sequential updates for now:
-    const { error: updateCurrentError } = await supabase
-       .from('classes')
-       .update({ display_order: previousClass.display_order })
-       .eq('id', currentClass.id);
-
-    if (updateCurrentError) {
-      console.error('Error updating current class order (up):', updateCurrentError);
-      // Attempt to revert? Risky without transaction.
-      return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 1).' };
-    }
-    
-    const { error: updatePreviousError } = await supabase
-      .from('classes')
-      .update({ display_order: currentOrder })
-      .eq('id', previousClass.id);
-      
-    if (updatePreviousError) {
-       console.error('Error updating previous class order (up):', updatePreviousError);
-       // CRITICAL: Need to revert the first update here!
-       // Rollback manually (attempt to set currentClass back to currentOrder)
-       await supabase.from('classes').update({ display_order: currentOrder }).eq('id', currentClass.id); 
-       return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 2), geri alma denendi.' };
-    }
-
-    // revalidatePath('/dashboard/classes');
-    return { success: true };
-
-  } catch (err) {
-    console.error('moveClassUp error:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
 }
 
 /**
  * Moves a class one position down in the display order.
  */
 export async function moveClassDown(classId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createSupabaseServerClient();
-   try {
-    // Get the current class's order
-    const { data: currentClass, error: fetchError } = await supabase
-      .from('classes')
-      .select('id, display_order')
-      .eq('id', classId)
-      .single();
-
-    if (fetchError || !currentClass) {
-      console.error('Error fetching class to move down:', fetchError);
-      return { success: false, error: 'Sınıf bulunamadı.' };
+    if (!z.string().uuid().safeParse(classId).success) {
+        return { success: false, error: 'Geçersiz sınıf IDsi.' };
     }
-    
-    const currentOrder = currentClass.display_order;
+    const supabase = await createSupabaseServerClient();
+    try {
+        // Get the current class's order
+        const { data: currentClass, error: fetchError } = await supabase
+          .from('classes')
+          .select('id, display_order')
+          .eq('id', classId)
+          .single();
 
-    // Find the class directly below
-    const { data: nextClass, error: fetchNextError } = await supabase
-       .from('classes')
-       .select('id, display_order')
-       .eq('display_order', currentOrder + 1)
-       .single();
-       
-     // If no class below, it's already at the bottom
-     if (fetchNextError?.code === 'PGRST116') { // 'PGRST116' is Supabase code for single() not finding a row
-         return { success: true }; // Already at the bottom
-     } else if (fetchNextError || !nextClass) {
-        console.error('Error fetching next class:', fetchNextError);
-        return { success: false, error: 'Alttaki sınıf bulunamadı veya sıra numaralarında tutarsızlık var.' };
-     }
+        if (fetchError || !currentClass) {
+          console.error('Error fetching class to move down:', fetchError);
+          return { success: false, error: 'Sınıf bulunamadı.' };
+        }
+        
+        const currentOrder = currentClass.display_order;
 
-    // Swap the display_order values (Sequential Updates)
-    const { error: updateCurrentError } = await supabase
-       .from('classes')
-       .update({ display_order: nextClass.display_order })
-       .eq('id', currentClass.id);
+        // Find the class directly below
+        const { data: nextClass, error: fetchNextError } = await supabase
+           .from('classes')
+           .select('id, display_order')
+           .eq('display_order', currentOrder + 1)
+           .single();
+           
+         // If no class below, it's already at the bottom
+         if (fetchNextError?.code === 'PGRST116') { // 'PGRST116' is Supabase code for single() not finding a row
+             return { success: true }; // Already at the bottom
+         } else if (fetchNextError || !nextClass) {
+            console.error('Error fetching next class:', fetchNextError);
+            return { success: false, error: 'Alttaki sınıf bulunamadı veya sıra numaralarında tutarsızlık var.' };
+         }
 
-    if (updateCurrentError) {
-      console.error('Error updating current class order (down):', updateCurrentError);
-      return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 1).' };
+        // Swap the display_order values (Sequential Updates)
+        const { error: updateCurrentError } = await supabase
+           .from('classes')
+           .update({ display_order: nextClass.display_order })
+           .eq('id', currentClass.id);
+
+        if (updateCurrentError) {
+          console.error('Error updating current class order (down):', updateCurrentError);
+          return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 1).' };
+        }
+        
+        const { error: updateNextError } = await supabase
+          .from('classes')
+          .update({ display_order: currentOrder })
+          .eq('id', nextClass.id);
+          
+        if (updateNextError) {
+           console.error('Error updating next class order (down):', updateNextError);
+           // CRITICAL: Rollback the first update!
+           await supabase.from('classes').update({ display_order: currentOrder }).eq('id', currentClass.id);
+           return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 2), geri alma denendi.' };
+        }
+
+        // revalidatePath('/dashboard/classes');
+        return { success: true };
+
+    } catch (err) {
+        console.error('moveClassDown error:', err);
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
-    
-    const { error: updateNextError } = await supabase
-      .from('classes')
-      .update({ display_order: currentOrder })
-      .eq('id', nextClass.id);
-      
-    if (updateNextError) {
-       console.error('Error updating next class order (down):', updateNextError);
-       // CRITICAL: Rollback the first update!
-       await supabase.from('classes').update({ display_order: currentOrder }).eq('id', currentClass.id);
-       return { success: false, error: 'Sınıf sırası güncellenirken hata (adım 2), geri alma denendi.' };
-    }
-
-    // revalidatePath('/dashboard/classes');
-    return { success: true };
-
-  } catch (err) {
-    console.error('moveClassDown error:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
 }

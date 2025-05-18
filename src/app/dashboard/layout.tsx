@@ -5,17 +5,17 @@ import { loadUserData, signOut } from "@/lib/supabase";
 import { useSemesterStore } from '@/stores/useSemesterStore';
 import { Semester } from '@/types/semesters';
 import {
-  AcademicCapIcon,
-  BookOpenIcon,
-  BuildingLibraryIcon,
-  BuildingOffice2Icon,
-  CalendarDaysIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  ComputerDesktopIcon,
-  DocumentChartBarIcon,
-  MapPinIcon,
-  UserGroupIcon
+    AcademicCapIcon,
+    BookOpenIcon,
+    BuildingLibraryIcon,
+    BuildingOffice2Icon,
+    CalendarDaysIcon,
+    ClipboardDocumentListIcon,
+    ClockIcon,
+    ComputerDesktopIcon,
+    DocumentChartBarIcon,
+    MapPinIcon,
+    UserGroupIcon
 } from '@heroicons/react/24/outline';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon, LogOutIcon } from "lucide-react";
@@ -92,18 +92,25 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      if (window.innerWidth >= 768) {
+      const currentWidth = window.innerWidth;
+      setWindowWidth(currentWidth);
+      if (currentWidth >= 768) {
         setIsSidebarOpen(true);
       } else {
         setIsSidebarOpen(false);
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    handleResize();
+    if (typeof window !== 'undefined') {
+      handleResize();
+      window.addEventListener('resize', handleResize);
+    }
     
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleResize);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -158,7 +165,7 @@ export default function DashboardLayout({
   };
 
   const handleOverlayClick = () => {
-    if (windowWidth < 768) {
+    if (windowWidth < 768 && isSidebarOpen) {
       setIsSidebarOpen(false);
     }
   };
@@ -170,16 +177,16 @@ export default function DashboardLayout({
       <div className="flex h-screen">
         {isSidebarOpen && windowWidth < 768 && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-10" 
+            className="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
             onClick={handleOverlayClick}
           />
         )}
         
         {!isPrintView && (
           <div
-            className={`fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-blue-900 via-blue-800 to-blue-700 shadow-lg transform transition-transform duration-300 ease-in-out z-20 ${
+            className={`fixed inset-y-0 left-0 w-72 bg-gradient-to-b from-blue-900 via-blue-800 to-blue-700 shadow-lg transform transition-transform duration-300 ease-in-out z-20 flex flex-col ${
               isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-            } md:translate-x-0 md:static md:w-72 flex flex-col`}
+            }`}
           >
             <div className="px-6 py-4 border-b border-blue-700 flex-shrink-0">
               <div className="flex items-center">
@@ -455,12 +462,14 @@ export default function DashboardLayout({
           </div>
         )}
 
-        <div className="flex-1 flex flex-col">
+        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+          isPrintView ? '' : (isSidebarOpen ? 'md:ml-72' : 'md:ml-0')
+        }`}>
           {!isPrintView && (
-            <header className="bg-blue-50 shadow-md p-4 flex justify-between items-center">
+            <header className="bg-blue-50 shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
               <div className="flex items-center">
                 <button
-                  className="mr-3 md:hidden text-gray-600 hover:text-gray-800 focus:outline-none"
+                  className="mr-3 text-gray-600 hover:text-gray-800 focus:outline-none"
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                   aria-label="Toggle sidebar"
                 >
@@ -506,7 +515,7 @@ export default function DashboardLayout({
             </header>
           )}
 
-          <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+          <main className={`flex-1 p-6 overflow-y-auto ${isPrintView ? '' : 'pt-20 md:pt-6'}`}>
             {children}
           </main>
         </div>

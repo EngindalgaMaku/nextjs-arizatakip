@@ -6,31 +6,46 @@ import { Test, TestOption, TestQuestion } from '@/types/tests'; // Bu Test tipi 
 const TABLE_NAME = 'tests';
 
 // Veritabanı satırını UI Test tipine dönüştürmek için yardımcı fonksiyon
-// Bu, questions JSONB alanını TestQuestion[] formatına düzgünce mapler.
 function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row']): Test {
-  // questions alanı JSONB olduğu için doğru şekilde parse edilmeli.
-  // Supabase client bunu otomatik olarak yapabilir, ancak emin olmak için kontrol edelim.
   let questionsArray: TestQuestion[] = [];
+  // questions alanı string ise (eski bir kayıt veya beklenmedik durum)
   if (typeof row.questions === 'string') {
     try {
-      questionsArray = JSON.parse(row.questions);
+      const parsedQuestions = JSON.parse(row.questions);
+      if (Array.isArray(parsedQuestions)) {
+        questionsArray = parsedQuestions.map((q: any): TestQuestion => ({
+          id: q.id, 
+          text: q.text,
+          options: q.options && typeof q.options === 'object' && !Array.isArray(q.options)
+            ? Object.entries(q.options).map(([key, value]): TestOption => ({
+                id: key, 
+                text: String(value),
+              }))
+            : [], 
+          correctOptionId: q.correctOptionId,
+          question_type: q.question_type || 'multiple_choice_single_answer',
+          points: q.points === undefined ? 1 : q.points,
+          explanation: q.explanation || null,
+        }));
+      }
     } catch (error) {
-      console.error('Failed to parse questions JSON string:', error);
-      // Hata durumunda boş bir dizi veya uygun bir hata yönetimi yapılabilir.
+      console.error('Failed to parse questions JSON string during map:', error);
     }
   } else if (Array.isArray(row.questions)) {
-    // Eğer Supabase zaten doğru bir şekilde array olarak döndürüyorsa
-    // ve elemanları TestQuestion tipine uyuyorsa doğrudan atanabilir.
-    // Ancak, Supabase'den gelen jsonb içindeki nesnelerin TestQuestion ile birebir aynı olmayabileceğini varsayarak
-    // manuel bir map yapmak daha güvenli olabilir, özellikle nested TestOption için.
+    // questions alanı zaten bir array ise (Supabase JSONB'yi otomatik array olarak parse ettiyse)
     questionsArray = (row.questions as any[]).map((q: any): TestQuestion => ({
-      id: q.id,
+      id: q.id, 
       text: q.text,
-      options: (q.options as any[]).map((opt: any): TestOption => ({
-        id: opt.id,
-        text: opt.text,
-      })),
+      options: q.options && typeof q.options === 'object' && !Array.isArray(q.options)
+        ? Object.entries(q.options).map(([key, value]): TestOption => ({
+            id: key,
+            text: String(value),
+          }))
+        : [],
       correctOptionId: q.correctOptionId,
+      question_type: q.question_type || 'multiple_choice_single_answer',
+      points: q.points === undefined ? 1 : q.points,
+      explanation: q.explanation || null,
     }));
   }
 
@@ -39,14 +54,14 @@ function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row'])
     title: row.title,
     slug: row.slug,
     description: row.description || '',
-    questions: questionsArray,
+    questions: questionsArray, 
     passingScore: row.passing_score === null ? undefined : row.passing_score,
     timeLimit: row.time_limit === null ? undefined : row.time_limit,
-    randomizeQuestions: row.randomize_questions === null ? undefined : row.randomize_questions,
-    randomizeOptions: row.randomize_options === null ? undefined : row.randomize_options,
-    isPublished: row.is_published === null ? undefined : row.is_published,
-    createdAt: row.created_at ? new Date(row.created_at) : undefined,
-    updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    randomizeQuestions: row.randomize_questions === null ? false : row.randomize_questions,
+    randomizeOptions: row.randomize_options === null ? false : row.randomize_options,
+    isPublished: row.is_published === null ? false : row.is_published,
+    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+    updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
   };
 }
 
@@ -229,8 +244,17 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
 
     let processedQuestions: TestQuestion[] | undefined = undefined;
     if (updates.questions) {
-        const existingTest = await getTestById(testId);
-        let nextQuestionId = existingTest ? Math.max(0, ...existingTest.questions.map(q => q.id || 0)) + 1 : 1;
+        // const existingTest = await getTestById(testId); // Bu satıra bu mantıkta ihtiyaç kalmıyor
+        let nextQuestionId = 1; // Varsayılan başlangıç
+
+        // Formdan gelen güncellemelerdeki mevcut sayısal ID'lerin en büyüğünü bul
+        const numericIdsInUpdate = updates.questions
+            .map(qUpd => qUpd.id) // qUpd.id number | undefined
+            .filter((id): id is number => typeof id === 'number' && id > 0);
+
+        if (numericIdsInUpdate.length > 0) {
+            nextQuestionId = Math.max(0, ...numericIdsInUpdate) + 1;
+        }
         
         processedQuestions = updates.questions
             .filter(qUpdate => !qUpdate.toBeDeleted)
@@ -256,11 +280,11 @@ export async function updateTest(testId: string, updates: UpdateTestData): Promi
                 }
 
                 return {
-                    id: qUpdate.id || nextQuestionId++,
+                    id: String(qUpdate.id || nextQuestionId++), // YENİ ID'Yİ STRING'E ÇEVİR
                     text: qUpdate.text,
                     options: liveOptions,
                     correctOptionId: correctOptionIdToSet,
-                };
+                } as TestQuestion; // Tip zorlaması eklendi
             });
     }
 

@@ -97,7 +97,7 @@ export default function EditTestPage({ params }: EditTestPageProps) {
               randomizeOptions: fetchedTest.randomizeOptions || false,
               isPublished: fetchedTest.isPublished || false,
               questions: fetchedTest.questions.map(q => ({
-                id: q.id,
+                id: parseInt(q.id, 10),
                 text: q.text,
                 options: q.options.map(opt => ({ 
                   id: opt.id, 

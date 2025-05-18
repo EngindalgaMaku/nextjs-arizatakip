@@ -1,7 +1,7 @@
 'use server';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Semester, SemesterSchema, SemesterFormValues, SemesterFormSchema } from '@/types/semesters';
+import { Semester, SemesterFormSchema, SemesterFormValues, SemesterSchema } from '@/types/semesters';
 import { z } from 'zod';
 
 const SEMESTERS_TABLE = 'semesters';
@@ -9,7 +9,7 @@ const SEMESTERS_PATH = '/dashboard/semesters'; // Path for revalidation
 
 // Fetch all semesters, ordered by start date
 export async function fetchSemesters(): Promise<Semester[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from(SEMESTERS_TABLE)
     .select('*')
@@ -33,7 +33,7 @@ export async function fetchSemesters(): Promise<Semester[]> {
 
 // Create a new semester
 export async function createSemester(formData: SemesterFormValues): Promise<{ success: boolean; semester?: Semester; error?: string | z.ZodIssue[] }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const parseResult = SemesterFormSchema.safeParse(formData);
 
   if (!parseResult.success) {
@@ -73,7 +73,7 @@ export async function createSemester(formData: SemesterFormValues): Promise<{ su
 
 // Update an existing semester
 export async function updateSemester(id: string, formData: SemesterFormValues): Promise<{ success: boolean; semester?: Semester; error?: string | z.ZodIssue[] }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const parseResult = SemesterFormSchema.safeParse(formData);
 
   if (!parseResult.success) {
@@ -114,7 +114,7 @@ export async function updateSemester(id: string, formData: SemesterFormValues): 
 
 // Delete a semester
 export async function deleteSemester(id: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     const { error } = await supabase
       .from(SEMESTERS_TABLE)
@@ -140,7 +140,7 @@ export async function deleteSemester(id: string): Promise<{ success: boolean; er
 // Set a specific semester as active (and deactivate others)
 // NOTE: This uses a transaction to ensure atomicity.
 export async function setActiveSemester(id: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     // Use Supabase Edge Function or RPC for transactions if needed complex logic,
     // otherwise, perform sequential updates (less safe if interrupted).

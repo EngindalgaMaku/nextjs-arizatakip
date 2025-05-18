@@ -1,7 +1,7 @@
 'use server';
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { Branch, BranchSchema, BranchFormData, BranchFormSchema } from '@/types/branches';
+import { Branch, BranchFormData, BranchFormSchema, BranchSchema } from '@/types/branches';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -9,7 +9,7 @@ const BRANCHES_TABLE = 'branches';
 
 // Fetch all branches
 export async function fetchBranches(): Promise<Branch[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from(BRANCHES_TABLE).select('*').order('name', { ascending: true });
   if (error) {
     console.error('Error fetching branches:', error);
@@ -22,7 +22,7 @@ export async function fetchBranches(): Promise<Branch[]> {
 // Fetch a single branch by ID
 export async function fetchBranchById(id: string): Promise<Branch | null> {
   if (!id) return null;
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from(BRANCHES_TABLE).select('*').eq('id', id).single();
   if (error) {
     if (error.code === 'PGRST116') { // Not found
@@ -36,7 +36,7 @@ export async function fetchBranchById(id: string): Promise<Branch | null> {
 
 // Create a new branch
 export async function createBranch(formData: BranchFormData): Promise<Branch> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const validatedData = BranchFormSchema.parse(formData);
   const { data, error } = await supabase.from(BRANCHES_TABLE).insert(validatedData).select().single();
 
@@ -52,7 +52,7 @@ export async function createBranch(formData: BranchFormData): Promise<Branch> {
 // Update an existing branch
 export async function updateBranch(id: string, formData: BranchFormData): Promise<Branch> {
   if (!id) throw new Error('Güncelleme için Branş ID\'si gereklidir.');
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const validatedData = BranchFormSchema.parse(formData);
   const { data, error } = await supabase.from(BRANCHES_TABLE).update(validatedData).eq('id', id).select().single();
 
@@ -68,7 +68,7 @@ export async function updateBranch(id: string, formData: BranchFormData): Promis
 // Delete a branch
 export async function deleteBranch(id: string): Promise<void> {
   if (!id) throw new Error('Silme için Branş ID\'si gereklidir.');
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from(BRANCHES_TABLE).delete().eq('id', id);
 
   if (error) {

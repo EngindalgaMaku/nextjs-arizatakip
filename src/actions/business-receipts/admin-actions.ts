@@ -40,7 +40,7 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
   error: string | null;
   count: number | null;
 }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { 
     studentName, className, schoolNumber, 
     businessName, month, year, 
@@ -126,7 +126,7 @@ export async function getReceiptDownloadUrl(
   filePath: string,
   expiresIn: number = 3600 
 ): Promise<{ data: { downloadUrl: string } | null; error: string | null }> {
-  const supabase = createSupabaseServerClient(); // New
+  const supabase = await createSupabaseServerClient();
   const validation = z.string().min(1).safeParse(filePath);
 
   if (!validation.success) {
@@ -165,7 +165,7 @@ export type UpdateAdminReceiptPayload = z.infer<typeof updateReceiptSchema>;
 export async function updateAdminReceipt(
   payload: UpdateAdminReceiptPayload
 ): Promise<{ data: { id: string } | null; error: string | null }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const validation = updateReceiptSchema.safeParse(payload);
 
   if (!validation.success) {

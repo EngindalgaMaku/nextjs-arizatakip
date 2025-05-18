@@ -4,10 +4,10 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // New
 // import { cookies } from 'next/headers'; // No longer needed here
 import {
-    UpdateReceiptFormPayload,
-    UpdateReceiptFormSchema, // New schema for metadata
-    UploadReceiptFormPayload, // Keep this for reference to file validation constants if needed, or define them locally
-    UploadReceiptMetadataSchema
+  UpdateReceiptFormPayload,
+  UpdateReceiptFormSchema, // New schema for metadata
+  UploadReceiptFormPayload, // Keep this for reference to file validation constants if needed, or define them locally
+  UploadReceiptMetadataSchema
 } from '@/types/schemas/receipt-schema';
 import { z } from 'zod';
 import { getOrCreateStajIsletmesiByName } from './business-actions';
@@ -33,7 +33,7 @@ export async function uploadReceipt(
   payload: UploadReceiptFormPayload,
   file: File
 ): Promise<{ data: { id: string } | null; error: string | null }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   // Validate metadata payload
   const validatedForm = UploadReceiptMetadataSchema.safeParse(payload);
@@ -129,7 +129,7 @@ export async function updateReceipt(
   payload: UpdateReceiptFormPayload,
   file?: File // Dosya opsiyonel, sadece diğer bilgiler güncellenebilir
 ): Promise<{ data: { id: string } | null; error: string | null }> {
-  const supabase = createSupabaseServerClient(); // New
+  const supabase = await createSupabaseServerClient();
 
   const validatedForm = UpdateReceiptFormSchema.safeParse(payload);
   if (!validatedForm.success) {
@@ -240,7 +240,7 @@ export async function updateReceipt(
 // export async function deleteReceipt(studentId: string, receiptId: string) { ... }
 
 export async function deleteReceiptAndFile(receiptId: string, filePath: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   if (!receiptId || !filePath) {
     return { success: false, error: 'Dekont ID veya dosya yolu eksik.' };

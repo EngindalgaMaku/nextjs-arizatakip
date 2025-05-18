@@ -1,19 +1,19 @@
 'use server';
 
-import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { 
-  Business, 
-  BusinessSchema, 
-  BusinessFormValues, 
-  BusinessFormSchema 
+import {
+    Business,
+    BusinessFormSchema,
+    BusinessFormValues,
+    BusinessSchema
 } from '@/types/businesses';
+import { z } from 'zod';
 
 /**
  * Fetch all businesses, optionally filtered by semester.
  */
 export async function fetchBusinesses(semesterId?: string): Promise<Business[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   let query = supabase
     .from('businesses')
     .select('id, name, contact_person, contact_phone, address, industry, business_type, notes, semester_id, created_at, updated_at');
@@ -60,7 +60,7 @@ export async function fetchBusinessById(id: string): Promise<Business | null> {
     console.error('[fetchBusinessById] Invalid or missing ID provided.');
     return null;
   }
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from('businesses')
     .select('id, name, contact_person, contact_phone, address, industry, business_type, notes, semester_id, created_at, updated_at')
@@ -111,7 +111,7 @@ export async function createBusiness(
     return { success: false, error: parse.error.issues };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const businessDataToInsert = {
     name: parse.data.name,
     contact_person: parse.data.contactPerson,
@@ -186,7 +186,7 @@ export async function updateBusiness(
     return { success: false, error: parse.error.issues };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const businessDataToUpdate = {
     name: parse.data.name,
     contact_person: parse.data.contactPerson,
@@ -257,7 +257,7 @@ export async function deleteBusiness(id: string): Promise<{ success: boolean; er
     return { success: false, error: 'Geçersiz işletme IDsi.' };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     console.log(`[deleteBusiness] Attempting to delete business with ID: ${id} from Supabase.`);
     const { error } = await supabase

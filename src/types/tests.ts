@@ -6,10 +6,13 @@ export interface TestOption {
 }
 
 export interface TestQuestion {
-  id: number;
+  id: string;
   text: string;
   options: TestOption[];
   correctOptionId: string;
+  question_type?: string;
+  points?: number;
+  explanation?: string | null;
 }
 
 export interface Test {
@@ -28,7 +31,7 @@ export interface Test {
 }
 
 export interface TestUserState {
-  answers: Record<number, string>; // questionId -> optionId
+  answers: Record<string, string>;
   startTime: Date;
   isSubmitted: boolean;
   endTime?: Date;
@@ -93,7 +96,7 @@ export interface LiveExamParticipant {
   ipAddress?: string;    // Öğrencinin IP adresi
   deviceInfo?: string;   // Cihaz bilgisi
   progress: number;      // İlerleme yüzdesi (0-100)
-  answers?: Record<number, string>; // Verilen cevaplar
+  answers?: Record<string, string>; // Verilen cevaplar
   score?: number;        // Puanı (sonuçlar hesaplandığında)
   isPassed?: boolean;    // Geçti mi (sonuçlar hesaplandığında)
   attemptNumber: number; // Deneme numarası

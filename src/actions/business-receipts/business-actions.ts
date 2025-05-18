@@ -4,9 +4,8 @@ import { z } from 'zod';
 // import { createServerActionClient } from '@supabase/auth-helpers-nextjs'; // Old
 import { createSupabaseServerClient } from '@/lib/supabase/server'; // New
 // import { cookies } from 'next/headers'; // No longer needed here
-import { type Database } from '@/lib/database.types';
 // Updated import paths and names for StajIsletmesi schemas
-import { CreateStajIsletmesiSchema, UpsertStajIsletmesiPayload } from '@/types/schemas/business-schema';
+import { UpsertStajIsletmesiPayload } from '@/types/schemas/business-schema';
 
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
 const getSupabaseClient = () => createSupabaseServerClient(); // New
@@ -17,7 +16,7 @@ const getSupabaseClient = () => createSupabaseServerClient(); // New
  * @returns Staj İşletmesi ID'si
  */
 export async function getOrCreateStajIsletmesiByName(name: string): Promise<{ data: { id: string } | null; error: string | null; }> {
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClient();
   const validatedName = z.string().min(2).safeParse(name);
 
   if (!validatedName.success) {

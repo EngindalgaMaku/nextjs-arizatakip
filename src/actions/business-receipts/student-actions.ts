@@ -26,7 +26,7 @@ export async function loginStudentForReceipts(
   schoolNumber: string,
   studentName: string
 ): Promise<{ data: StudentLoginResult | null; error: string | null }> {
-  const supabase = createSupabaseServerClient(); // New way to get client
+  const supabase = await createSupabaseServerClient(); // New way to get client
 
   const validation = z.object({
     schoolNumber: z.string().min(1, "Okul numarası boş olamaz."),
@@ -106,7 +106,7 @@ export async function getStudentReceiptsDashboard(
   studentId: string,
   year: number
 ): Promise<{ data: any[] | null; error: string | null }> { // any[] tipi detaylandırılacak
-  const supabase = createSupabaseServerClient(); // New way to get client
+  const supabase = await createSupabaseServerClient(); // New way to get client
   const validation = z.object({
     studentId: z.string().uuid("Geçersiz öğrenci ID."),
     year: z.number().int().min(new Date().getFullYear() - 5).max(new Date().getFullYear() + 1, "Geçersiz yıl."),
@@ -155,7 +155,7 @@ export async function getStudentReceiptsDashboard(
 }
 
 export async function getClassesForReceiptLogin(): Promise<{ data: Array<{ id: string; name: string }> | null; error: string | null }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     const { data, error } = await supabase
       .from('classes')
@@ -176,7 +176,7 @@ export async function getClassesForReceiptLogin(): Promise<{ data: Array<{ id: s
 }
 
 export async function getStudentsByClassForReceiptLogin(classId: string): Promise<{ data: Array<{ id: string; name: string }> | null; error: string | null }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const validatedClassId = z.string().uuid().safeParse(classId);
   if (!validatedClassId.success) {
     return { data: null, error: 'Geçersiz sınıf ID.' };
@@ -204,7 +204,7 @@ export async function verifyStudentLogin(
   studentId: string,
   schoolNumberInput: string
 ): Promise<{ data: StudentLoginResult | null; error: string | null }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const validation = z.object({
     studentId: z.string().uuid("Geçersiz öğrenci ID."),

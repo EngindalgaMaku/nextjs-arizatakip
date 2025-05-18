@@ -1,6 +1,5 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { cache } from 'react';
 
 // Force dynamic rendering for this component
 export const dynamic = 'force-dynamic';
@@ -8,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // Create a server-side Supabase client for Next.js route handlers and server actions
 // using the recommended @supabase/ssr package.
 // Make the function async to properly handle cookie operations if needed internally by createServerClient
-export const createSupabaseServerClient = cache(() => {
+export const createSupabaseServerClient = async () => {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -45,4 +44,4 @@ export const createSupabaseServerClient = cache(() => {
       },
     }
   );
-}); 
+}; 

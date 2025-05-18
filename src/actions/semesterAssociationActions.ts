@@ -15,7 +15,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
  * Updates the semester_id field for the specified teachers
  */
 export async function associateTeachersWithSemester(semesterId: string, teacherIds: string[]) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   
   try {
     const { error } = await supabase
@@ -49,7 +49,7 @@ export async function associateTeachersWithSemester(semesterId: string, teacherI
  * Updates the semester_id field for the specified classes
  */
 export async function associateClassesWithSemester(semesterId: string, classIds: string[]) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   
   try {
     const { error } = await supabase
@@ -83,7 +83,7 @@ export async function associateClassesWithSemester(semesterId: string, classIds:
  * Updates the semester_id field for the specified locations
  */
 export async function associateLocationsWithSemester(semesterId: string, locationIds: string[]) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   
   try {
     const { error } = await supabase
@@ -116,7 +116,7 @@ export async function associateLocationsWithSemester(semesterId: string, locatio
  * Fetches entities (teachers, classes, or locations) that are associated with a semester
  */
 export async function fetchEntitiesBySemester(entityType: 'teachers' | 'classes' | 'locations', semesterId: string) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   
   try {
     const { data, error } = await supabase

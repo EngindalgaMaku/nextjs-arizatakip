@@ -8,7 +8,7 @@ export const TESTS: Test[] = [
     description: 'OSI modelinin 7. katmanı olan Uygulama Katmanı hakkında 50 soruluk çoktan seçmeli test.',
     questions: [
       {
-        id: 1,
+        id: "1",
         text: 'OSI modelinde Uygulama Katmanı hangi katmandır?',
         options: [
           { id: 'a', text: '5. katman' },
@@ -19,7 +19,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 2,
+        id: "2",
         text: 'Aşağıdakilerden hangisi Uygulama Katmanı\'nın temel görevlerinden biridir?',
         options: [
           { id: 'a', text: 'Veri şifreleme' },
@@ -30,7 +30,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 3,
+        id: "3",
         text: 'DNS\'in temel amacı nedir?',
         options: [
           { id: 'a', text: 'E-posta göndermek' },
@@ -41,7 +41,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 4,
+        id: "4",
         text: 'DNS\'de kullanılan "A" kayıt türü neyi ifade eder?',
         options: [
           { id: 'a', text: 'Mail sunucusu' },
@@ -52,7 +52,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 5,
+        id: "5",
         text: 'DNS isim uzayı nasıl bir yapıya sahiptir?',
         options: [
           { id: 'a', text: 'Düz' },
@@ -63,7 +63,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 6,
+        id: "6",
         text: 'DNS, host isimlerini en fazla kaç karaktere kadar çevirebilir?',
         options: [
           { id: 'a', text: '128' },
@@ -74,7 +74,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 7,
+        id: "7",
         text: 'Aşağıdakilerden hangisi DNS\'in bir parçası değildir?',
         options: [
           { id: 'a', text: 'İsim sunucuları' },
@@ -85,7 +85,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 8,
+        id: "8",
         text: 'DNS\'de "CNAME" kaydı ne için kullanılır?',
         options: [
           { id: 'a', text: 'Mail alışverişi' },
@@ -96,7 +96,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 9,
+        id: "9",
         text: 'Elektronik postanın temel avantajı nedir?',
         options: [
           { id: 'a', text: 'Yüksek güvenlik' },
@@ -107,7 +107,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 10,
+        id: "10",
         text: 'Aşağıdakilerden hangisi bir e-posta servisidir?',
         options: [
           { id: 'a', text: 'Dosya sıkıştırma' },
@@ -118,7 +118,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 11,
+        id: "11",
         text: 'RFC 822\'de "Cc" başlık alanı neyi ifade eder?',
         options: [
           { id: 'a', text: 'Birincil alıcı' },
@@ -129,7 +129,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 12,
+        id: "12",
         text: 'MIME\'in temel amacı nedir?',
         options: [
           { id: 'a', text: 'Metin tabanlı e-posta göndermek' },
@@ -140,7 +140,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 13,
+        id: "13",
         text: 'E-posta mesajları hangi protokol ile transfer edilir?',
         options: [
           { id: 'a', text: 'HTTP' },
@@ -151,7 +151,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 14,
+        id: "14",
         text: 'POP3 ve IMAP arasındaki temel fark nedir?',
         options: [
           { id: 'a', text: 'POP3 mesajları sunucuda saklar, IMAP istemciye indirir' },
@@ -162,7 +162,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 15,
+        id: "15",
         text: 'WWW\'nin temel amacı nedir?',
         options: [
           { id: 'a', text: 'Dosya transferi yapmak' },
@@ -173,7 +173,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 16,
+        id: "16",
         text: 'Web sayfalarını görüntülemek için ne kullanılır?',
         options: [
           { id: 'a', text: 'E-posta istemcisi' },
@@ -184,7 +184,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 17,
+        id: "17",
         text: 'Bir web sayfasına erişim sürecinde ilk adım nedir?',
         options: [
           { id: 'a', text: 'Sunucuya bağlanmak' },
@@ -195,7 +195,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 18,
+        id: "18",
         text: 'Web sunucusu ne iş yapar?',
         options: [
           { id: 'a', text: 'İstemciden gelen bağlantıları kabul eder ve dosya gönderir' },
@@ -206,7 +206,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'a'
       },
       {
-        id: 19,
+        id: "19",
         text: 'Aşağıdakilerden hangisi DNS\'in temel bileşenlerinden biri değildir?',
         options: [
           { id: 'a', text: 'İsim sunucuları' },
@@ -217,7 +217,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'd'
       },
       {
-        id: 20,
+        id: "20",
         text: 'DNS kayıtlarında "MX" kaydı neyi belirtir?',
         options: [
           { id: 'a', text: 'Host adresi' },
@@ -228,7 +228,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 21,
+        id: "21",
         text: 'E-postada "Bcc" başlık alanı ne anlama gelir?',
         options: [
           { id: 'a', text: 'Birincil alıcı' },
@@ -239,7 +239,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 22,
+        id: "22",
         text: 'Aşağıdakilerden hangisi MIME\'in desteklediği içerik türlerinden biri değildir?',
         options: [
           { id: 'a', text: 'Metin' },
@@ -250,7 +250,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'd'
       },
       {
-        id: 23,
+        id: "23",
         text: 'SMTP hangi TCP portunu kullanır?',
         options: [
           { id: 'a', text: '21' },
@@ -261,7 +261,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 24,
+        id: "24",
         text: 'POP3 hangi TCP portunu kullanır?',
         options: [
           { id: 'a', text: '21' },
@@ -272,7 +272,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'd'
       },
       {
-        id: 25,
+        id: "25",
         text: 'IMAP\'in POP3\'ten temel farkı nedir?',
         options: [
           { id: 'a', text: 'IMAP mesajları siler, POP3 saklar' },
@@ -283,7 +283,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 26,
+        id: "26",
         text: 'WWW\'de bir bağlantıya (link) tıklanınca ne olur?',
         options: [
           { id: 'a', text: 'Yeni bir e-posta gönderilir' },
@@ -294,7 +294,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 27,
+        id: "27",
         text: 'Web sayfaları hangi dilde yazılır?',
         options: [
           { id: 'a', text: 'C++' },
@@ -305,7 +305,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 28,
+        id: "28",
         text: 'Bir web sunucusuna istek gönderildiğinde kullanılan temel protokol nedir?',
         options: [
           { id: 'a', text: 'FTP' },
@@ -316,7 +316,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 29,
+        id: "29",
         text: 'DNS\'de "SOA" kaydı neyi ifade eder?',
         options: [
           { id: 'a', text: 'Host bilgisi' },
@@ -327,7 +327,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 30,
+        id: "30",
         text: 'E-posta adresinde kullanılan "@" işareti neyi ayırır?',
         options: [
           { id: 'a', text: 'Ad ve soyadı' },
@@ -338,7 +338,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 31,
+        id: "31",
         text: 'MIME\'de "Content-Type" başlığı neyi belirtir?',
         options: [
           { id: 'a', text: 'Mesajın şifreleme türü' },
@@ -349,7 +349,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 32,
+        id: "32",
         text: 'SMTP\'de "HELO" komutu ne için kullanılır?',
         options: [
           { id: 'a', text: 'Mesaj göndermeye başlamak' },
@@ -360,7 +360,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 33,
+        id: "33",
         text: 'POP3\'te "RETR" komutu ne işe yarar?',
         options: [
           { id: 'a', text: 'Mesajı silmek' },
@@ -371,7 +371,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 34,
+        id: "34",
         text: 'WWW\'de "URL" neyin kısaltmasıdır?',
         options: [
           { id: 'a', text: 'Universal Resource Locator' },
@@ -382,7 +382,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 35,
+        id: "35",
         text: 'DNS sorgusu sonucunda alınan bilgiye ne ad verilir?',
         options: [
           { id: 'a', text: 'IP adresi' },
@@ -393,7 +393,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'a'
       },
       {
-        id: 36,
+        id: "36",
         text: 'E-posta mesajının hangi bölümünde alıcı, gönderen, konu gibi bilgiler yer alır?',
         options: [
           { id: 'a', text: 'Gövde' },
@@ -404,7 +404,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 37,
+        id: "37",
         text: 'MIME\'de "multipart/alternative" ne anlama gelir?',
         options: [
           { id: 'a', text: 'Mesajın farklı parçalarının sıralı gönderilmesi' },
@@ -415,7 +415,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 38,
+        id: "38",
         text: 'SMTP\'de "MAIL FROM" komutu neyi belirtir?',
         options: [
           { id: 'a', text: 'Alıcı adresi' },
@@ -426,7 +426,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 39,
+        id: "39",
         text: 'POP3\'te "DELE" komutu ne yapar?',
         options: [
           { id: 'a', text: 'Mesajı indirir' },
@@ -437,7 +437,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 40,
+        id: "40",
         text: 'WWW\'de bir web sunucusunun ana görevi nedir?',
         options: [
           { id: 'a', text: 'E-posta göndermek' },
@@ -448,7 +448,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 41,
+        id: "41",
         text: 'DNS\'de "PTR" kaydı ne için kullanılır?',
         options: [
           { id: 'a', text: 'IP adresinden host adına çevirme' },
@@ -459,7 +459,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'a'
       },
       {
-        id: 42,
+        id: "42",
         text: 'E-posta mesajında "Reply-To" başlığı neyi ifade eder?',
         options: [
           { id: 'a', text: 'Mesajın gönderilme tarihi' },
@@ -470,7 +470,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 43,
+        id: "43",
         text: 'MIME\'de "Content-Transfer-Encoding" neyi belirtir?',
         options: [
           { id: 'a', text: 'İçerik türü' },
@@ -481,7 +481,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 44,
+        id: "44",
         text: 'SMTP\'de "RCPT TO" komutu neyi belirtir?',
         options: [
           { id: 'a', text: 'Gönderen adresi' },
@@ -492,7 +492,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 45,
+        id: "45",
         text: 'POP3\'te "QUIT" komutu ne yapar?',
         options: [
           { id: 'a', text: 'Mesajı indirir' },
@@ -503,7 +503,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 46,
+        id: "46",
         text: 'WWW\'de "HTTP" neyin kısaltmasıdır?',
         options: [
           { id: 'a', text: 'Hypertext Transfer Protocol' },
@@ -514,7 +514,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'a'
       },
       {
-        id: 47,
+        id: "47",
         text: 'DNS\'de "TXT" kaydı ne için kullanılır?',
         options: [
           { id: 'a', text: 'Mail sunucusu belirtmek' },
@@ -525,7 +525,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 48,
+        id: "48",
         text: 'E-posta mesajında "Message-ID" ne işe yarar?',
         options: [
           { id: 'a', text: 'Mesajın konusu' },
@@ -536,7 +536,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'c'
       },
       {
-        id: 49,
+        id: "49",
         text: 'MIME\'de "Content-Disposition" neyi belirtir?',
         options: [
           { id: 'a', text: 'İçerik türü' },
@@ -547,7 +547,7 @@ export const TESTS: Test[] = [
         correctOptionId: 'b'
       },
       {
-        id: 50,
+        id: "50",
         text: 'SMTP\'de "DATA" komutu neyi başlatır?',
         options: [
           { id: 'a', text: 'Alıcı adresini belirtme' },
