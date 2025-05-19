@@ -150,7 +150,9 @@ function QuestionDisplay({
             }
           } else if (isIndividuallyRevealed) {
             if (isCorrect) {
-              style = { ...correctOptionStyle, cursor: 'not-allowed' };
+              style = correctOptionStyle;
+            } else if (isSelected && !isCorrect) {
+              style = incorrectOptionStyle;
             } else {
               style.cursor = 'not-allowed';
               style.backgroundColor = '#f0f0f0';
@@ -189,6 +191,16 @@ function QuestionDisplay({
         </div>
       )}
       {showResults && (selectedAnswer === question.correctOptionId) && question.explanation && (
+        <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '4px', border: '1px solid #c3e6cb'}}>
+            <strong>Açıklama:</strong> {question.explanation}
+        </div>
+      )}
+      {isIndividuallyRevealed && selectedAnswer && !(selectedAnswer === question.correctOptionId) && question.explanation && (
+        <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '4px', border: '1px solid #f5c6cb'}}>
+            <strong>Açıklama:</strong> {question.explanation}
+        </div>
+      )}
+      {isIndividuallyRevealed && (selectedAnswer === question.correctOptionId) && question.explanation && (
         <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '4px', border: '1px solid #c3e6cb'}}>
             <strong>Açıklama:</strong> {question.explanation}
         </div>
