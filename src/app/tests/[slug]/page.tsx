@@ -106,6 +106,15 @@ function getOptionLabel(index: number): string {
   return String.fromCharCode(65 + index) + ')'; // A), B), C)...
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+}
+
 function QuestionDisplay({
   question,
   index,
@@ -114,15 +123,19 @@ function QuestionDisplay({
   showResults,
   isIndividuallyRevealed,
   onRevealAnswer,
-}: QuestionDisplayProps) {
+  randomizeOptions = false,
+}: QuestionDisplayProps & { randomizeOptions?: boolean }) {
+  // Şıkları karıştır veya orijinal sırada göster
+  const displayOptions = randomizeOptions ? shuffleArray(question.options) : question.options;
+
   return (
     <div style={questionCardStyle}>
       <h4 style={questionTextStyle}>
         Soru {index + 1}: {question.text}
       </h4>
       <div>
-        {question.options.map((option, optionIndex) => {
-          let style = { ...optionButtonStyle }; // Start with a copy to allow modifications
+        {displayOptions.map((option, optionIndex) => {
+          let style = { ...optionButtonStyle };
           const isCorrect = option.id === question.correctOptionId;
           const isSelected = option.id === selectedAnswer;
 
@@ -175,7 +188,7 @@ function QuestionDisplay({
             <strong>Açıklama:</strong> {question.explanation}
         </div>
       )}
-       {showResults && (selectedAnswer === question.correctOptionId) && question.explanation && (
+      {showResults && (selectedAnswer === question.correctOptionId) && question.explanation && (
         <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '4px', border: '1px solid #c3e6cb'}}>
             <strong>Açıklama:</strong> {question.explanation}
         </div>
@@ -191,7 +204,7 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
-  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({}); // State for individually revealed answers
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     async function fetchTest() {
@@ -200,7 +213,7 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
       setTest(null);
       setSelectedAnswers({});
       setShowResults(false);
-      setRevealedAnswers({}); // Reset revealed answers on new test
+      setRevealedAnswers({});
       try {
         const fetchedTest = await getPublicTestBySlug(slug);
         if (fetchedTest) {
@@ -241,7 +254,7 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
   const handleReset = () => {
     setSelectedAnswers({});
     setShowResults(false);
-    setRevealedAnswers({}); // Reset revealed answers on full reset
+    setRevealedAnswers({});
   }
 
   if (isLoading) {
@@ -250,88 +263,75 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
 
   if (error) {
     return (
-      <div style={{ textAlign: 'center', marginTop: '50px' }}>
-        <h1>Hata</h1>
+      <div style={{ textAlign: 'center', marginTop: '50px', fontSize: '1.2rem' }}>
         <p>{error}</p>
-        <Link href="/tests">
-          <button style={{ ...primaryButtonStyle, marginTop: '20px' }}>Tüm Testlere Geri Dön</button>
+        <Link href="/tests" style={primaryButtonStyle}>
+          Test Listesine Dön
         </Link>
       </div>
     );
   }
 
   if (!test) {
-    return (
-      <div style={{ textAlign: 'center', marginTop: '50px' }}>
-        <h1>Test Bulunamadı</h1>
-        <Link href="/tests">
-          <button style={{ ...primaryButtonStyle, marginTop: '20px' }}>Tüm Testlere Geri Dön</button>
-        </Link>
-      </div>
-    );
+    return null;
   }
-  
-  let score = 0;
-  let totalPoints = 0;
-  if(showResults && test.questions){
-      test.questions.forEach(q => {
-        totalPoints += q.points || 1; 
-        if(selectedAnswers[String(q.id)] === q.correctOptionId){
-            score += q.points || 1;
-        }
-      });
-  }
+
+  // Soruları karıştır veya orijinal sırada göster
+  const displayQuestions = test.randomizeQuestions ? shuffleArray(test.questions) : test.questions;
 
   return (
-    <div style={{ maxWidth: '800px', margin: '20px auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <Link href="/tests">
-        <button style={{ ...secondaryButtonStyle, marginBottom: '20px' }}>&larr; Tüm Testler</button>
-      </Link>
-      <div style={{ backgroundColor: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '30px' }}>
-        <h1 style={{ borderBottom: '2px solid #dee2e6', paddingBottom: '15px', marginBottom: '15px', fontSize: '1.8rem' }}>
-          {test.title}
-        </h1>
-        <p style={{ fontSize: '1rem', color: '#555' }}>{test.description || 'Açıklama bulunmuyor.'}</p>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+      <div style={{ marginBottom: '30px' }}>
+        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>{test.title}</h1>
+        {test.description && (
+          <p style={{ color: '#666', marginBottom: '20px' }}>{test.description}</p>
+        )}
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+          <div>
+            <strong>Geçme Puanı:</strong> {test.passingScore}%
+          </div>
+          {test.timeLimit && (
+            <div>
+              <strong>Süre:</strong> {test.timeLimit} dakika
+            </div>
+          )}
+        </div>
       </div>
 
-      {test.questions && test.questions.length > 0 ? (
-        test.questions.map((question, index) => (
-          <QuestionDisplay
-            key={String(question.id) || index}
-            question={question}
-            index={index}
-            selectedAnswer={selectedAnswers[String(question.id)]}
-            onAnswerSelect={handleAnswerSelect}
-            showResults={showResults}
-            isIndividuallyRevealed={revealedAnswers[String(question.id)] || false}
-            onRevealAnswer={handleRevealAnswer}
-          />
-        ))
-      ) : (
-        <p style={{ textAlign: 'center', fontSize: '1.1rem' }}>Bu test için soru bulunmamaktadır.</p>
-      )}
+      {displayQuestions.map((question, index) => (
+        <QuestionDisplay
+          key={question.id}
+          question={question}
+          index={index}
+          selectedAnswer={selectedAnswers[question.id]}
+          onAnswerSelect={handleAnswerSelect}
+          showResults={showResults}
+          isIndividuallyRevealed={revealedAnswers[question.id]}
+          onRevealAnswer={handleRevealAnswer}
+          randomizeOptions={test.randomizeOptions ?? false}
+        />
+      ))}
 
-      {test.questions && test.questions.length > 0 && (
-          <div style={{ marginTop: '30px', textAlign: 'center' }}>
-            {!showResults ? (
-              <button style={primaryButtonStyle} onClick={handleSubmitOrShowResults}>
-                Cevapları Kontrol Et
-              </button>
-            ) : (
-              <button style={secondaryButtonStyle} onClick={handleReset}>
-                Sıfırla ve Tekrar Dene
-              </button>
-            )}
-          </div>
-      )}
-      
-      {showResults && test.questions && test.questions.length > 0 && (
-          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#e9ecef', borderRadius: '8px', textAlign: 'center'}}>
-              <h3 style={{fontSize: '1.5rem', marginBottom: '10px'}}>Sonucunuz</h3>
-              <p style={{fontSize: '1.2rem'}}>Toplam {totalPoints} puandan {score} puan aldınız.</p>
-              <p style={{fontSize: '1.2rem'}}>Başarı Oranı: {totalPoints > 0 ? ((score / totalPoints) * 100).toFixed(2) : 0}%</p>
-          </div>
-      )}
+      <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+        {!showResults ? (
+          <button
+            style={primaryButtonStyle}
+            onClick={handleSubmitOrShowResults}
+          >
+            Testi Bitir
+          </button>
+        ) : (
+          <button
+            style={secondaryButtonStyle}
+            onClick={handleReset}
+          >
+            Testi Yeniden Başlat
+          </button>
+        )}
+        <Link href="/tests" style={secondaryButtonStyle}>
+          Test Listesine Dön
+        </Link>
+      </div>
     </div>
   );
 } 
