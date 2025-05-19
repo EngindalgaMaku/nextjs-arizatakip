@@ -217,6 +217,7 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
   const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({});
+  const [displayQuestions, setDisplayQuestions] = useState<TestQuestion[]>([]);
 
   useEffect(() => {
     async function fetchTest() {
@@ -230,6 +231,21 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
         const fetchedTest = await getPublicTestBySlug(slug);
         if (fetchedTest) {
           setTest(fetchedTest);
+          
+          // Soruları ve şıkları bir kez karıştır
+          let questions = [...fetchedTest.questions];
+          if (fetchedTest.randomizeQuestions) {
+            questions = shuffleArray(questions);
+          }
+          
+          if (fetchedTest.randomizeOptions) {
+            questions = questions.map(question => ({
+              ...question,
+              options: shuffleArray(question.options)
+            }));
+          }
+          
+          setDisplayQuestions(questions);
         } else {
           setError('Aradığınız test bulunamadı veya herkese açık değil.');
         }
@@ -288,9 +304,6 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
     return null;
   }
 
-  // Soruları karıştır veya orijinal sırada göster
-  const displayQuestions = test.randomizeQuestions ? shuffleArray(test.questions) : test.questions;
-
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <div style={{ marginBottom: '30px' }}>
@@ -320,7 +333,7 @@ export default function PublicTestViewPage({ params }: TestViewPageProps) {
           showResults={showResults}
           isIndividuallyRevealed={revealedAnswers[question.id]}
           onRevealAnswer={handleRevealAnswer}
-          randomizeOptions={test.randomizeOptions ?? false}
+          randomizeOptions={false} // Artık her zaman false çünkü şıklar zaten karıştırıldı
         />
       ))}
 
