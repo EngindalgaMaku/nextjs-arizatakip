@@ -28,6 +28,7 @@ function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row'])
           question_type: q.question_type || 'multiple_choice_single_answer',
           points: q.points === undefined ? 1 : q.points,
           explanation: q.explanation || null,
+          imageUrl: q.imageUrl || undefined,
         }));
       }
     } catch (error) {
@@ -50,6 +51,7 @@ function mapSupabaseRowToTest(row: Database['public']['Tables']['tests']['Row'])
       question_type: q.question_type || 'multiple_choice_single_answer',
       points: q.points === undefined ? 1 : q.points,
       explanation: q.explanation || null,
+      imageUrl: q.imageUrl || undefined,
     }));
   }
 

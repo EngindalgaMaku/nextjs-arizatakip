@@ -1,11 +1,13 @@
 'use client';
 
 import { addTest, NewTestData } from '@/actions/testActions';
-import { ArrowLeftIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { supabase } from '@/lib/supabase';
+import { ArrowLeftIcon, ArrowPathIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Controller, SubmitHandler, useFieldArray, useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
 import { z } from 'zod';
 
 const optionSchema = z.object({
@@ -14,6 +16,7 @@ const optionSchema = z.object({
 
 const questionSchema = z.object({
   text: z.string().min(1, { message: 'Soru metni boş olamaz.' }),
+  imageUrl: z.string().optional(),
   options: z.array(optionSchema)
     .min(2, { message: 'Her soru en az 2 seçenek içermelidir.' })
     .max(5, { message: 'Bir soru en fazla 5 seçenek içerebilir.' }),
@@ -49,6 +52,7 @@ type TestFormValues = {
   isPublicViewable: boolean;
   questions: {
     text: string;
+    imageUrl?: string;
     options: { text: string }[];
     correctOptionIndex: number;
   }[];
@@ -70,6 +74,7 @@ export default function NewTestPage() {
   const router = useRouter();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState<Record<string, boolean>>({});
 
   const {
     control,
@@ -192,6 +197,63 @@ export default function NewTestPage() {
      }
   };
 
+  const handleImageUpload = async (file: File, questionIndex: number) => {
+    if (!file) return;
+
+    try {
+      setUploadingImages(prev => ({ ...prev, [questionIndex]: true }));
+      
+      // Dosya adını benzersiz yap
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `test-questions/${fileName}`;
+
+      // Supabase'e yükle
+      const { data, error } = await supabase.storage
+        .from('test-images')
+        .upload(filePath, file);
+
+      if (error) throw error;
+
+      // Public URL al
+      const { data: { publicUrl } } = supabase.storage
+        .from('test-images')
+        .getPublicUrl(filePath);
+
+      // Form değerini güncelle
+      setValue(`questions.${questionIndex}.imageUrl`, publicUrl);
+      
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Resim yüklenirken bir hata oluştu.');
+    } finally {
+      setUploadingImages(prev => ({ ...prev, [questionIndex]: false }));
+    }
+  };
+
+  const handleRemoveImage = async (questionIndex: number) => {
+    const imageUrl = watch(`questions.${questionIndex}.imageUrl`);
+    if (!imageUrl) return;
+
+    try {
+      // Supabase'den dosyayı sil
+      const filePath = imageUrl.split('/').pop();
+      if (filePath) {
+        const { error } = await supabase.storage
+          .from('test-images')
+          .remove([`test-questions/${filePath}`]);
+
+        if (error) throw error;
+      }
+
+      // Form değerini temizle
+      setValue(`questions.${questionIndex}.imageUrl`, undefined);
+      
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast.error('Resim silinirken bir hata oluştu.');
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
@@ -323,13 +385,13 @@ export default function NewTestPage() {
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-700">Sorular <span className="text-red-500">*</span></h2>
             <button
-                type="button"
-                onClick={handleAddQuestion}
-                disabled={isSubmitting}
-                className="inline-flex items-center px-4 py-2 border border-dashed border-indigo-400 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              type="button"
+              onClick={handleAddQuestion}
+              disabled={isSubmitting}
+              className="inline-flex items-center px-4 py-2 border border-dashed border-indigo-400 text-sm font-medium rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-                <PlusIcon className="w-5 h-5 mr-2" />
-                Yeni Soru Ekle
+              <PlusIcon className="w-5 h-5 mr-2" />
+              Yeni Soru Ekle
             </button>
           </div>
           {errors.questions && !errors.questions.root && !Array.isArray(errors.questions) && <p className="mt-1 text-xs text-red-600">{errors.questions.message}</p>}
@@ -359,6 +421,59 @@ export default function NewTestPage() {
                 className={`mt-1 block w-full px-3 py-2 border ${errors.questions?.[qIndex]?.text ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
               />
               {errors.questions?.[qIndex]?.text && <p className="mt-1 text-xs text-red-600">{errors.questions[qIndex]?.text?.message}</p>}
+
+              {/* Resim Yükleme Alanı */}
+              <div className="mt-4">
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    id={`questions.${qIndex}.image`}
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, qIndex);
+                    }}
+                    className="hidden"
+                    disabled={isSubmitting || uploadingImages[qIndex]}
+                  />
+                  <label
+                    htmlFor={`questions.${qIndex}.image`}
+                    className={`inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${(isSubmitting || uploadingImages[qIndex]) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    {uploadingImages[qIndex] ? (
+                      <>
+                        <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-5 w-5 text-gray-500" />
+                        Yükleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <PlusIcon className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
+                        Resim Ekle
+                      </>
+                    )}
+                  </label>
+                  {watch(`questions.${qIndex}.imageUrl`) && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(qIndex)}
+                      disabled={isSubmitting || uploadingImages[qIndex]}
+                      className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <TrashIcon className="-ml-1 mr-2 h-5 w-5 text-red-500" />
+                      Resmi Kaldır
+                    </button>
+                  )}
+                </div>
+                {watch(`questions.${qIndex}.imageUrl`) && (
+                  <div className="mt-2">
+                    <img
+                      src={watch(`questions.${qIndex}.imageUrl`)}
+                      alt={`Soru ${qIndex + 1} resmi`}
+                      className="max-w-md rounded-lg shadow-sm"
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className="mt-4 space-y-3">
                 <h3 className="text-sm font-medium text-gray-700 mb-1">Seçenekler <span className="text-red-500">*</span> (En az 2, en fazla 5)</h3>

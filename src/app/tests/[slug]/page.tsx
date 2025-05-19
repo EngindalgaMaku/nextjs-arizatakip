@@ -133,6 +133,20 @@ function QuestionDisplay({
       <h4 style={questionTextStyle}>
         Soru {index + 1}: {question.text}
       </h4>
+      {question.imageUrl && (
+        <div style={{ marginBottom: '20px' }}>
+          <img
+            src={question.imageUrl}
+            alt={`Soru ${index + 1} resmi`}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '400px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          />
+        </div>
+      )}
       <div>
         {displayOptions.map((option, optionIndex) => {
           let style = { ...optionButtonStyle };

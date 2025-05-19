@@ -13,6 +13,7 @@ export interface TestQuestion {
   question_type?: string;
   points?: number;
   explanation?: string | null;
+  imageUrl?: string;
 }
 
 export interface Test {
