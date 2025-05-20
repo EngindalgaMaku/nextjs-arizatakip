@@ -9,6 +9,7 @@ export const baseOptionTemplate = {
 export const baseQuestionTemplate = {
   id: -Date.now(), // Geçici negatif ID
   text: '',
+  imageUrl: '',
   options: [
     { ...baseOptionTemplate },
     { ...baseOptionTemplate }

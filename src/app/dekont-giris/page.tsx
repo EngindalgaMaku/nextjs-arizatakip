@@ -1,14 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { getClassesForReceiptLogin, getStudentsByClassForReceiptLogin, verifyStudentLogin } from '@/actions/business-receipts/student-actions'; // New actions
-import { Input } from '@/components/ui/input'; // Shadcn/ui Input veya kendi Input component'iniz
 import { Button } from '@/components/ui/button'; // Shadcn/ui Button veya kendi Button component'iniz
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; // Örnek UI componentleri
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import toast from 'react-hot-toast';
+import { Input } from '@/components/ui/input'; // Shadcn/ui Input veya kendi Input component'iniz
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface ClassInfo {
   id: string;
@@ -157,7 +157,7 @@ function DekontGirisContent() {
           </form>
         </CardContent>
         <CardFooter className="text-xs text-gray-500 text-center block">
-          <p>Bu sistem sadece 12A ve 12H sınıfı öğrencileri içindir.</p>
+          <p>Bu sistem sadece 12A, 12H ve 12Mesem sınıfı öğrencileri içindir.</p>
           <p>&copy; {new Date().getFullYear()} Okul Yönetimi</p>
         </CardFooter>
       </Card>

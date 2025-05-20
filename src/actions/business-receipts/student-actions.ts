@@ -8,7 +8,7 @@ import { z } from 'zod';
 // const getSupabaseClient = () => createServerActionClient<Database>({ cookies }); // Old
 
 // İlgili sınıfların adları (12A ve 12H)
-const TARGET_CLASS_NAMES = ['12A', '12H'];
+const TARGET_CLASS_NAMES = ['12A', '12H', '12Mesem'];
 const TARGET_GRADE_LEVEL = 12;
 
 interface StudentLoginResult {

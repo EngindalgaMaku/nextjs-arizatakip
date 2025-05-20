@@ -112,6 +112,32 @@ export async function createClass(
         return { success: false, error: parseResult.error.issues };
     }
 
+    const supabase = await createSupabaseServerClient();
+
+    // Calculate display_order
+    let newDisplayOrder = 0; // Default to 0
+    try {
+        const { data: existingClasses, error: fetchError } = await supabase
+            .from(CLASSES_TABLE)
+            .select('display_order')
+            .eq('semester_id', semesterId)
+            .order('display_order', { ascending: false })
+            .limit(1);
+
+        if (fetchError) {
+            console.warn('Could not fetch existing classes to determine display_order:', fetchError.message);
+            // Proceed with default 0 or handle error more strictly if required
+        } else if (existingClasses && existingClasses.length > 0 && existingClasses[0].display_order !== null) {
+            newDisplayOrder = existingClasses[0].display_order + 1;
+        } else {
+            // No classes yet for this semester or display_order is null, start from 0 or 1
+            newDisplayOrder = 0; // Or 1, depending on preference
+        }
+    } catch (e) {
+        console.warn('Error calculating display_order:', e);
+        // Proceed with default 0
+    }
+
     // Veritabanı sütun adlarına uygun hale getir (camelCase'den snake_case'e)
     const dbData = {
         name: parseResult.data.name,
@@ -120,12 +146,12 @@ export async function createClass(
         dal_id: parseResult.data.dal_id,
         class_teacher_id: parseResult.data.classTeacherId,
         class_president_name: parseResult.data.classPresidentName,
-        semester_id: semesterId
+        semester_id: semesterId,
+        display_order: newDisplayOrder,
     };
 
     console.log('Database insert payload:', dbData);
 
-    const supabase = await createSupabaseServerClient();
     try {
         const { data: newClass, error } = await supabase
             .from(CLASSES_TABLE)

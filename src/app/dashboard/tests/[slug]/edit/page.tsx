@@ -2,6 +2,7 @@
 
 import { getTestBySlug, updateTest, UpdateTestData } from '@/actions/testActions';
 import { Switch } from '@/components/ui/switch';
+import { supabase } from '@/lib/supabase';
 import { baseFormTemplate, createNewOption, createNewQuestion } from '@/types/form-templates';
 import { Test as TestType } from '@/types/tests';
 import { ArrowLeftIcon, ArrowPathIcon, CheckIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -21,6 +22,7 @@ const optionSchema = z.object({
 const questionSchema = z.object({
   id: z.number().optional(), // Varolan sorular için ID
   text: z.string().min(1, { message: 'Soru metni boş olamaz.' }),
+  imageUrl: z.string().optional(),
   options: z.array(optionSchema).min(2, { message: 'Her soru en az 2 seçenek içermelidir.' }).max(5, { message: 'Bir soru en fazla 5 seçenek içerebilir.' }),
   correctOptionIdOrIndex: z.union([z.string(), z.number()]) // Güncelleme için ID veya index
     .refine(val => (typeof val === 'string' && val.length > 0) || (typeof val === 'number' && val >= 0), {
@@ -62,6 +64,7 @@ export default function EditTestPage({ params }: EditTestPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState<Record<number, boolean>>({});
 
   const {
     control,
@@ -105,6 +108,7 @@ export default function EditTestPage({ params }: EditTestPageProps) {
               questions: fetchedTest.questions.map(q => ({
                 id: parseInt(q.id, 10),
                 text: q.text,
+                imageUrl: q.imageUrl || '',
                 options: q.options.map(opt => ({ 
                   id: opt.id, 
                   text: opt.text, 
@@ -188,6 +192,7 @@ export default function EditTestPage({ params }: EditTestPageProps) {
         return {
             id: q.id, // Varolan soru ID'si
             text: q.text,
+            imageUrl: q.imageUrl,
             options: liveOptions.map(opt => ({ id: opt.id, text: opt.text })),
             correctOptionIdOrIndex: correctOptIdOrIdx,
             toBeDeleted: q.toBeDeleted,
@@ -258,6 +263,47 @@ export default function EditTestPage({ params }: EditTestPageProps) {
 
      trigger(questionOptionsPath);
      trigger(questionCorrectPath);
+  };
+
+  const handleImageUpload = async (file: File, questionIndex: number) => {
+    if (!file) return;
+    try {
+      setUploadingImages(prev => ({ ...prev, [questionIndex]: true }));
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `test-questions/${fileName}`;
+      const { data, error } = await supabase.storage
+        .from('test-images')
+        .upload(filePath, file);
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('test-images')
+        .getPublicUrl(filePath);
+      setValue(`questions.${questionIndex}.imageUrl`, publicUrl);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      // toast.error('Resim yüklenirken bir hata oluştu.');
+    } finally {
+      setUploadingImages(prev => ({ ...prev, [questionIndex]: false }));
+    }
+  };
+
+  const handleRemoveImage = async (questionIndex: number) => {
+    const imageUrl = watch(`questions.${questionIndex}.imageUrl`);
+    if (!imageUrl) return;
+    try {
+      const filePath = imageUrl.split('/').pop();
+      if (filePath) {
+        const { error } = await supabase.storage
+          .from('test-images')
+          .remove([`test-questions/${filePath}`]);
+        if (error) throw error;
+      }
+      setValue(`questions.${questionIndex}.imageUrl`, '');
+    } catch (error) {
+      console.error('Error removing image:', error);
+      // toast.error('Resim silinirken bir hata oluştu.');
+    }
   };
 
   if (isLoading) {
@@ -399,6 +445,58 @@ export default function EditTestPage({ params }: EditTestPageProps) {
                     <button type="button" onClick={() => handleAddOption(qIndex)} disabled={isSubmitting || watch(`questions.${qIndex}.toBeDeleted`)} className="mt-2 inline-flex items-center px-3 py-1.5 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 disabled:opacity-50"><PlusIcon className="w-4 h-4 mr-1" />Seçenek Ekle</button>
                  )}
                  {errors.questions?.[qIndex]?.correctOptionIdOrIndex && <p className="mt-1 text-xs text-red-600">{errors.questions?.[qIndex]?.correctOptionIdOrIndex?.message}</p>}
+              </div>
+
+              <div className="mt-4">
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    id={`questions.${qIndex}.image`}
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, qIndex);
+                    }}
+                    className="hidden"
+                    disabled={isSubmitting || uploadingImages[qIndex]}
+                  />
+                  <label
+                    htmlFor={`questions.${qIndex}.image`}
+                    className={`inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${(isSubmitting || uploadingImages[qIndex]) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    {uploadingImages[qIndex] ? (
+                      <>
+                        <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-5 w-5 text-gray-500" />
+                        Yükleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <PlusIcon className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
+                        Resim Ekle
+                      </>
+                    )}
+                  </label>
+                  {watch(`questions.${qIndex}.imageUrl`) && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(qIndex)}
+                      disabled={isSubmitting || uploadingImages[qIndex]}
+                      className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <TrashIcon className="-ml-1 mr-2 h-5 w-5 text-red-500" />
+                      Resmi Kaldır
+                    </button>
+                  )}
+                </div>
+                {watch(`questions.${qIndex}.imageUrl`) && (
+                  <div className="mt-2">
+                    <img
+                      src={watch(`questions.${qIndex}.imageUrl`)}
+                      alt={`Soru ${qIndex + 1} resmi`}
+                      className="max-w-md rounded-lg shadow-sm"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             )
