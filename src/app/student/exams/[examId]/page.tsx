@@ -2,33 +2,30 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { LiveExam, LiveExamStatus, Test, TestQuestion } from "@/types/tests";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // Helper function to map Supabase live_exam row to our LiveExam type
-function mapSupabaseRowToLiveExamPage(row: any): LiveExam { // Using 'any' for row for simplicity, consider Database type from supabase.ts
+function mapSupabaseRowToLiveExamPage(row: any): LiveExam | null {
   if (!row) {
-    // Handle the case where row is null or undefined, perhaps return null or throw an error
-    // For now, returning a structure that might highlight issues, or you could return null
-    // and ensure the calling code handles it.
     console.error("mapSupabaseRowToLiveExamPage received null or undefined row");
-    return null as unknown as LiveExam; // Or a more specific error/default handling
+    return null;
   }
   return {
-    id: String(row.id || ''), // Ensure string and provide fallback
-    testId: String(row.test_id || ''), // snake_case to camelCase
+    id: String(row.id || ''),
+    testId: String(row.test_id || ''),
     title: String(row.title || ''),
     description: row.description || undefined,
     timeLimit: Number(row.time_limit || 0),
-    scheduledStartTime: new Date(row.scheduled_start_time || Date.now()), // Fallback to now if undefined
-    scheduledEndTime: new Date(row.scheduled_end_time || Date.now()),     // Fallback to now if undefined
+    scheduledStartTime: new Date(row.scheduled_start_time || Date.now()),
+    scheduledEndTime: new Date(row.scheduled_end_time || Date.now()),
     actualStartTime: row.actual_start_time ? new Date(row.actual_start_time) : undefined,
     actualEndTime: row.actual_end_time ? new Date(row.actual_end_time) : undefined,
-    status: row.status as LiveExamStatus, // Type assertion
-    createdBy: String(row.created_by || ''), // Handle possible null
+    status: row.status as LiveExamStatus,
+    createdBy: String(row.created_by || ''),
     createdAt: new Date(row.created_at || Date.now()),
     updatedAt: new Date(row.updated_at || Date.now()),
     studentIds: row.student_ids || undefined,
@@ -42,22 +39,22 @@ function mapSupabaseRowToLiveExamPage(row: any): LiveExam { // Using 'any' for r
 }
 
 // Helper function to map Supabase test row to our Test type
-function mapSupabaseRowToTestPage(row: any): Test { // Using 'any' for row for simplicity
+function mapSupabaseRowToTestPage(row: any): Test | null {
   if (!row) {
     console.error("mapSupabaseRowToTestPage received null or undefined row");
-    return null as unknown as Test;
+    return null;
   }
   let questionsArray: TestQuestion[] = [];
   const rawQuestions = row.questions;
 
   if (rawQuestions && Array.isArray(rawQuestions)) {
     questionsArray = rawQuestions.map((q: any): TestQuestion => ({
-      id: String(q.id || `gen-q-${Date.now()}-${Math.random()}`), 
+      id: String(q.id || `gen-q-${Date.now()}-${Math.random()}`),
       text: String(q.text || ''),
       options: Array.isArray(q.options)
-        ? q.options.map((opt: any) => ({ 
-            id: String(opt.id || `gen-opt-${Date.now()}-${Math.random()}`), 
-            text: String(opt.text || '') 
+        ? q.options.map((opt: any) => ({
+            id: String(opt.id || `gen-opt-${Date.now()}-${Math.random()}`),
+            text: String(opt.text || '')
           }))
         : [],
       correctOptionId: String(q.correctOptionId || ''),
@@ -69,19 +66,19 @@ function mapSupabaseRowToTestPage(row: any): Test { // Using 'any' for row for s
     try {
       const parsedQuestions = JSON.parse(rawQuestions);
       if (Array.isArray(parsedQuestions)) {
-         questionsArray = parsedQuestions.map((q: any): TestQuestion => ({
-            id: String(q.id || `gen-q-${Date.now()}-${Math.random()}`),
-            text: String(q.text || ''),
-            options: Array.isArray(q.options)
-                ? q.options.map((opt: any) => ({ 
-                    id: String(opt.id || `gen-opt-${Date.now()}-${Math.random()}`), 
-                    text: String(opt.text || '') 
-                  }))
-                : [],
-            correctOptionId: String(q.correctOptionId || ''),
-            question_type: q.question_type || 'multiple_choice_single_answer',
-            points: q.points === undefined || q.points === null ? 1 : Number(q.points),
-            explanation: q.explanation || null,
+        questionsArray = parsedQuestions.map((q: any): TestQuestion => ({
+          id: String(q.id || `gen-q-${Date.now()}-${Math.random()}`),
+          text: String(q.text || ''),
+          options: Array.isArray(q.options)
+            ? q.options.map((opt: any) => ({
+                id: String(opt.id || `gen-opt-${Date.now()}-${Math.random()}`),
+                text: String(opt.text || '')
+              }))
+            : [],
+          correctOptionId: String(q.correctOptionId || ''),
+          question_type: q.question_type || 'multiple_choice_single_answer',
+          points: q.points === undefined || q.points === null ? 1 : Number(q.points),
+          explanation: q.explanation || null,
         }));
       }
     } catch (error) {
@@ -101,8 +98,8 @@ function mapSupabaseRowToTestPage(row: any): Test { // Using 'any' for row for s
     randomizeQuestions: row.randomize_questions === null ? false : Boolean(row.randomize_questions),
     randomizeOptions: row.randomize_options === null ? false : Boolean(row.randomize_options),
     isPublished: row.is_published === null ? false : Boolean(row.is_published),
-    createdAt: row.created_at ? new Date(row.created_at) : undefined, // Prefer undefined over Date.now() if truly optional
-    updatedAt: row.updated_at ? new Date(row.updated_at) : undefined, // Prefer undefined over Date.now() if truly optional
+    createdAt: row.created_at ? new Date(row.created_at) : undefined,
+    updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
   };
 }
 
@@ -209,7 +206,7 @@ export default function TakeExamPage() {
   };
 
   const handleSubmitExam = async () => {
-    if (!studentId || !liveExam?.id || !test?.id || !test.questions) {
+    if (!studentId || !liveExam?.id || !test?.id || !test.questions || test.questions.length === 0) {
       toast.error("Sınav gönderimi için gerekli bilgiler eksik: Öğrenci, canlı sınav veya test detayları bulunamadı.");
       console.error("Submission failed due to missing data:", { studentId, liveExamId: liveExam?.id, testId: test?.id, questionsAvailable: !!test?.questions });
       return;
@@ -226,17 +223,17 @@ export default function TakeExamPage() {
 
     const submissionData = {
       student_id: studentId,
-      live_exam_id: liveExam.id, // Guarded by the check above
-      test_id: test.id,         // Guarded by the check above
+      live_exam_id: liveExam.id,
+      test_id: test.id,
       score: percentage,
-      answers: answers, 
+      answers: answers,
       submitted_at: new Date().toISOString(),
     };
 
-    console.log("Submitting exam with data:", submissionData); // For debugging
+    console.log("Submitting exam with data:", submissionData);
 
     const { error: submissionError } = await supabase
-      .from('student_exam_results') 
+      .from('student_exam_results')
       .insert(submissionData);
 
     if (submissionError) {
@@ -244,7 +241,7 @@ export default function TakeExamPage() {
       console.error("Error submitting exam:", submissionError);
     } else {
       toast.success(`Sınav tamamlandı! Puanınız: ${percentage.toFixed(2)}%`);
-      router.push(`/student/results?liveExamId=${liveExam.id}&studentId=${studentId}`); 
+      router.push(`/student/results?liveExamId=${liveExam.id}&studentId=${studentId}`);
     }
   };
   

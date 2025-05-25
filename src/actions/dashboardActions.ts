@@ -58,7 +58,7 @@ export const getDashboardStats = cache(async (schoolId?: string): Promise<Dashbo
     }
 
     // Construct query based on whether we have a school ID
-    let query = supabase.from('issues').select('*');
+    let query: any = supabase.from('issues').select('*');
     
     if (schoolId) {
       query = query.eq('school_id', schoolId);
@@ -76,7 +76,7 @@ export const getDashboardStats = cache(async (schoolId?: string): Promise<Dashbo
     const { count: usersCount, error: usersError } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true })
-      .eq(schoolId ? 'school_id' : 'id', schoolId || '*');
+      .eq('school_id', parseInt(schoolId || '0'));
     
     if (usersError) {
       console.error('Error fetching users count:', usersError);
@@ -106,29 +106,27 @@ export const getDashboardStats = cache(async (schoolId?: string): Promise<Dashbo
       return acc;
     }, {});
     
-    // Get recent issues (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Get recent issues, sorted by creation date (newest first)
+    const recentIssues = [...issuesData]
+      .filter((issue): issue is typeof issue & { created_at: string } => !!issue.created_at)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
     
     // Generate timeline data for the last 30 days
-    const timelineData = [];
+    const timelineData: { date: string; count: number }[] = [];
     for (let i = 0; i < 30; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD format
       
       const count = issuesData.filter(issue => {
+        if (!issue.created_at) return false;
         const issueDate = new Date(issue.created_at).toISOString().split('T')[0];
         return issueDate === dateString;
       }).length;
       
-      timelineData.unshift({ date: dateString, count });
+      timelineData.unshift({ date: dateString ?? '', count });
     }
-    
-    // Get recent issues, sorted by creation date (newest first)
-    const recentIssues = [...issuesData]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 5);
     
     return {
       openIssuesCount: openIssues.length,

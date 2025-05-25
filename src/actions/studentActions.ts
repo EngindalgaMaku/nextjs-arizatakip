@@ -1,7 +1,7 @@
 // Client-side student actions (no 'use server')
 
 import supabase from '@/lib/supabase-browser';
-import { Student, StudentSchema, Guardian } from '@/types/students';
+import { Student, StudentSchema } from '@/types/students';
 
 /**
  * Fetch all students for a given class.
@@ -21,13 +21,13 @@ export async function fetchStudentsByClass(classId: string): Promise<Student[]> 
   const mappedData = data?.map(student => ({
     id: student.id,
     name: student.name,
-    email: student.email,
+    email: student.email ?? '',
     birthDate: student.birth_date,
-    phone: student.phone,
-    gender: student.gender,
+    phone: student.phone ?? '',
+    gender: student.gender ?? undefined,
     schoolNumber: student.school_number,
     status: student.status,
-    guardians: student.guardians,
+    guardians: student.guardians ?? [],
   })) || [];
 
   const validatedData = mappedData.map(studentData => {
@@ -37,7 +37,7 @@ export async function fetchStudentsByClass(classId: string): Promise<Student[]> 
       return null;
     }
     return parseResult.data;
-  }).filter((s): s is Student => s !== null);
+  }).filter((s): s is NonNullable<typeof s> => s !== null);
 
   return validatedData;
 }
@@ -55,19 +55,19 @@ export async function createStudent(classId: string, payload: Student): Promise<
   const studentData = {
     class_id: classId,
     name: parse.data.name,
-    school_number: parse.data.schoolNumber,
+    school_number: parse.data.schoolNumber ?? '',
     email: parse.data.email || null, // Use null if empty string
     birth_date: parse.data.birthDate || null, // Use null if empty string
     phone: parse.data.phone || null, // Use null if empty string
-    gender: parse.data.gender, // Optional enum, pass directly
+    gender: parse.data.gender!, // Non-null assertion
     status: parse.data.status, // Already has default
-    guardians: parse.data.guardians ?? [], // Pass validated guardians array, default to empty
+    guardians: JSON.stringify(parse.data.guardians ?? []), // Store as JSON string
   };
 
   try {
     const { data, error } = await supabase
       .from('students')
-      .insert(studentData) // Use the mapped data (includes guardians)
+      .insert(studentData)
       .select()
       .single();
 
@@ -76,7 +76,19 @@ export async function createStudent(classId: string, payload: Student): Promise<
       return { success: false, error: error?.message };
     }
 
-    return { success: true, student: data as Student };
+    const mappedStudent: Student = {
+      id: data.id,
+      name: data.name,
+      email: data.email ?? null,
+      birthDate: data.birth_date ?? null,
+      phone: data.phone ?? null,
+      gender: data.gender,
+      schoolNumber: data.school_number ?? null,
+      status: data.status,
+      guardians: JSON.parse(typeof data.guardians === 'string' ? data.guardians : JSON.stringify(data.guardians ?? [])),
+    };
+
+    return { success: true, student: mappedStudent };
   } catch (err) {
     console.error('createStudent error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -95,19 +107,19 @@ export async function updateStudent(classId: string, id: string, payload: Studen
   // Map Zod schema (camelCase) to DB columns (snake_case)
   const studentData = {
     name: parse.data.name,
-    school_number: parse.data.schoolNumber,
+    school_number: parse.data.schoolNumber ?? '',
     email: parse.data.email || null, // Use null if empty string
     birth_date: parse.data.birthDate || null, // Use null if empty string
     phone: parse.data.phone || null, // Use null if empty string
-    gender: parse.data.gender, // Optional enum, pass directly
+    gender: parse.data.gender!, // Non-null assertion
     status: parse.data.status, // Already has default
-    guardians: parse.data.guardians ?? [], // Pass validated guardians array, default to empty
+    guardians: JSON.stringify(parse.data.guardians ?? []), // Store as JSON string
   };
 
   try {
     const { data, error } = await supabase
       .from('students')
-      .update(studentData) // Use the mapped data (includes guardians)
+      .update(studentData)
       .eq('id', id)
       .select()
       .single();
@@ -117,7 +129,19 @@ export async function updateStudent(classId: string, id: string, payload: Studen
       return { success: false, error: error?.message };
     }
 
-    return { success: true, student: data as Student };
+    const mappedStudent: Student = {
+      id: data.id,
+      name: data.name,
+      email: data.email ?? null,
+      birthDate: data.birth_date ?? null,
+      phone: data.phone ?? null,
+      gender: data.gender,
+      schoolNumber: data.school_number ?? null,
+      status: data.status,
+      guardians: JSON.parse(typeof data.guardians === 'string' ? data.guardians : JSON.stringify(data.guardians ?? [])),
+    };
+
+    return { success: true, student: mappedStudent };
   } catch (err) {
     console.error('updateStudent error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };

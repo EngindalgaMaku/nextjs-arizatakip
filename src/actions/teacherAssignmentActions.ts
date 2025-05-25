@@ -3,9 +3,8 @@
 import { supabase } from '@/lib/supabase';
 import {
     TeacherCourseAssignment,
-    TeacherCourseAssignmentSchema,
-    TeacherCourseAssignmentFormValues,
-    TeacherCourseAssignmentFormSchema
+    TeacherCourseAssignmentFormSchema,
+    TeacherCourseAssignmentFormValues
 } from '@/types/teacherCourseAssignments'; // Assuming types are defined here
 import { z } from 'zod';
 
@@ -158,7 +157,7 @@ export async function createTeacherAssignment(teacherId: string, dalDersId: stri
             id: data.id,
             teacher_id: data.teacher_id,
             dal_ders_id: data.dal_ders_id,
-            assignment: data.assignment,
+            assignment: data.assignment as 'required' | 'excluded',
             created_at: data.created_at,
             updated_at: data.updated_at,
             teacher: finalTeacher,
@@ -227,7 +226,7 @@ export async function updateTeacherAssignment(assignmentId: string, teacherId: s
             id: data.id,
             teacher_id: data.teacher_id,
             dal_ders_id: data.dal_ders_id,
-            assignment: data.assignment,
+            assignment: data.assignment as 'required' | 'excluded',
             created_at: data.created_at,
             updated_at: data.updated_at,
             teacher: finalTeacher,

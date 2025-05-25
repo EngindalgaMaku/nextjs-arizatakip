@@ -1,12 +1,12 @@
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import {
-    LiveExam,
-    LiveExamCreationParams,
-    LiveExamParticipant,
-    LiveExamStatus,
-    LiveExamUpdateParams,
-    ParticipantStatus,
-    Test
+  LiveExam,
+  LiveExamCreationParams,
+  LiveExamParticipant,
+  LiveExamStatus,
+  LiveExamUpdateParams,
+  ParticipantStatus,
+  Test
 } from '@/types/tests';
 import { getTestById } from './testActions';
 
@@ -16,7 +16,7 @@ const PARTICIPANTS_TABLE = 'live_exam_participants';
 
 // LiveExam DB satırından UI tipine dönüştürmek için
 function mapSupabaseRowToLiveExam(row: any): LiveExam {
-  return {
+  const exam: any = {
     id: row.id,
     testId: row.test_id,
     title: row.title,
@@ -24,8 +24,6 @@ function mapSupabaseRowToLiveExam(row: any): LiveExam {
     timeLimit: row.time_limit,
     scheduledStartTime: new Date(row.scheduled_start_time),
     scheduledEndTime: new Date(row.scheduled_end_time),
-    actualStartTime: row.actual_start_time ? new Date(row.actual_start_time) : undefined,
-    actualEndTime: row.actual_end_time ? new Date(row.actual_end_time) : undefined,
     status: row.status as LiveExamStatus,
     createdBy: row.created_by,
     createdAt: new Date(row.created_at),
@@ -38,18 +36,21 @@ function mapSupabaseRowToLiveExam(row: any): LiveExam {
     randomizeQuestions: row.randomize_questions,
     randomizeOptions: row.randomize_options
   };
+  if (row.actual_start_time) exam.actualStartTime = new Date(row.actual_start_time);
+  if (row.actual_end_time) exam.actualEndTime = new Date(row.actual_end_time);
+  return exam as LiveExam;
 }
 
 // LiveExamParticipant DB satırından UI tipine dönüştürmek için
 function mapSupabaseRowToParticipant(row: any): LiveExamParticipant {
   return {
     id: row.id,
-    examId: row.exam_id,
+    examId: row.live_exam_id,
     studentId: row.student_id,
     status: row.status as ParticipantStatus,
     startTime: row.start_time ? new Date(row.start_time) : undefined,
     submitTime: row.submit_time ? new Date(row.submit_time) : undefined,
-    lastActiveTime: row.last_active_time ? new Date(row.last_active_time) : undefined,
+    lastActiveTime: row.last_active ? new Date(row.last_active) : undefined,
     ipAddress: row.ip_address,
     deviceInfo: row.device_info,
     progress: row.progress,
@@ -110,7 +111,7 @@ export async function getLiveExamsByTeacher(teacherId: string): Promise<LiveExam
 }
 
 // Öğrencinin katılabileceği sınavları getir
-export async function getLiveExamsForStudent(studentId: string, classIds: string[]): Promise<LiveExam[]> {
+export async function getLiveExamsForStudent(studentId: string, classIds: string[]): Promise<any[]> {
   // Öğrencinin katılabileceği sınavlar:
   // 1. Doğrudan öğrenci ID'sine göre izin verilenler
   // 2. Öğrencinin sınıflarına göre izin verilenler
@@ -128,7 +129,23 @@ export async function getLiveExamsForStudent(studentId: string, classIds: string
     return [];
   }
   
-  return data ? data.map(mapSupabaseRowToLiveExam) : [];
+  // Her sınav için öğrencinin katılım durumunu da getir
+  const exams = data ? data.map(mapSupabaseRowToLiveExam) : [];
+  const examIds = exams.map(e => e.id);
+  const participantMap: Record<string, string> = {};
+  if (examIds.length > 0) {
+    const { data: participants } = await supabase
+      .from(PARTICIPANTS_TABLE)
+      .select('live_exam_id, status')
+      .in('live_exam_id', examIds)
+      .eq('student_id', studentId);
+    if (participants) {
+      for (const p of participants) {
+        participantMap[p.live_exam_id] = (p.status ?? '') as string;
+      }
+    }
+  }
+  return exams.map(e => ({ ...e, participantStatus: participantMap[e.id] || null }));
 }
 
 // Canlı sınavın katılımcılarını getir
@@ -136,8 +153,8 @@ export async function getLiveExamParticipants(examId: string): Promise<LiveExamP
   const { data, error } = await supabase
     .from(PARTICIPANTS_TABLE)
     .select('*')
-    .eq('exam_id', examId)
-    .order('last_active_time', { ascending: false });
+    .eq('live_exam_id', examId)
+    .order('last_active', { ascending: false });
     
   if (error) {
     console.error(`Error fetching participants for exam ${examId}:`, error);
@@ -155,24 +172,22 @@ export async function createLiveExam(
   params: LiveExamCreationParams
 ): Promise<LiveExam | { error: string }> {
   try {
-    // Önce referans alınan testi kontrol et
     const test = await getTestById(params.testId);
+
     if (!test) {
       return { error: 'Referans alınan test bulunamadı.' };
     }
     
     const now = new Date();
-    
-    // Sınav başlangıç zamanı geçmişte olamaz
+
     if (params.scheduledStartTime < now) {
       return { error: 'Sınav başlangıç zamanı geçmişte olamaz.' };
     }
     
-    // Bitiş zamanı başlangıç zamanından sonra olmalı
     if (params.scheduledEndTime <= params.scheduledStartTime) {
       return { error: 'Sınav bitiş zamanı başlangıç zamanından sonra olmalı.' };
     }
-    
+
     const newLiveExam = {
       test_id: params.testId,
       title: params.title || test.title,
@@ -196,23 +211,33 @@ export async function createLiveExam(
       .insert(newLiveExam)
       .select()
       .single();
-      
+    
     if (error) {
-      console.error('Error creating live exam (full error object):', JSON.stringify(error, null, 2));
-      const errorMessage = error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Bilinmeyen bir veritabanı hatası.';
-      return { error: `Canlı sınav oluşturulurken bir hata oluştu: ${errorMessage}` };
+      const message = error.message || 'Bilinmeyen bir veritabanı hatası.';
+      return { error: `Supabase hatası: ${message}` };
     }
     
     if (!data) {
-      console.error('Error creating live exam: No data returned from Supabase after insert but no explicit error.');
-      return { error: 'Canlı sınav oluşturuldu ancak veritabanından yanıt alınamadı.' };
+      return { error: 'Canlı sınav oluşturuldu ancak veritabanından doğrulama yanıtı alınamadı.' };
     }
     
     return mapSupabaseRowToLiveExam(data);
-  } catch (e) {
-    console.error('createLiveExam catch error:', JSON.stringify(e, null, 2));
-    const errorMessage = e instanceof Error ? e.message : 'İşlem sırasında bilinmeyen bir hata oluştu.';
-    return { error: `Canlı sınav oluşturma başarısız: ${errorMessage}` };
+  } catch (e: unknown) {
+    let errorMessage = 'İşlem sırasında bilinmeyen bir genel hata oluştu.';
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string') {
+      errorMessage = e;
+    } else if (typeof e === 'object' && e !== null && 'message' in e && typeof (e as any).message === 'string') {
+      errorMessage = (e as any).message;
+    } else {
+      try {
+        errorMessage = JSON.stringify(e);
+      } catch (stringifyError) {
+        errorMessage = 'Hata mesajı alınamadı veya seri hale getirilemedi.';
+      }
+    }
+    return { error: `Genel hata: ${errorMessage}` };
   }
 }
 
@@ -227,12 +252,10 @@ export async function updateLiveExam(
       return { error: 'Güncellenecek canlı sınav bulunamadı.' };
     }
     
-    // COMPLETED veya CANCELLED durumundaki sınavlar güncellenemez
     if (currentExam.status === LiveExamStatus.COMPLETED || currentExam.status === LiveExamStatus.CANCELLED) {
       return { error: 'Tamamlanmış veya iptal edilmiş sınavlar güncellenemez.' };
     }
     
-    // Durumu ACTIVE olarak değiştiriyorsa, actualStartTime'ı da ayarla
     const updateData: any = {
       ...updates,
       scheduled_start_time: updates.scheduledStartTime?.toISOString(),
@@ -244,18 +267,12 @@ export async function updateLiveExam(
       updateData.actual_start_time = new Date().toISOString();
     }
     
-    // Durumu COMPLETED olarak değiştiriyorsa, actualEndTime'ı da ayarla
     if (updates.status === LiveExamStatus.COMPLETED) {
       updateData.actual_end_time = new Date().toISOString();
       
-      // Sonuçları otomatik yayınla
-      if (currentExam.autoPublishResults) {
-        // Burada sonuçları hesaplama ve katılımcı kayıtlarını güncelleme işlemleri yapılabilir
-        await calculateAndPublishResults(examId);
-      }
+      await calculateAndPublishResults(examId);
     }
     
-    // snake_case dönüşümlerini yap
     if (updates.studentIds !== undefined) updateData.student_ids = updates.studentIds;
     if (updates.classIds !== undefined) updateData.class_ids = updates.classIds;
     if (updates.autoPublishResults !== undefined) updateData.auto_publish_results = updates.autoPublishResults;
@@ -273,13 +290,11 @@ export async function updateLiveExam(
       .single();
       
     if (error) {
-      console.error(`Error updating live exam ${examId}:`, error);
       return { error: `Canlı sınav güncellenirken bir hata oluştu: ${error.message}` };
     }
     
     return mapSupabaseRowToLiveExam(data);
   } catch (error) {
-    console.error('updateLiveExam error:', error);
     return { error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
   }
 }
@@ -312,31 +327,26 @@ export async function cancelLiveExam(examId: string): Promise<LiveExam | { error
 // Canlı sınavı sil
 export async function deleteLiveExam(examId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Önce katılımcıları sil
     const { error: participantsError } = await supabase
       .from(PARTICIPANTS_TABLE)
       .delete()
-      .eq('exam_id', examId);
+      .eq('live_exam_id', examId);
       
     if (participantsError) {
-      console.error(`Error deleting participants for exam ${examId}:`, participantsError);
       return { success: false, error: `Katılımcı kayıtları silinirken bir hata oluştu: ${participantsError.message}` };
     }
     
-    // Sonra sınavı sil
     const { error } = await supabase
       .from(LIVE_EXAMS_TABLE)
       .delete()
       .eq('id', examId);
       
     if (error) {
-      console.error(`Error deleting live exam ${examId}:`, error);
       return { success: false, error: `Canlı sınav silinirken bir hata oluştu: ${error.message}` };
     }
     
     return { success: true };
   } catch (error) {
-    console.error('deleteLiveExam error:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
   }
 }
@@ -348,58 +358,67 @@ export async function registerStudentForExam(
   examId: string, 
   studentId: string
 ): Promise<LiveExamParticipant | { error: string }> {
+  console.log(`[registerStudentForExam] Attempting to register student ${studentId} for exam ${examId}`);
   try {
     const exam = await getLiveExamById(examId);
     if (!exam) {
+      console.error(`[registerStudentForExam] Exam ${examId} not found.`);
       return { error: 'Canlı sınav bulunamadı.' };
     }
     
-    // Sınav durumunu kontrol et
     if (exam.status !== LiveExamStatus.SCHEDULED && exam.status !== LiveExamStatus.ACTIVE) {
+      console.error(`[registerStudentForExam] Exam ${examId} is not SCHEDULLED or ACTIVE. Status: ${exam.status}`);
       return { error: 'Bu sınava şu anda kayıt yapılamaz.' };
     }
     
-    // Öğrencinin bu sınava daha önce kaydolup olmadığını kontrol et
     const { data: existingParticipants, error: queryError } = await supabase
       .from(PARTICIPANTS_TABLE)
       .select('*')
-      .eq('exam_id', examId)
+      .eq('live_exam_id', examId)
       .eq('student_id', studentId);
       
     if (queryError) {
-      console.error(`Error checking existing participants for exam ${examId}, student ${studentId}:`, queryError);
+      console.error(`[registerStudentForExam] Error checking existing participants for exam ${examId}, student ${studentId}:`, queryError);
       return { error: `Katılımcı kontrolü sırasında bir hata oluştu: ${queryError.message}` };
     }
-    
-    // Öğrencinin kayıt sayısını kontrol et
-    if (existingParticipants && existingParticipants.length >= exam.maxAttempts) {
-      return { error: `Bu sınav için maksimum deneme sayısına (${exam.maxAttempts}) ulaştınız.` };
+
+    // Eğer öğrenci zaten kayıtlıysa ve status'u IN_PROGRESS ise mevcut kaydı döndür
+    if (existingParticipants && existingParticipants.length > 0) {
+      const latest = existingParticipants[existingParticipants.length - 1];
+      if (latest.status === ParticipantStatus.IN_PROGRESS) {
+        return mapSupabaseRowToParticipant(latest);
+      }
+      if (latest.status === ParticipantStatus.COMPLETED || latest.status === ParticipantStatus.TIMED_OUT) {
+        return { error: 'Bu sınavı zaten tamamladınız.' };
+      }
     }
     
-    // Yeni deneme numarasını belirle
     const attemptNumber = existingParticipants ? existingParticipants.length + 1 : 1;
+    console.log(`[registerStudentForExam] Student ${studentId} attempt number ${attemptNumber} for exam ${examId}.`);
     
     const newParticipantData = {
       live_exam_id: examId,
       student_id: studentId,
       status: ParticipantStatus.REGISTERED,
       progress: 0,
+      attempt_number: attemptNumber
     };
     
+    console.log('[registerStudentForExam] Attempting to insert new participant data:', JSON.stringify(newParticipantData, null, 2));
     const { data, error } = await supabase
       .from(PARTICIPANTS_TABLE)
       .insert(newParticipantData)
       .select()
       .single();
       
+    console.log('[registerStudentForExam] Supabase insert completed. Error:', JSON.stringify(error, null, 2), 'Data:', JSON.stringify(data, null, 2));
+
     if (error) {
-      console.error(`Error registering student ${studentId} for exam ${examId}:`, error);
       return { error: `Sınava kayıt yapılırken bir hata oluştu: ${error.message}` };
     }
     
     return mapSupabaseRowToParticipant(data);
   } catch (error) {
-    console.error('registerStudentForExam error:', error);
     return { error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
   }
 }
@@ -417,21 +436,18 @@ export async function startExamForStudent(
       return { error: 'Canlı sınav bulunamadı.' };
     }
     
-    // Sınav aktif mi kontrol et
     if (exam.status !== LiveExamStatus.ACTIVE) {
       return { error: 'Bu sınav şu anda aktif değil.' };
     }
     
-    // Öğrencinin kaydını bul
     const { data: participants, error: queryError } = await supabase
       .from(PARTICIPANTS_TABLE)
       .select('*')
-      .eq('exam_id', examId)
+      .eq('live_exam_id', examId)
       .eq('student_id', studentId)
       .order('attempt_number', { ascending: false });
       
     if (queryError) {
-      console.error(`Error fetching participant for exam ${examId}, student ${studentId}:`, queryError);
       return { error: `Katılımcı bilgisi alınırken bir hata oluştu: ${queryError.message}` };
     }
     
@@ -439,10 +455,12 @@ export async function startExamForStudent(
       return { error: 'Bu sınava kayıtlı değilsiniz. Lütfen önce kayıt olun.' };
     }
     
-    // En son denemeyi al
     const latestAttempt = participants[0];
     
-    // Durumu kontrol et
+    if (latestAttempt.status === ParticipantStatus.IN_PROGRESS) {
+      // Sınav zaten devam ediyor, mevcut kaydı döndür
+      return mapSupabaseRowToParticipant(latestAttempt);
+    }
     if (latestAttempt.status !== ParticipantStatus.REGISTERED) {
       return { error: 'Bu sınava zaten başladınız veya tamamladınız.' };
     }
@@ -452,11 +470,11 @@ export async function startExamForStudent(
     const updateData = {
       status: ParticipantStatus.IN_PROGRESS,
       start_time: now.toISOString(),
-      last_active_time: now.toISOString(),
+      last_active: now.toISOString(),
       ip_address: ipAddress,
       device_info: deviceInfo
     };
-    
+
     const { data, error } = await supabase
       .from(PARTICIPANTS_TABLE)
       .update(updateData)
@@ -465,13 +483,11 @@ export async function startExamForStudent(
       .single();
       
     if (error) {
-      console.error(`Error starting exam for student ${studentId}, exam ${examId}:`, error);
       return { error: `Sınav başlatılırken bir hata oluştu: ${error.message}` };
     }
     
     return mapSupabaseRowToParticipant(data);
   } catch (error) {
-    console.error('startExamForStudent error:', error);
     return { error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
   }
 }
@@ -484,17 +500,15 @@ export async function updateStudentAnswers(
   progress: number
 ): Promise<LiveExamParticipant | { error: string }> {
   try {
-    // Öğrencinin kaydını bul
     const { data: participants, error: queryError } = await supabase
       .from(PARTICIPANTS_TABLE)
       .select('*')
-      .eq('exam_id', examId)
+      .eq('live_exam_id', examId)
       .eq('student_id', studentId)
       .eq('status', ParticipantStatus.IN_PROGRESS)
       .order('attempt_number', { ascending: false });
       
     if (queryError) {
-      console.error(`Error fetching participant for exam ${examId}, student ${studentId}:`, queryError);
       return { error: `Katılımcı bilgisi alınırken bir hata oluştu: ${queryError.message}` };
     }
     
@@ -507,7 +521,7 @@ export async function updateStudentAnswers(
     const updateData = {
       answers,
       progress,
-      last_active_time: new Date().toISOString()
+      last_active: new Date().toISOString()
     };
     
     const { data, error } = await supabase
@@ -518,13 +532,11 @@ export async function updateStudentAnswers(
       .single();
       
     if (error) {
-      console.error(`Error updating answers for student ${studentId}, exam ${examId}:`, error);
       return { error: `Cevaplar güncellenirken bir hata oluştu: ${error.message}` };
     }
     
     return mapSupabaseRowToParticipant(data);
   } catch (error) {
-    console.error('updateStudentAnswers error:', error);
     return { error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
   }
 }
@@ -533,81 +545,80 @@ export async function updateStudentAnswers(
 export async function submitExamForStudent(
   examId: string,
   studentId: string,
-  answers: Record<string, string>
-): Promise<LiveExamParticipant | { error: string }> {
+  answers: Record<string, string>,
+  questionOrder: { questionId: string; originalIndex: number }[]
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const exam = await getLiveExamById(examId);
-    if (!exam) {
-      return { error: 'Canlı sınav bulunamadı.' };
-    }
-    
-    // Öğrencinin kaydını bul
-    const { data: participants, error: queryError } = await supabase
-      .from(PARTICIPANTS_TABLE)
-      .select('*')
-      .eq('exam_id', examId)
-      .eq('student_id', studentId)
-      .eq('status', ParticipantStatus.IN_PROGRESS)
-      .order('attempt_number', { ascending: false });
-      
-    if (queryError) {
-      console.error(`Error fetching participant for exam ${examId}, student ${studentId}:`, queryError);
-      return { error: `Katılımcı bilgisi alınırken bir hata oluştu: ${queryError.message}` };
-    }
-    
-    if (!participants || participants.length === 0) {
-      return { error: 'Aktif bir sınav oturumu bulunamadı.' };
-    }
-    
-    const participant = participants[0];
-    const now = new Date();
-    
-    // Sınav süresi doldu mu kontrol et
-    let status = ParticipantStatus.COMPLETED;
-    if (participant.start_time) {
-      const startTime = new Date(participant.start_time);
-      const timeLimitMs = exam.timeLimit * 60 * 1000;
-      const expiryTime = new Date(startTime.getTime() + timeLimitMs);
-      
-      if (now > expiryTime && !exam.allowLateSubmissions) {
-        status = ParticipantStatus.TIMED_OUT;
-      }
-    }
-    
-    const updateData: any = {
-      status,
-      answers,
-      progress: 100,
-      submit_time: now.toISOString(),
-      last_active_time: now.toISOString()
-    };
-    
-    // Eğer sonuçlar hemen yayınlanacaksa hesapla
-    if (exam.autoPublishResults || exam.status === LiveExamStatus.COMPLETED) {
-      const testData = await getTestById(exam.testId);
-      if (testData) {
-        const { score, isPassed } = calculateScore(testData, answers);
-        updateData.score = score;
-        updateData.is_passed = isPassed;
-      }
-    }
-    
-    const { data, error } = await supabase
-      .from(PARTICIPANTS_TABLE)
-      .update(updateData)
-      .eq('id', participant.id)
-      .select()
+    const { data: exam, error: examError } = await supabase
+      .from('live_exams')
+      .select('id, title, time_limit, status, test_id, tests(questions)')
+      .eq('id', examId)
       .single();
-      
-    if (error) {
-      console.error(`Error submitting exam for student ${studentId}, exam ${examId}:`, error);
-      return { error: `Sınav gönderilirken bir hata oluştu: ${error.message}` };
+
+    if (examError) throw examError;
+    if (!exam) throw new Error("Sınav detayları bulunamadı.");
+
+    if (exam.status !== 'active') {
+      return { success: false, error: 'Bu sınav şu anda aktif değil.' };
     }
-    
-    return mapSupabaseRowToParticipant(data);
-  } catch (error) {
-    console.error('submitExamForStudent error:', error);
-    return { error: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.' };
+
+    const { data: participant, error: participantError } = await supabase
+      .from('live_exam_participants')
+      .select('*')
+      .eq('live_exam_id', examId)
+      .eq('student_id', studentId)
+      .single();
+
+    if (participantError) throw participantError;
+    if (!participant) throw new Error("Katılımcı bilgisi bulunamadı.");
+
+    if (participant.status === 'completed') {
+      return { success: false, error: 'Bu sınav zaten tamamlanmış.' };
+    }
+
+    // Soruları orijinal sıralamaya göre düzenle
+    let originalQuestions: any[] = [];
+    if (Array.isArray(exam.tests.questions)) {
+      originalQuestions = (exam.tests.questions as any[]).sort((a: any, b: any) => {
+        const aOrder = questionOrder.find(q => q.questionId === a.id)?.originalIndex ?? 0;
+        const bOrder = questionOrder.find(q => q.questionId === b.id)?.originalIndex ?? 0;
+        return aOrder - bOrder;
+      });
+    }
+
+    // Cevapları kontrol et ve puanları hesapla
+    let totalScore = 0;
+    const questionResults = originalQuestions.map((question: any) => {
+      const studentAnswer = answers[question.id];
+      const correctOptionId = question.correctOptionId || question.correct_option_id;
+      const isCorrect = !!studentAnswer && studentAnswer === correctOptionId;
+      if (isCorrect) totalScore++;
+      return {
+        question_id: question.id,
+        student_answer: studentAnswer,
+        is_correct: isCorrect,
+        original_index: questionOrder.find(q => q.questionId === question.id)?.originalIndex ?? 0
+      };
+    });
+
+    const { error: updateError } = await supabase
+      .from('live_exam_participants')
+      .update({
+        status: 'completed',
+        answers: answers,
+        score: totalScore,
+        submit_time: new Date().toISOString(),
+        question_results: questionResults
+      })
+      .eq('live_exam_id', examId)
+      .eq('student_id', studentId);
+
+    if (updateError) throw updateError;
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error submitting exam:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -636,25 +647,21 @@ async function calculateAndPublishResults(examId: string): Promise<void> {
   try {
     const exam = await getLiveExamById(examId);
     if (!exam) {
-      console.error(`Exam not found: ${examId}`);
       return;
     }
     
     const testData = await getTestById(exam.testId);
     if (!testData) {
-      console.error(`Test not found for exam: ${examId}, test: ${exam.testId}`);
       return;
     }
     
     const participants = await getLiveExamParticipants(examId);
     
-    // Her katılımcı için sonuçları hesapla
     for (const participant of participants) {
       if (participant.status === ParticipantStatus.COMPLETED || participant.status === ParticipantStatus.TIMED_OUT) {
         if (participant.answers) {
           const { score, isPassed } = calculateScore(testData, participant.answers);
           
-          // Sonuçları güncelle
           await supabase
             .from(PARTICIPANTS_TABLE)
             .update({
@@ -666,6 +673,5 @@ async function calculateAndPublishResults(examId: string): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('calculateAndPublishResults error:', error);
   }
 } 

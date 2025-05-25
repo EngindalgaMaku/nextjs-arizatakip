@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getUsers, deleteUser, registerUser, updateUser, updateUserProfile } from '@/lib/supabase';
+import { deleteUser, getUsers, registerUser, updateUserProfile } from '@/lib/supabase';
+import { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 
 interface UserData {
@@ -54,24 +54,16 @@ export default function UsersPage() {
       
       if (data) {
         // API'den gelen veriyi formata
-        const formattedUsers = data.map(user => ({
+        const formattedUsers = data.map((user: any) => ({
           id: user.id,
           email: user.email,
-          role: user.role,
-          status: user.status as 'active' | 'inactive',
-          lastLogin: user.last_login ? new Date(user.last_login).toLocaleString('tr-TR') : 'Hiç giriş yapmadı'
+          role: user.role ?? 'viewer',
+          status: user.status ?? 'active',
+          lastLogin: user.last_login ? new Date(user.last_login).toLocaleString('tr-TR') : 'Hiç giriş yapmadı',
         }));
         setUsers(formattedUsers);
       } else {
-        // Veri yoksa mock veri kullan (geliştirme için)
-        setUsers([
-          { id: 1, email: 'ahmet@example.com', role: 'admin', status: 'active', lastLogin: '2023-10-25 14:30' },
-          { id: 2, email: 'ayse@example.com', role: 'editor', status: 'active', lastLogin: '2023-10-24 09:15' },
-          { id: 3, email: 'mehmet@example.com', role: 'viewer', status: 'inactive', lastLogin: '2023-10-10 11:45' },
-          { id: 4, email: 'zeynep@example.com', role: 'editor', status: 'active', lastLogin: '2023-10-25 10:20' },
-          { id: 5, email: 'ali@example.com', role: 'admin', status: 'active', lastLogin: '2023-10-25 16:05' },
-          { id: 6, email: 'fatma@example.com', role: 'viewer', status: 'inactive', lastLogin: '2023-10-15 13:30' },
-        ]);
+        setUsers([]); // Mock veri kaldırıldı
       }
     } catch (err) {
       console.error('Kullanıcılar yüklenirken hata oluştu:', err);
@@ -94,16 +86,12 @@ export default function UsersPage() {
     if (!window.confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) {
       return;
     }
-
     try {
-      if (typeof userId === 'string') {
-        // Gerçek silme işlemini Supabase'e gönder
-        const { error } = await deleteUser(userId);
-        if (error) throw error;
-      }
-      
+      // Her iki tip için de silme işlemi uygula
+      const { error } = await deleteUser(String(userId));
+      if (error) throw error;
       // UI'dan kullanıcıyı kaldır (optimistic update)
-      setUsers(users.filter(user => user.id !== userId));
+      setUsers(users.filter(user => String(user.id) !== String(userId)));
     } catch (error) {
       console.error('Kullanıcı silinirken hata oluştu:', error);
       alert('Kullanıcı silinirken bir hata oluştu. Lütfen tekrar deneyin.');
@@ -349,23 +337,13 @@ export default function UsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      onClick={() => Swal.fire({
-                        title: 'Bilgi',
-                        text: 'Bu işlem güvenlik amaçlı buradan yapılamaz. Ana yöneticinize başvurun',
-                        icon: 'info',
-                        confirmButtonText: 'Tamam'
-                      })}
+                      onClick={() => openEditModal(user)}
                     >
                       Düzenle
                     </button>
                     <button
                       className="text-red-600 hover:text-red-900"
-                      onClick={() => Swal.fire({
-                        title: 'Bilgi',
-                        text: 'Bu işlem güvenlik amaçlı buradan yapılamaz. Ana yöneticinize başvurun',
-                        icon: 'info',
-                        confirmButtonText: 'Tamam'
-                      })}
+                      onClick={() => handleDeleteUser(user.id)}
                     >
                       Sil
                     </button>

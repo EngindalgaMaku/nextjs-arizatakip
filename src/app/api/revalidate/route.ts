@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let revalidatedItems: string[] = [];
-  let errors: string[] = [];
+  const revalidatedItems: string[] = [];
+  const errors: string[] = [];
 
   if (path) {
     try {

@@ -40,7 +40,7 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
     async function fetchTest() {
       if (typeof slug !== 'string' || !slug) {
         setIsLoading(false);
-        setError('Geçersiz test kimliği.'); // Set an error if slug is invalid
+        setError('Geçersiz test kimliği.');
         return;
       }
       setIsLoading(true);
@@ -51,15 +51,15 @@ export default function TestViewPage({ params }: { params: { slug: string } }) {
         if (!fetchedTest) {
           setError('Test bulunamadı.');
         }
-      } catch (e: any) {
-        console.error("Failed to fetch test:", e);
-        setError(e.message || 'Test yüklenirken bir hata oluştu.');
+      } catch (error) {
+        console.error("Failed to fetch test:", error);
+        setError(error instanceof Error ? error.message : 'Test yüklenirken bir hata oluştu.');
       } finally {
         setIsLoading(false);
       }
     }
     fetchTest();
-  }, [slug]);
+  }, [slug, setIsLoading, setError, setTest, getTestBySlug]);
   
   const questionsToDisplay = useMemo(() => {
     if (test && test.questions && test.randomizeQuestions) {

@@ -3,7 +3,6 @@
 import { createLiveExam } from "@/actions/liveExamActions";
 import { getTests } from "@/actions/testActions";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
     Card,
     CardContent,
@@ -14,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
     Select,
     SelectContent,
@@ -24,13 +22,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabaseClient";
-import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import type { LiveExamCreationParams, Test } from "@/types/tests";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
-import { CalendarIcon, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -42,8 +38,8 @@ import { z } from "zod";
 // const ADMIN_USER_ID_PLACEHOLDER = "admin-user-placeholder-id";
 
 const liveExamSchema = z.object({
-  testId: z.string().min(1, "Lütfen bir test seçin."),
-  title: z.string().min(3, "Sınav başlığı en az 3 karakter olmalıdır.").max(100, "Sınav başlığı en fazla 100 karakter olabilir."),
+  testId: z.string({ required_error: "Lütfen bir test seçin." }),
+  title: z.string().min(3, "Sınav başlığı en az 3 karakter olmalıdır.").max(100, "Sınav başlığı en fazla 100 karakter olabilir.").optional(),
   description: z.string().max(500, "Açıklama en fazla 500 karakter olabilir.").optional(),
   scheduledStartTime: z.date({ required_error: "Başlangıç zamanı zorunludur." }),
   scheduledEndTime: z.date({ required_error: "Bitiş zamanı zorunludur." }),
@@ -53,11 +49,13 @@ const liveExamSchema = z.object({
   allowLateSubmissions: z.boolean(),
   randomizeQuestions: z.boolean(),
   randomizeOptions: z.boolean(),
-  // studentIds: z.array(z.string()).optional(), // İleride eklenebilir
-  // classIds: z.array(z.string()).optional(), // İleride eklenebilir
-}).refine((data) => data.scheduledEndTime > data.scheduledStartTime, {
+}).refine((data) => {
+  const start = new Date(data.scheduledStartTime);
+  const end = new Date(data.scheduledEndTime);
+  return end > start;
+}, {
   message: "Bitiş zamanı, başlangıç zamanından sonra olmalıdır.",
-  path: ["scheduledEndTime"], 
+  path: ["scheduledEndTime"],
 });
 
 type LiveExamFormValues = z.infer<typeof liveExamSchema>;
@@ -74,10 +72,12 @@ export default function CreateLiveExamPage() {
     formState: { errors },
     watch,
     setValue,
+    reset,
   } = useForm<LiveExamFormValues>({
     resolver: zodResolver(liveExamSchema),
     defaultValues: {
-      title: "",
+      testId: "",
+      title: undefined,
       description: "",
       timeLimit: 60,
       maxAttempts: 1,
@@ -85,6 +85,8 @@ export default function CreateLiveExamPage() {
       allowLateSubmissions: false,
       randomizeQuestions: true,
       randomizeOptions: true,
+      scheduledStartTime: new Date(new Date().getTime() + 5 * 60000),
+      scheduledEndTime: new Date(new Date().getTime() + 65 * 60000),
     },
   });
 
@@ -112,32 +114,34 @@ export default function CreateLiveExamPage() {
   }, []);
 
   const onSubmit: SubmitHandler<LiveExamFormValues> = async (data) => {
+    console.log('Form submission started', { data });
     setIsSubmitting(true);
+
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('Auth check result:', { user, userError });
 
       if (userError || !user) {
         toast.error("Kullanıcı oturumu bulunamadı. Lütfen tekrar giriş yapın.");
         console.error("Error getting user session:", userError);
-        setIsSubmitting(false);
         return;
       }
 
-      if (!user.id) {
-        toast.error("Kullanıcı kimliği alınamadı. Lütfen destek ile iletişime geçin.");
-        console.error("User ID is missing from user object:", user);
-        setIsSubmitting(false);
+      const selectedTest = tests.find(t => t.id === data.testId);
+      if (!selectedTest) {
+        toast.error("Seçilen test bulunamadı.");
         return;
       }
-
-      const teacherId = user.id; // Gerçek kullanıcı ID'si alındı
 
       const creationParams: LiveExamCreationParams = {
         ...data,
-        // scheduledStartTime ve scheduledEndTime zaten Date objesi olduğu için direkt kullanılabilir.
+        title: data.title || selectedTest.title,
+        description: data.description || selectedTest.description,
+        scheduledStartTime: new Date(data.scheduledStartTime),
+        scheduledEndTime: new Date(data.scheduledEndTime),
       };
       
-      const result = await createLiveExam(teacherId, creationParams); // ADMIN_USER_ID_PLACEHOLDER yerine teacherId kullanıldı
+      const result = await createLiveExam(user.id, creationParams);
 
       if ('id' in result && result.id) {
         toast.success(`Canlı sınav "${result.title}" başarıyla oluşturuldu.`);
@@ -181,17 +185,18 @@ export default function CreateLiveExamPage() {
             Seçtiğiniz bir testi canlı sınava dönüştürün ve ayarlarını yapılandırın.
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="testId">Temel Alınacak Test</Label>
               <Controller
                 name="testId"
                 control={control}
+                rules={{ required: "Lütfen bir test seçin" }}
                 render={({ field }) => (
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={isLoadingTests || isSubmitting}
                   >
                     <SelectTrigger id="testId">
@@ -215,7 +220,15 @@ export default function CreateLiveExamPage() {
               <Controller
                 name="title"
                 control={control}
-                render={({ field }) => <Input id="title" {...field} placeholder="Örn: 1. Dönem Matematik Canlı Sınavı" disabled={isSubmitting} />}
+                render={({ field }) => (
+                  <Input 
+                    id="title" 
+                    {...field} 
+                    value={field.value || ''} 
+                    placeholder="Örn: 1. Dönem Matematik Canlı Sınavı" 
+                    disabled={isSubmitting} 
+                  />
+                )}
               />
               {errors.title && <p className="text-sm text-red-500">{errors.title.message}</p>}
             </div>
@@ -225,7 +238,16 @@ export default function CreateLiveExamPage() {
               <Controller
                 name="description"
                 control={control}
-                render={({ field }) => <Textarea id="description" {...field} placeholder="Sınavla ilgili ek bilgiler..." disabled={isSubmitting} rows={3} />}
+                render={({ field }) => (
+                  <Textarea 
+                    id="description" 
+                    {...field} 
+                    value={field.value || ''} 
+                    placeholder="Sınavla ilgili ek bilgiler..." 
+                    disabled={isSubmitting} 
+                    rows={3} 
+                  />
+                )}
               />
               {errors.description && <p className="text-sm text-red-500">{errors.description.message}</p>}
             </div>
@@ -236,52 +258,20 @@ export default function CreateLiveExamPage() {
                 <Controller
                   name="scheduledStartTime"
                   control={control}
-                  render={({ field }) => (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          disabled={isSubmitting}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? format(field.value, "PPP HH:mm", { locale: tr }) : <span>Bir tarih ve saat seçin</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                          locale={tr}
-                        />
-                        {/* Saat seçimi için ayrı bir input eklenebilir veya Calendar'a time prop'u gelirse o kullanılır */}
-                        <div className="p-2 border-t border-border">
-                            <Input 
-                                type="time" 
-                                value={field.value ? format(field.value, 'HH:mm') : ''}
-                                onChange={(e) => {
-                                    const time = e.target.value;
-                                    if (field.value) {
-                                        const [hours, minutes] = time.split(':').map(Number);
-                                        const newDate = new Date(field.value);
-                                        newDate.setHours(hours);
-                                        newDate.setMinutes(minutes);
-                                        field.onChange(newDate);
-                                    } else {
-                                        // Eğer başlangıçta tarih yoksa, sadece saat ayarlanmamalı
-                                        // Ya da bugünün tarihiyle birleştirilmeli
-                                        // Şimdilik, önce tarih seçilmesini zorunlu kılalım
-                                    }
-                                }}
-                            />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                  rules={{ required: "Başlangıç zamanı zorunludur" }}
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      type="datetime-local"
+                      id="scheduledStartTime"
+                      value={value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : ''}
+                      onChange={(e) => {
+                        console.log("scheduledStartTime raw value:", e.target.value);
+                        const dateValue = new Date(e.target.value);
+                        console.log("scheduledStartTime parsed date:", dateValue);
+                        onChange(dateValue);
+                      }}
+                      disabled={isSubmitting}
+                    />
                   )}
                 />
                 {errors.scheduledStartTime && <p className="text-sm text-red-500">{errors.scheduledStartTime.message}</p>}
@@ -292,47 +282,20 @@ export default function CreateLiveExamPage() {
                 <Controller
                   name="scheduledEndTime"
                   control={control}
-                  render={({ field }) => (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          disabled={isSubmitting}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? format(field.value, "PPP HH:mm", { locale: tr }) : <span>Bir tarih ve saat seçin</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                          locale={tr}
-                        />
-                        <div className="p-2 border-t border-border">
-                            <Input 
-                                type="time" 
-                                value={field.value ? format(field.value, 'HH:mm') : ''}
-                                onChange={(e) => {
-                                    const time = e.target.value;
-                                    if (field.value) {
-                                        const [hours, minutes] = time.split(':').map(Number);
-                                        const newDate = new Date(field.value);
-                                        newDate.setHours(hours);
-                                        newDate.setMinutes(minutes);
-                                        field.onChange(newDate);
-                                    }
-                                }}
-                            />
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                  rules={{ required: "Bitiş zamanı zorunludur" }}
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      type="datetime-local"
+                      id="scheduledEndTime"
+                      value={value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : ''}
+                      onChange={(e) => {
+                        console.log("scheduledEndTime raw value:", e.target.value);
+                        const dateValue = new Date(e.target.value);
+                        console.log("scheduledEndTime parsed date:", dateValue);
+                        onChange(dateValue);
+                      }}
+                      disabled={isSubmitting}
+                    />
                   )}
                 />
                 {errors.scheduledEndTime && <p className="text-sm text-red-500">{errors.scheduledEndTime.message}</p>}
@@ -410,8 +373,12 @@ export default function CreateLiveExamPage() {
               />
             </div>
           </CardContent>
-          <CardFooter className="mt-6">
-            <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting || isLoadingTests}>
+          <CardFooter className="mt-6 flex justify-end border-t pt-6">
+            <Button 
+              type="submit" 
+              className="w-full md:w-auto bg-primary text-white hover:bg-primary/90" 
+              disabled={isSubmitting || isLoadingTests}
+            >
               {isSubmitting ? "Oluşturuluyor..." : (isLoadingTests ? "Testler Yükleniyor..." : "Canlı Sınavı Oluştur")}
             </Button>
           </CardFooter>

@@ -83,6 +83,13 @@ export async function loginStudentForReceipts(
       };
     }
 
+    if (!student) {
+      return {
+        data: null,
+        error: 'Öğrenci bulunamadı'
+      };
+    }
+
     return {
       data: {
         studentId: student.id,
@@ -90,7 +97,7 @@ export async function loginStudentForReceipts(
         className: actualStudentClass.name,
         schoolNumber: student.school_number,
       },
-      error: null,
+      error: null
     };
 
   } catch (error) {
@@ -119,7 +126,6 @@ export async function getStudentReceiptsDashboard(
   // Eylül (9) - Haziran (6) arası aylar.
   // Veritabanında aylar 1-12 olarak tutulduğu için bu aralıkta sorgu yapacağız.
   // Ancak gösterimde Eylül'den Haziran'a doğru bir sıra izlenmeli.
-  const months = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6]; 
 
   try {
     const { data: receipts, error } = await supabase
@@ -136,7 +142,6 @@ export async function getStudentReceiptsDashboard(
       `)
       .eq('student_id', validation.data.studentId)
       .or(`and(month.gte.9,month.lte.12,year.eq.${validation.data.year}),and(month.gte.1,month.lte.6,year.eq.${validation.data.year + 1})`)
-      // .eq('year', validation.data.year) // This line will be replaced by the .or() condition above
 
     if (error) {
       console.error('Error fetching student receipts:', error);

@@ -1,18 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { getIssues, deleteIssue, Issue, DeviceType, DeviceLocation, IssueStatus, IssuePriority, getIssue } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { deleteIssue, DeviceLocation, DeviceType, getIssue, getIssues, Issue, IssuePriority, IssueStatus, supabase } from '@/lib/supabase';
+import { ArrowRightIcon, EyeIcon, PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import React, { useCallback, useEffect, useState } from 'react';
+import Swal from 'sweetalert2';
 import AddIssueForm from './add-form';
 import EditIssueForm from './edit-form';
 import ViewIssueForm from './view-issue-form';
-import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
-import Swal from 'sweetalert2';
-import { supabase } from '@/lib/supabase';
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { ArrowRightIcon } from '@heroicons/react/24/outline';
-import { PlusCircleIcon } from '@heroicons/react/24/outline';
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
   created_at: string;
@@ -83,19 +79,19 @@ const IssueList = ({
       // API'den gelen veriyi formata
       const formattedIssues = data.map(issue => ({
         id: issue.id,
-        device_type: issue.device_type,
+        device_type: issue.device_type as DeviceType,
         device_name: issue.device_name,
-        device_location: issue.device_location,
-        room_number: issue.room_number,
+        device_location: issue.device_location as DeviceLocation,
+        room_number: issue.room_number ?? '-',
         reported_by: issue.reported_by,
         assigned_to: issue.assigned_to,
         description: issue.description,
-        status: issue.status,
-        priority: issue.priority,
+        status: issue.status as IssueStatus,
+        priority: issue.priority as IssuePriority,
         notes: issue.notes,
-        created_at: new Date(issue.created_at).toLocaleString('tr-TR'),
-        updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : null,
-        resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : null
+        created_at: issue.created_at ? new Date(issue.created_at).toLocaleString('tr-TR') : '-',
+        updated_at: issue.updated_at ? new Date(issue.updated_at).toLocaleString('tr-TR') : '-',
+        resolved_at: issue.resolved_at ? new Date(issue.resolved_at).toLocaleString('tr-TR') : '-'
       }));
       
       setIssues(formattedIssues);
@@ -185,10 +181,20 @@ const IssueList = ({
             
             // Veriyi IssueData formatına çevir
             const formattedIssue: IssueData = {
-              ...data,
-              created_at: new Date(data.created_at).toLocaleString('tr-TR'),
-              updated_at: data.updated_at ? new Date(data.updated_at).toLocaleString('tr-TR') : null,
-              resolved_at: data.resolved_at ? new Date(data.resolved_at).toLocaleString('tr-TR') : null
+              id: data.id,
+              device_type: data.device_type as DeviceType,
+              device_name: data.device_name,
+              device_location: data.device_location as DeviceLocation,
+              room_number: data.room_number ?? '-',
+              reported_by: data.reported_by,
+              assigned_to: data.assigned_to,
+              description: data.description,
+              status: data.status as IssueStatus,
+              priority: data.priority as IssuePriority,
+              notes: data.notes,
+              created_at: data.created_at ? new Date(data.created_at).toLocaleString('tr-TR') : '-',
+              updated_at: data.updated_at ? new Date(data.updated_at).toLocaleString('tr-TR') : '-',
+              resolved_at: data.resolved_at ? new Date(data.resolved_at).toLocaleString('tr-TR') : '-'
             };
             
             setCurrentIssue(formattedIssue);

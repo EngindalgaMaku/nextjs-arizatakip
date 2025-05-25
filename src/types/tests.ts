@@ -64,8 +64,8 @@ export interface LiveExam {
   timeLimit: number; // Dakika cinsinden
   scheduledStartTime: Date; // Planlanmış başlangıç zamanı
   scheduledEndTime: Date;   // Planlanmış bitiş zamanı
-  actualStartTime?: Date;   // Gerçek başlangıç zamanı (başlatıldığında)
-  actualEndTime?: Date;     // Gerçek bitiş zamanı (sonlandırıldığında)
+  actualStartTime?: Date | undefined;   // Gerçek başlangıç zamanı (başlatıldığında)
+  actualEndTime?: Date | undefined;     // Gerçek bitiş zamanı (sonlandırıldığında)
   status: LiveExamStatus;
   createdBy: string;        // Oluşturan öğretmen ID'si
   createdAt: Date;
@@ -77,6 +77,7 @@ export interface LiveExam {
   maxAttempts: number;      // Maksimum deneme sayısı (1=tek deneme)
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
+  participantStatus?: string; // Öğrencinin sınavdaki durumu
 }
 
 export enum LiveExamStatus {
@@ -144,4 +145,6 @@ export interface LiveExamUpdateParams {
   maxAttempts?: number;
   randomizeQuestions?: boolean;
   randomizeOptions?: boolean;
-} 
+}
+
+export type ExamStatus = 'active' | 'past' | 'upcoming'; 

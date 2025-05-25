@@ -2,7 +2,6 @@
 
 import { supabase } from '@/lib/supabase';
 import { LocationType, LocationTypeFormValues } from '@/types/locationTypes';
-import { revalidatePath } from 'next/cache';
 
 // Fetch all location types
 export async function fetchLocationTypes(): Promise<LocationType[]> {
@@ -100,7 +99,7 @@ export async function fetchDalDersLocationTypes(dalDersId: string): Promise<stri
   if (!dalDersId) return [];
 
   const { data, error } = await supabase
-    .from('dal_ders_location_types')
+    .from('dal_ders_location_types' as any)
     .select('location_type_id')
     .eq('dal_ders_id', dalDersId);
 
@@ -110,7 +109,10 @@ export async function fetchDalDersLocationTypes(dalDersId: string): Promise<stri
     return [];
   }
 
-  return data ? data.map(item => item.location_type_id) : [];
+  if (!Array.isArray(data)) return [];
+  return data.every(item => 'location_type_id' in item)
+    ? data.map(item => String(item.location_type_id))
+    : [];
 }
 
 /**
@@ -125,45 +127,33 @@ export async function setDalDersLocationTypes(
     return { success: false, error: 'Ders ID sağlanmadı.' };
   }
 
-  // Begin a transaction
-  const { error: transactionError } = await supabase.rpc('transaction', async () => {
-    // Delete existing associations for this dal_ders_id
-    const { error: deleteError } = await supabase
-      .from('dal_ders_location_types')
-      .delete()
-      .eq('dal_ders_id', dalDersId);
+  // Delete existing associations for this dal_ders_id
+  const { error: deleteError } = await supabase
+    .from('dal_ders_location_types' as any)
+    .delete()
+    .eq('dal_ders_id', dalDersId);
 
-    if (deleteError) {
-      console.error(`Error deleting old location types for dal_ders_id ${dalDersId}:`, deleteError.message);
-      throw new Error(deleteError.message); // This will rollback the transaction
-    }
-
-    // If there are new locationTypeIds, insert them
-    if (locationTypeIds && locationTypeIds.length > 0) {
-      const newLinks = locationTypeIds.map(locationTypeId => ({
-        dal_ders_id: dalDersId,
-        location_type_id: locationTypeId,
-      }));
-
-      const { error: insertError } = await supabase
-        .from('dal_ders_location_types')
-        .insert(newLinks);
-
-      if (insertError) {
-        console.error(`Error inserting new location types for dal_ders_id ${dalDersId}:`, insertError.message);
-        throw new Error(insertError.message); // This will rollback the transaction
-      }
-    }
-  });
-
-  if (transactionError) {
-    return { success: false, error: transactionError.message };
+  if (deleteError) {
+    console.error(`Error deleting old location types for dal_ders_id ${dalDersId}:`, deleteError.message);
+    return { success: false, error: deleteError.message };
   }
-  
-  // It's good practice to revalidate paths that might display this data.
-  // However, the specific path depends on where this data is used.
-  // For now, revalidating a generic path related to the dalId might be too broad or incorrect.
-  // Consider revalidating from the calling action (e.g., in dalDersActions) more specifically.
+
+  // If there are new locationTypeIds, insert them
+  if (locationTypeIds && locationTypeIds.length > 0) {
+    const newLinks = locationTypeIds.map(locationTypeId => ({
+      dal_ders_id: dalDersId,
+      location_type_id: locationTypeId,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('dal_ders_location_types' as any)
+      .insert(newLinks);
+
+    if (insertError) {
+      console.error(`Error inserting new location types for dal_ders_id ${dalDersId}:`, insertError.message);
+      return { success: false, error: insertError.message };
+    }
+  }
 
   return { success: true };
 } 

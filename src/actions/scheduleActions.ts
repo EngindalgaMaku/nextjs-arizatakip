@@ -2,19 +2,18 @@
 
 import { supabase } from '@/lib/supabase';
 import {
-  ScheduleEntry,
-  ScheduleUpsertEntry,
-  ScheduleEntrySchema,
-  ScheduleUpsertEntrySchema,
+  LocationScheduleEntryPayload,
   LocationScheduleEntryPayloadSchema,
-  LocationScheduleEntryPayload 
+  ScheduleEntry,
+  ScheduleEntrySchema,
+  ScheduleUpsertEntry,
+  ScheduleUpsertEntrySchema
 } from '@/types/schedules';
-import { TeacherScheduleEntrySchema } from '@/types/teacherSchedules';
 import { z } from 'zod';
-import { fetchAllDersOptions } from './dalDersActions';
 import { fetchClasses } from './classActions';
-import { fetchTeachers } from './teacherActions';
+import { fetchAllDersOptions } from './dalDersActions';
 import { fetchLocationById } from './locationActions';
+import { fetchTeachers } from './teacherActions';
 
 /**
  * Fetch all schedule entries for a given lab, joining related names.
@@ -107,7 +106,12 @@ export async function saveScheduleEntries(entries: ScheduleUpsertEntry[]): Promi
               .not('teacher_id', 'is', null);
           
           if (fetchPrevError) throw fetchPrevError;
-          previousTeacherIds = [...new Set(previousEntries?.map(e => e.teacher_id) || [])];
+          previousTeacherIds = Array.isArray(previousEntries)
+            ? [...new Set(previousEntries
+                .filter(item => item && typeof item === 'object' && 'teacher_id' in item && typeof (item as any).teacher_id === 'string' && !('code' in item))
+                .map(e => (e as any).teacher_id as string)
+              )]
+            : [];
       } catch(err) {
           console.error(`Error fetching previous teacher IDs for lab ${effectiveLabId} before clearing:`, err);
       }
@@ -183,27 +187,29 @@ export async function saveScheduleEntries(entries: ScheduleUpsertEntry[]): Promi
               throw new Error(`Öğretmenin (${teacherId}) eski programı silinemedi: ${deleteTeacherSchedError.message}`);
           }
 
-          if (teacherFullScheduleData && teacherFullScheduleData.length > 0) {
-              const mappedTeacherEntries = teacherFullScheduleData.map(entry => ({
-                  teacher_id: teacherId,
-                  day_of_week: entry.day,
-                  time_slot: entry.period,
-                  class_name: entry.lesson?.ders_adi || null, 
-                  location_name: entry.location?.name || 'Bilinmeyen Konum', 
-                  class_id: entry.class_id || null,
-              }));
-
-              const { error: insertTeacherSchedError } = await supabase
-                  .from('teacher_schedules')
-                  .insert(mappedTeacherEntries);
-
-              if (insertTeacherSchedError) {
-                   if (insertTeacherSchedError.code === '23505') {
-                       console.error(`Unique constraint violation for teacher ${teacherId}:`, insertTeacherSchedError.details);
-                       throw new Error(`Öğretmenin (${teacherId}) programında çakışma veya tekrarlanan kayıt bulundu. Lütfen verileri kontrol edin.`);
-                   }
-                  throw new Error(`Öğretmenin (${teacherId}) yeni programı kaydedilemedi: ${insertTeacherSchedError.message}`);
-              }
+          if (Array.isArray(teacherFullScheduleData) && teacherFullScheduleData.length > 0) {
+              const mappedTeacherEntries = (teacherFullScheduleData as any[])
+                .filter(entry => entry && typeof entry === 'object' && !('code' in entry))
+                .map(entry => ({
+                   teacher_id: teacherId,
+                   day_of_week: 'day' in entry && typeof entry.day === 'number' ? entry.day : 0,
+                   time_slot: 'period' in entry && typeof entry.period === 'number' ? entry.period : 0,
+                   class_name: entry.lesson && typeof entry.lesson === 'object' && 'ders_adi' in entry.lesson ? String(entry.lesson.ders_adi) : null,
+                   location_name: entry.location && typeof entry.location === 'object' && 'name' in entry.location ? String(entry.location.name) : 'Bilinmeyen Konum',
+                   class_id: 'class_id' in entry && typeof entry.class_id === 'string' ? entry.class_id : null,
+                })) as { teacher_id: string; day_of_week: number; time_slot: number; class_name: string | null; location_name: string | null; class_id: string | null }[];
+                
+                const { error: insertTeacherSchedError } = await supabase
+                   .from('teacher_schedules')
+                   .insert(mappedTeacherEntries);
+                
+                if (insertTeacherSchedError) {
+                    if (insertTeacherSchedError.code === '23505') {
+                        console.error(`Unique constraint violation for teacher ${teacherId}:`, insertTeacherSchedError.details);
+                        throw new Error(`Öğretmenin (${teacherId}) programında çakışma veya tekrarlanan kayıt bulundu. Lütfen verileri kontrol edin.`);
+                    }
+                   throw new Error(`Öğretmenin (${teacherId}) yeni programı kaydedilemedi: ${insertTeacherSchedError.message}`);
+                }
           } else {
               console.log(`Teacher ${teacherId} has no entries after update across all locations. Their teacher_schedule is now empty.`);
           }
@@ -473,7 +479,7 @@ export async function resetLocationSchedule(labId: string): Promise<{ success: b
   try {
     // First, get the teacher IDs associated with this location before deleting
     const { data: previousEntries, error: fetchPrevError } = await supabase
-        .from('location_schedule_entries')
+        .from('location_schedule_entries' as any)
         .select('teacher_id')
         .eq('lab_id', labId)
         .not('teacher_id', 'is', null);
@@ -483,12 +489,17 @@ export async function resetLocationSchedule(labId: string): Promise<{ success: b
        // Decide if this is a fatal error or if we should proceed with deletion anyway
        // Proceeding for now, but logging the issue.
     }
-    const previousTeacherIds = [...new Set(previousEntries?.map(e => e.teacher_id).filter(Boolean) as string[] || [])];
+    const previousTeacherIds = Array.isArray(previousEntries)
+      ? [...new Set(previousEntries
+          .filter(item => item && typeof item === 'object' && 'teacher_id' in item && typeof (item as any).teacher_id === 'string' && !('code' in item))
+          .map(e => (e as any).teacher_id as string)
+        )]
+      : [];
     console.log(`[Action resetLocationSchedule] Teachers to sync after reset for lab ${labId}:`, previousTeacherIds);
 
     // Delete all entries for the location
     const { error: deleteError } = await supabase
-      .from('location_schedule_entries')
+      .from('location_schedule_entries' as any)
       .delete()
       .eq('lab_id', labId);
 
@@ -505,7 +516,7 @@ export async function resetLocationSchedule(labId: string): Promise<{ success: b
          try {
              // Refetch the teacher's full schedule from *all* locations now
              const { data: teacherFullScheduleData, error: fetchTeacherSchedError } = await supabase
-                 .from('location_schedule_entries') // Check location_schedule_entries again for remaining entries
+                 .from('location_schedule_entries' as any) // Check location_schedule_entries again for remaining entries
                  .select('*, lesson:dal_dersleri(ders_adi), location:locations(name), class:classes(name)')
                  .eq('teacher_id', teacherId);
 
@@ -524,16 +535,17 @@ export async function resetLocationSchedule(labId: string): Promise<{ success: b
              }
 
              // Re-insert remaining entries, if any
-             if (teacherFullScheduleData && teacherFullScheduleData.length > 0) {
-                 const mappedTeacherEntries = teacherFullScheduleData.map(entry => ({
+             if (Array.isArray(teacherFullScheduleData) && teacherFullScheduleData.length > 0) {
+                 const mappedTeacherEntries = (teacherFullScheduleData as any[])
+                   .filter(entry => entry && typeof entry === 'object' && !('code' in entry))
+                   .map(entry => ({
                       teacher_id: teacherId,
-                      day_of_week: entry.day,
-                      time_slot: entry.period,
-                      // Use original source table names for joins
-                      class_name: entry.lesson?.ders_adi || null, 
-                      location_name: entry.location?.name || 'Bilinmeyen Konum', 
-                      class_id: entry.class_id || null,
-                 }));
+                      day_of_week: 'day' in entry && typeof entry.day === 'number' ? entry.day : 0,
+                      time_slot: 'period' in entry && typeof entry.period === 'number' ? entry.period : 0,
+                      class_name: entry.lesson && typeof entry.lesson === 'object' && 'ders_adi' in entry.lesson ? String(entry.lesson.ders_adi) : null,
+                      location_name: entry.location && typeof entry.location === 'object' && 'name' in entry.location ? String(entry.location.name) : 'Bilinmeyen Konum',
+                      class_id: 'class_id' in entry && typeof entry.class_id === 'string' ? entry.class_id : null,
+                 })) as { teacher_id: string; day_of_week: number; time_slot: number; class_name: string | null; location_name: string | null; class_id: string | null }[];
                  
                  const { error: insertTeacherSchedError } = await supabase
                     .from('teacher_schedules')

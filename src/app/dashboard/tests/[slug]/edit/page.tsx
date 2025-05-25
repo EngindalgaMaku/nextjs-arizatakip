@@ -131,7 +131,7 @@ export default function EditTestPage({ params }: EditTestPageProps) {
       }
     }
     fetchAndSetTestData();
-  }, [currentSlug, reset]);
+  }, [currentSlug, reset, setIsLoading, setSubmissionError, setTestData]);
   
   // Sorulardaki seçenek sayısı değiştiğinde veya bir seçenek silindiğinde correctOptionIdOrIndex'in geçerliliğini kontrol et
   useEffect(() => {

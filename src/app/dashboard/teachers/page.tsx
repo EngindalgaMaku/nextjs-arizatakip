@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { getIssues, Issue, IssueStatus } from '@/lib/supabase';
-import { UserIcon, DocumentTextIcon, CheckCircleIcon, ClockIcon, ExclamationTriangleIcon, ChartPieIcon, ChartBarIcon } from '@heroicons/react/24/outline';
-import Swal from 'sweetalert2';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { getIssues } from '@/lib/supabase';
+import { ArrowLeftIcon, ChartBarIcon, ChartPieIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon, UserIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import Swal from 'sweetalert2';
 
 interface TeacherStats {
   name: string;
@@ -80,7 +79,7 @@ export default function TeachersPage() {
         }
         
         // Son rapor tarihini güncelle (en yeni tarih olsun)
-        if (!teacherStats.lastReportDate || new Date(issue.created_at) > new Date(teacherStats.lastReportDate)) {
+        if (!teacherStats.lastReportDate || new Date(issue.created_at ?? '') > new Date(teacherStats.lastReportDate ?? '')) {
           teacherStats.lastReportDate = issue.created_at;
         }
       });
@@ -142,7 +141,7 @@ export default function TeachersPage() {
         comparison = a.resolvedIssues - b.resolvedIssues;
       } else if (selectedSortBy === 'lastReportDate') {
         comparison = a.lastReportDate && b.lastReportDate 
-          ? new Date(a.lastReportDate).getTime() - new Date(b.lastReportDate).getTime()
+          ? new Date(a.lastReportDate ?? '').getTime() - new Date(b.lastReportDate ?? '').getTime()
           : 0;
       }
       

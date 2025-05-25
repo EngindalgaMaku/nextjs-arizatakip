@@ -20,8 +20,8 @@ interface ReceiptData {
   month: number;
   year: number;
   file_path: string;
-  file_name_original?: string;
-  notes?: string;
+  file_name_original: string | null;
+  notes: string | null;
 }
 
 /**
@@ -92,7 +92,7 @@ export async function uploadReceipt(
       year,
       file_path: filePath,
       file_name_original: file.name,
-      notes,
+      notes: notes || null,
     };
 
     const { data: newReceipt, error: dbError } = await supabase
@@ -168,8 +168,8 @@ export async function updateReceipt(
       staj_isletmesi_id: stajIsletmesiId,
       month,
       year,
-      notes,
-      file_name_original: file ? file.name : undefined,
+      notes: notes || null,
+      file_name_original: file ? file.name : null,
     };
 
     // 3. Eğer yeni bir dosya yüklendiyse, eskisini sil ve yenisini yükle
@@ -272,8 +272,8 @@ export async function deleteReceiptAndFile(receiptId: string, filePath: string):
 
     return { success: true };
 
-  } catch (error: any) {
-    console.error('deleteReceiptAndFile içinde beklenmedik hata:', error);
-    return { success: false, error: `Beklenmedik bir hata oluştu: ${error.message}` };
+  } catch (error: unknown) {
+    console.error('Unexpected error in deleteReceiptAndFile:', error);
+    return { success: false, error: `Beklenmedik bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}` };
   }
 } 

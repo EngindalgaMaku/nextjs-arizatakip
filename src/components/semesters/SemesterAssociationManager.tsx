@@ -25,6 +25,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
 import { toast } from 'react-toastify';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useFieldArray } from 'react-hook-form';
 
 type EntityType = 'teachers' | 'classes' | 'locations';
 
@@ -58,7 +61,7 @@ export function SemesterAssociationManager({ semesterId, type, semesterName }: S
   useEffect(() => {
     // Apply default branch selection for both locations and teachers tabs
     if ((type === 'locations' || type === 'teachers') && branches.length > 0 && selectedBranchId === 'all') {
-      const bilisimBranch = branches.find((branch: any) => 
+      const bilisimBranch = branches.find((branch) => 
         branch.name.toLowerCase().includes('bilişim') || 
         branch.name.toLowerCase().includes('bilisim')
       );
@@ -67,8 +70,7 @@ export function SemesterAssociationManager({ semesterId, type, semesterName }: S
         setSelectedBranchId(bilisimBranch.id);
       }
     }
-    // Only re-run if branches, type changes, or if selectedBranchId was reset to 'all'
-  }, [branches, type, selectedBranchId]);
+  }, [branches, type, selectedBranchId, setSelectedBranchId]);
   
   // Fetch the appropriate data based on the entity type
   const { data: entityData = [], isLoading } = useQuery<BaseEntity[], Error>({
@@ -100,10 +102,10 @@ export function SemesterAssociationManager({ semesterId, type, semesterName }: S
   // Initialize selected IDs based on already associated entities
   useEffect(() => {
     if (associatedEntities.length > 0) {
-      const associatedIds = new Set(associatedEntities.map((entity: any) => entity.id));
+      const associatedIds = new Set(associatedEntities.map((entity) => entity.id));
       setSelectedIds(associatedIds);
     }
-  }, [associatedEntities]);
+  }, [associatedEntities, setSelectedIds]);
 
   // Filter entities based on search term and selected branch
   const filteredEntities = entityData.filter((entity: any) => {
@@ -205,6 +207,25 @@ export function SemesterAssociationManager({ semesterId, type, semesterName }: S
     const branch = branches.find((b: any) => b.id === branchId);
     return branch ? branch.name : 'Bilinmeyen Branş';
   };
+
+  const {
+    control,
+    handleSubmit,
+    register,
+    formState: { errors, isDirty },
+    reset,
+    setValue,
+    watch,
+    trigger,
+  } = useForm<TestFormValues>({
+    resolver: zodResolver(testSchema),
+    defaultValues
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'questions',
+  });
 
   return (
     <Card>

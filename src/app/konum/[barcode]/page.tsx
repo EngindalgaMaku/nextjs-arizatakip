@@ -1,8 +1,7 @@
-import { supabase } from '@/lib/supabase'; // Server-side client
-import { notFound } from 'next/navigation';
-import React from 'react';
-import { ScheduleEntry, ScheduleEntrySchema } from '@/types/schedules';
 import LocationSchedule from '@/components/schedules/LocationSchedule';
+import { supabase } from '@/lib/supabase'; // Server-side client
+import { ScheduleEntry, ScheduleEntrySchema } from '@/types/schedules';
+import { notFound } from 'next/navigation';
 import { z } from 'zod'; // Import Zod for validation
 
 // Next.js App Router sayfası için doğru props tipi
@@ -43,20 +42,35 @@ async function getLocationByBarcode(barcodeValue: string): Promise<(LocationData
     return null;
   }
   
-  // No need for assertion here anymore, return type handles it
-  return data; 
+  // Convert properties to the expected format if it exists
+  const convertedData = {
+    ...data,
+    properties: data.properties ? Object.entries(data.properties).map(([key, value]) => ({
+      key,
+      value
+    })) : null
+  };
+  
+  return convertedData;
 }
 
 // Update server-side fetch for schedule entries
 async function getScheduleEntriesByLab(labId: string): Promise<ScheduleEntry[]> {
   const { data, error } = await supabase
     .from('schedule_entries')
-    // Select required fields and joined names
     .select(`
-      *,
-      lessons ( name ),
-      classes ( name ),
-      teachers ( name )
+      id,
+      lab_id,
+      day,
+      period,
+      lesson_id,
+      class_id,
+      teacher_id,
+      created_at,
+      updated_at,
+      dal_dersleri!lesson_id(ders_adi),
+      classes!class_id(name),
+      teachers!teacher_id(name)
     `)
     .eq('lab_id', labId)
     .order('day', { ascending: true })
@@ -79,9 +93,9 @@ async function getScheduleEntriesByLab(labId: string): Promise<ScheduleEntry[]> 
     created_at: entry.created_at,
     updated_at: entry.updated_at,
     // Extract nested names or null
-    lesson_name: entry.lessons ? entry.lessons.name : null,
-    class_name: entry.classes ? entry.classes.name : null,
-    teacher_name: entry.teachers ? entry.teachers.name : null,
+    lesson_name: entry.dal_dersleri?.ders_adi ?? null,
+    class_name: entry.classes?.name ?? null,
+    teacher_name: entry.teachers?.name ?? null,
   })) || [];
 
   // Validate fetched data (optional but recommended)

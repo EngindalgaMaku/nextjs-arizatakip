@@ -4,18 +4,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { LessonScheduleData, ScheduledEntry } from '@/types/scheduling';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-
-// Define the expected input structure for the action
-const SaveScheduleInputSchema = z.object({
-    schedule_data: z.array(z.tuple([z.string(), z.any()])), // Assuming ScheduledEntry is complex, use z.any() for now or import/define its schema
-    unassigned_lessons: z.array(z.any()), // Assuming LessonScheduleData is complex, use z.any() or import/define its schema
-    fitnessScore: z.number(),
-    workloadVariance: z.number(),
-    totalGaps: z.number(),
-    logs: z.array(z.string()).nullable().optional(),
-    name: z.string().nullable().optional(),
-    description: z.string().nullable().optional(),
-});
+import { supabase } from '@/lib/supabase';
+import { SavedSchedule } from '@/types/savedSchedule';
 
 interface SaveScheduleInput {
     schedule_data: [string, ScheduledEntry][];
@@ -30,9 +20,6 @@ interface SaveScheduleInput {
 
 export async function saveScheduleAction(input: SaveScheduleInput): Promise<void> {
     console.log("saveScheduleAction called with input:", { ...input, logs: input.logs ? `${input.logs.length} lines` : 'null', schedule_data: '...', unassigned_lessons: '...' }); // Log input briefly
-
-    // Validate input if necessary (Zod schema can be used here)
-    // const validatedInput = SaveScheduleInputSchema.parse(input);
 
     const supabase = await createSupabaseServerClient(); // Get Supabase client for server actions
 
@@ -73,6 +60,22 @@ export async function saveScheduleAction(input: SaveScheduleInput): Promise<void
              throw new Error("An unknown error occurred while saving the schedule.");
         }
     }
+}
+
+export async function saveSchedule(schedule: SavedSchedule) {
+  try {
+    const { data, error } = await supabase
+      .from('saved_schedules')
+      .insert([schedule])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error saving schedule:', error);
+    return { success: false, error: 'Failed to save schedule' };
+  }
 }
 
 // --- NEW ACTION: Fetch Saved Schedules List --- 

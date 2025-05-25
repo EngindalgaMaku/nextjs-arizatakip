@@ -2,8 +2,9 @@
 
 import { supabase } from '@/lib/supabase';
 import { DalDers, DalDersFormSchema, DalDersFormValues, SinifSeviyesi } from '@/types/dalDersleri';
-import { z } from 'zod'; // Assuming zod might be needed or remove if not
+import { z } from 'zod';
 import { setDalDersLocationTypes } from '@/actions/locationTypeActions';
+
 /**
  * Fetch all lessons for a specific branch (dal).
  */
@@ -47,7 +48,7 @@ export async function createDalDers(
   dalId: string,
   payload: DalDersFormValues,
   suitableLocationTypeIds: string[] = []
-): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string }> {
+): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string | undefined }> {
   const parse = DalDersFormSchema.safeParse(payload);
   if (!parse.success) {
     return { success: false, error: parse.error.issues };
@@ -106,7 +107,11 @@ export async function createDalDers(
         updatedAt: createdDersRecord.updated_at,
     };
     
-    return { success: true, ders: createdDers, partialError };
+    return { 
+      success: true, 
+      ders: createdDers, 
+      partialError 
+    };
   } catch (err) {
     console.error('createDalDers error:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -120,7 +125,7 @@ export async function updateDalDers(
   dersId: string,
   payload: DalDersFormValues,
   suitableLocationTypeIds: string[]
-): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string }> {
+): Promise<{ success: boolean; ders?: DalDers; error?: string | z.ZodIssue[]; partialError?: string | undefined }> {
   const parse = DalDersFormSchema.safeParse(payload);
   if (!parse.success) {
     return { success: false, error: parse.error.issues };
@@ -201,7 +206,7 @@ export async function updateDalDers(
  */
 export async function deleteDalDers(dersId: string): Promise<{ success: boolean; error?: string }> {
    try {
-     const { data: existingData, error: fetchError } = await supabase
+     const { error: fetchError } = await supabase
       .from('dal_dersleri')
       .select('dal_id')
       .eq('id', dersId)

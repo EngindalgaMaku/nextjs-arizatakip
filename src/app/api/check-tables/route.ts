@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { NextResponse } from 'next/server';
 
 // Tablo bilgisi için tip tanımı
 interface TableInfo {
@@ -20,7 +20,7 @@ export async function GET() {
       try {
         // Tablodan bir satır almaya çalışalım (limit 1)
         const { data, error } = await supabase
-          .from(table)
+          .from(table as any)
           .select('*')
           .limit(1);
 

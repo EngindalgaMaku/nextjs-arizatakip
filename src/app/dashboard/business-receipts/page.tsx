@@ -48,6 +48,65 @@ interface AdminBusinessReceiptsContentProps {
   initialError?: string | null;
 }
 
+interface StudentByClass {
+  className: string;
+  students: string[];
+}
+
+interface StudentsByClassModalProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  studentsByClass: StudentByClass[];
+  isLoading?: boolean;
+}
+
+const StudentsByClassModal: React.FC<StudentsByClassModalProps> = ({ isOpen, onOpenChange, studentsByClass, isLoading }) => {
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Sınıfa Göre Dekont Gönderen Öğrenciler</DialogTitle>
+          <DialogDescription>
+            Bu dönem dekont gönderen öğrencilerin sınıflara göre listesi.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Öğrenci listesi yükleniyor...</p>
+            </div>
+          ) : studentsByClass.length === 0 ? (
+            <p>Filtre kriterlerine uygun dekont gönderen öğrenci bulunmamaktadır.</p>
+          ) : (
+            studentsByClass.map((classData) => (
+              <div key={classData.className} className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">{classData.className}</h3>
+                {classData.students.length > 0 ? (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {classData.students.map((studentName, index) => (
+                      <li key={index}>{studentName}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Bu sınıftan dekont gönderen öğrenci yok.</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">Kapat</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 interface EditReceiptModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -81,7 +140,7 @@ const EditReceiptModal: React.FC<EditReceiptModalProps> = ({ isOpen, onOpenChang
       setBusinessName("");
       setError(null);
     }
-  }, [receiptData]);
+  }, [receiptData, setMonth, setYear, setNotes, setBusinessName, setError]);
 
   const handleSubmit = async () => {
     if (!receiptData) return;
@@ -225,6 +284,9 @@ function AdminBusinessReceiptsContent() {
     const [totalCount, setTotalCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isStudentsByClassModalOpen, setIsStudentsByClassModalOpen] = useState(false);
+    const [studentsByClassData, setStudentsByClassData] = useState<StudentByClass[]>([]);
+    const [isModalDataLoading, setIsModalDataLoading] = useState(false);
     
     const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
     const [filters, setFilters] = useState<FiltersState>(() => {
@@ -250,34 +312,75 @@ function AdminBusinessReceiptsContent() {
         },
     });
 
-    const fetchAdminReceipts = useCallback(async (page: number, currentFilters: FiltersState) => {
+    const openEditModal = (receipt: AdminReceiptListItem) => {
+        setCurrentReceiptToEdit(receipt);
+        setIsEditModalOpen(true);
+    };
+    
+    const processStudentsByClass = useCallback((currentReceipts: AdminReceiptListItem[] | null | undefined) => {
+        if (!currentReceipts || currentReceipts.length === 0) {
+            setStudentsByClassData([]);
+            return;
+        }
+        const byClass: { [key: string]: Set<string> } = {};
+        currentReceipts.forEach(receipt => {
+            if (receipt.student_name && receipt.student_class_name) {
+                if (!byClass[receipt.student_class_name]) {
+                    byClass[receipt.student_class_name] = new Set();
+                }
+                byClass[receipt.student_class_name].add(receipt.student_name);
+            }
+        });
+
+        const processedData: StudentByClass[] = Object.entries(byClass)
+            .map(([className, studentSet]) => ({
+                className,
+                students: Array.from(studentSet).sort(),
+            }))
+            .sort((a, b) => a.className.localeCompare(b.className));
+        
+        setStudentsByClassData(processedData);
+    }, []);
+
+    const getApiFilters = (currentFilters: FiltersState, forAll: boolean = false): AdminReceiptFilter => {
+        const apiFilters: AdminReceiptFilter = {
+            studentName: currentFilters.studentName || undefined,
+            schoolNumber: currentFilters.schoolNumber || undefined,
+            className: currentFilters.className || undefined,
+            businessName: currentFilters.businessName || undefined,
+            month: currentFilters.month && currentFilters.month !== 'all' ? parseInt(currentFilters.month) : undefined,
+            year: currentFilters.year && currentFilters.year !== 'all' ? parseInt(currentFilters.year) : undefined,
+        };
+        if (forAll) {
+            apiFilters.fetchAll = true;
+        } else {
+            apiFilters.page = currentPage;
+            apiFilters.pageSize = ITEMS_PER_PAGE;
+        }
+        Object.keys(apiFilters).forEach(key => (apiFilters as any)[key] === undefined && delete (apiFilters as any)[key]);
+        return apiFilters;
+    };
+
+    const fetchAdminReceipts = useCallback(async (pageToFetch: number, currentFilters: FiltersState) => {
         setIsLoading(true);
         setError(null);
         try {
-            const apiFilters: any = { // Using any temporarily for flexibility, will match AdminReceiptFilter
-                studentName: currentFilters.studentName || undefined,
-                schoolNumber: currentFilters.schoolNumber || undefined,
-                className: currentFilters.className || undefined,
-                businessName: currentFilters.businessName || undefined,
-                month: currentFilters.month && currentFilters.month !== 'all' ? parseInt(currentFilters.month) : undefined,
-                year: currentFilters.year && currentFilters.year !== 'all' ? parseInt(currentFilters.year) : undefined,
-                page,
-                pageSize: ITEMS_PER_PAGE,
-            };
-            // Remove undefined keys to avoid sending them if not set
-            Object.keys(apiFilters).forEach(key => apiFilters[key] === undefined && delete apiFilters[key]);
+            const apiParams = getApiFilters(currentFilters);
+            apiParams.page = pageToFetch;
+            const result = await getReceiptsForAdmin(apiParams);
 
-            const result = await getReceiptsForAdmin(apiFilters as AdminReceiptFilter);
-            if (result.error || !result.data) {
-                setError(result.error || 'Dekontlar alınamadı.');
+            if (result.error) {
+                setError(result.error);
                 setReceipts([]);
                 setTotalCount(0);
             } else {
-                setReceipts(result.data);
+                setReceipts(result.data || []);
                 setTotalCount(result.count || 0);
+                setError(null);
             }
-        } catch (e) {
-            setError('Dekontlar yüklenirken bir hata oluştu.');
+        } catch (e: any) {
+            console.error("Failed to fetch admin receipts:", e);
+            setError("Dekontlar alınırken beklenmedik bir hata oluştu.");
             setReceipts([]);
             setTotalCount(0);
         } finally {
@@ -348,170 +451,218 @@ function AdminBusinessReceiptsContent() {
     const currentYear = new Date().getFullYear();
     const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-    const [isDownloading, setIsDownloading] = useState<Record<string, boolean>>({});
-
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingReceipt, setEditingReceipt] = useState<AdminReceiptListItem | null>(null);
+    const [currentReceiptToEdit, setCurrentReceiptToEdit] = useState<AdminReceiptListItem | null>(null);
+
+    const handleShowStudentsByClass = async () => {
+        setIsStudentsByClassModalOpen(true);
+        setIsModalDataLoading(true);
+        setStudentsByClassData([]);
+        setError(null);
+
+        try {
+            const apiParams = getApiFilters(filters, true);
+            const result = await getReceiptsForAdmin(apiParams);
+            if (result.error) {
+                setError(result.error);
+                toast.error(`Öğrenci listesi alınamadı: ${result.error}`);
+                processStudentsByClass(null);
+            } else {
+                processStudentsByClass(result.data);
+            }
+        } catch (e: any) {
+            console.error("Failed to fetch all students for modal:", e);
+            setError("Öğrenci listesi alınırken beklenmedik bir hata oluştu.");
+            toast.error("Öğrenci listesi alınırken beklenmedik bir hata oluştu.");
+            processStudentsByClass(null);
+        } finally {
+            setIsModalDataLoading(false);
+        }
+    };
 
     return (
-        <div className="container mx-auto p-4 md:p-6">
-            <h1 className="text-3xl font-bold mb-6">İşletme Dekontları Yönetimi</h1>
-
-            <Card className="mb-6">
-                <CardHeader>
-                    <CardTitle className="flex items-center">
-                        <FunnelIcon className="h-6 w-6 mr-2" /> Filtrele
-                    </CardTitle>
+        <div className="container mx-auto py-2 sm:py-4 md:py-6 lg:py-8">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-2xl font-bold">İşletme Dekontları (Yönetici)</CardTitle>
+                    <Button 
+                        onClick={handleShowStudentsByClass} 
+                        variant="outline"
+                        disabled={isModalDataLoading}
+                    >
+                        {isModalDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Sınıfa Göre Öğrencileri Göster
+                    </Button>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Input placeholder="Öğrenci Adı" name="studentName" value={filters.studentName || ''} onChange={handleFilterInputChange} />
-                    <Input placeholder="Okul Numarası" name="schoolNumber" value={filters.schoolNumber || ''} onChange={handleFilterInputChange} />
-                    <Input placeholder="Sınıf Adı (örn: 12A)" name="className" value={filters.className || ''} onChange={handleFilterInputChange} />
-                    <Input placeholder="İşletme Adı" name="businessName" value={filters.businessName || ''} onChange={handleFilterInputChange} />
-                    <Select name="month" value={filters.month || undefined} onValueChange={(value) => handleFilterSelectChange('month', value)}>
-                        <SelectTrigger><SelectValue placeholder="Ay Seçin" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tüm Aylar</SelectItem>
-                            {Object.entries(monthNames).map(([num, name]) => <SelectItem key={num} value={num}>{name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Select name="year" value={filters.year || undefined} onValueChange={(value) => handleFilterSelectChange('year', value)}>
-                        <SelectTrigger><SelectValue placeholder="Yıl Seçin" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tüm Yıllar</SelectItem>
-                            {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <div className="flex space-x-2 md:col-span-2 lg:col-span-1 lg:justify-self-end">
-                        <Button onClick={applyFilters} className="w-full sm:w-auto">Filtrele</Button>
-                        <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto flex items-center">
-                            <XCircleIcon className="h-5 w-5 mr-1"/> Temizle
-                        </Button>
-                    </div>
+                <CardContent>
+                    {error && (
+                        <div className="flex items-center justify-center">
+                            <Alert variant="destructive">
+                                <AlertTitle>Hata!</AlertTitle>
+                                <AlertDescription>
+                                    <p className="text-sm text-red-600 dark:text-red-500">{error}</p>
+                                </AlertDescription>
+                            </Alert>
+                        </div>
+                    )}
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle className="flex items-center">
+                                <FunnelIcon className="h-6 w-6 mr-2" /> Filtrele
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <Input placeholder="Öğrenci Adı" name="studentName" value={filters.studentName || ''} onChange={handleFilterInputChange} />
+                            <Input placeholder="Okul Numarası" name="schoolNumber" value={filters.schoolNumber || ''} onChange={handleFilterInputChange} />
+                            <Input placeholder="Sınıf Adı (örn: 12A)" name="className" value={filters.className || ''} onChange={handleFilterInputChange} />
+                            <Input placeholder="İşletme Adı" name="businessName" value={filters.businessName || ''} onChange={handleFilterInputChange} />
+                            <Select name="month" value={filters.month || undefined} onValueChange={(value) => handleFilterSelectChange('month', value)}>
+                                <SelectTrigger><SelectValue placeholder="Ay Seçin" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tüm Aylar</SelectItem>
+                                    {Object.entries(monthNames).map(([num, name]) => <SelectItem key={num} value={num}>{name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select name="year" value={filters.year || undefined} onValueChange={(value) => handleFilterSelectChange('year', value)}>
+                                <SelectTrigger><SelectValue placeholder="Yıl Seçin" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tüm Yıllar</SelectItem>
+                                    {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <div className="flex space-x-2 md:col-span-2 lg:col-span-1 lg:justify-self-end">
+                                <Button onClick={applyFilters} className="w-full sm:w-auto">Filtrele</Button>
+                                <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto flex items-center">
+                                    <XCircleIcon className="h-5 w-5 mr-1"/> Temizle
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {isLoading && <p className="text-center py-4">Dekontlar yükleniyor...</p>}
+
+                    {!isLoading && !error && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Dekont Listesi ({totalCount} kayıt)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Öğrenci</TableHead>
+                                            <TableHead>Okul No</TableHead>
+                                            <TableHead>Sınıf</TableHead>
+                                            <TableHead>İşletme</TableHead>
+                                            <TableHead>Dönem</TableHead>
+                                            <TableHead>Yüklenme</TableHead>
+                                            <TableHead>Not</TableHead>
+                                            <TableHead className="text-right">İşlemler</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {receipts.length > 0 ? receipts.map((r) => (
+                                            <TableRow key={r.receipt_id}>
+                                                <TableCell>{r.student_name || '-'}</TableCell>
+                                                <TableCell>{r.student_school_number || '-'}</TableCell>
+                                                <TableCell>{r.student_class_name || '-'}</TableCell>
+                                                <TableCell>{r.business_name || '-'}</TableCell>
+                                                <TableCell>{monthNames[r.receipt_month]} {r.receipt_year}</TableCell>
+                                                <TableCell>{r.receipt_uploaded_at}</TableCell>
+                                                <TableCell className="max-w-[150px] truncate" title={r.receipt_notes || undefined}>{r.receipt_notes || '-'}</TableCell>
+                                                <TableCell className="text-right space-x-2">
+                                                    <Button variant="outline" size="sm" onClick={() => handleDownload(r.receipt_file_path, r.receipt_file_name_original)} title="İndir">
+                                                        <ArrowDownTrayIcon className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-8 w-8 p-0"
+                                                        onClick={() => openEditModal(r)}
+                                                        aria-label={`Dekont düzenle ${r.receipt_id}`}
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button 
+                                                        variant="destructive" 
+                                                        size="sm" 
+                                                        onClick={() => handleDeleteReceipt(r.receipt_id, r.receipt_file_path)}
+                                                        title="Sil" 
+                                                        disabled={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.receipt_id}
+                                                    >
+                                                        {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.receipt_id 
+                                                            ? <span className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent rounded-full" role="status" aria-label="loading"></span> 
+                                                            : <TrashIcon className="h-4 w-4" />}
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={8} className="text-center">Filtre kriterlerine uygun dekont bulunamadı.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {totalPages > 1 && (
+                        <Pagination className="mt-6">
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationPrevious 
+                                        href="#" 
+                                        onClick={(e) => { 
+                                            e.preventDefault(); 
+                                            if(currentPage > 1) handlePageChange(currentPage - 1);
+                                        }}
+                                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                                    />
+                                </PaginationItem>
+                                {[...Array(totalPages)].map((_, i) => (
+                                    <PaginationItem key={i}>
+                                        <PaginationLink 
+                                            href="#" 
+                                            onClick={(e) => { 
+                                                e.preventDefault(); 
+                                                handlePageChange(i + 1); 
+                                            }} 
+                                            isActive={currentPage === i + 1}
+                                        >
+                                            {i + 1}
+                                        </PaginationLink>
+                                    </PaginationItem>
+                                ))}
+                                <PaginationItem>
+                                    <PaginationNext 
+                                        href="#" 
+                                        onClick={(e) => { 
+                                            e.preventDefault(); 
+                                            if(currentPage < totalPages) handlePageChange(currentPage + 1);
+                                        }}
+                                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
+                    )}
                 </CardContent>
             </Card>
-
-            {isLoading && <p className="text-center py-4">Dekontlar yükleniyor...</p>}
-            {error && <Alert variant="destructive" className="mb-4"><AlertTitle>Hata!</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-
-            {!isLoading && !error && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Dekont Listesi ({totalCount} kayıt)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Öğrenci</TableHead>
-                                    <TableHead>Okul No</TableHead>
-                                    <TableHead>Sınıf</TableHead>
-                                    <TableHead>İşletme</TableHead>
-                                    <TableHead>Dönem</TableHead>
-                                    <TableHead>Yüklenme</TableHead>
-                                    <TableHead>Not</TableHead>
-                                    <TableHead className="text-right">İşlemler</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {receipts.length > 0 ? receipts.map((r) => (
-                                    <TableRow key={r.receipt_id}>
-                                        <TableCell>{r.student_name || '-'}</TableCell>
-                                        <TableCell>{r.student_school_number || '-'}</TableCell>
-                                        <TableCell>{r.student_class_name || '-'}</TableCell>
-                                        <TableCell>{r.business_name || '-'}</TableCell>
-                                        <TableCell>{monthNames[r.receipt_month]} {r.receipt_year}</TableCell>
-                                        <TableCell>{r.receipt_uploaded_at}</TableCell>
-                                        <TableCell className="max-w-[150px] truncate" title={r.receipt_notes || undefined}>{r.receipt_notes || '-'}</TableCell>
-                                        <TableCell className="text-right space-x-2">
-                                            <Button variant="outline" size="sm" onClick={() => handleDownload(r.receipt_file_path, r.receipt_file_name_original)} title="İndir">
-                                                <ArrowDownTrayIcon className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-8 w-8 p-0"
-                                                onClick={() => {
-                                                    setEditingReceipt(r);
-                                                    setIsEditModalOpen(true);
-                                                }}
-                                                aria-label={`Dekont düzenle ${r.receipt_id}`}
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button 
-                                                variant="destructive" 
-                                                size="sm" 
-                                                onClick={() => handleDeleteReceipt(r.receipt_id, r.receipt_file_path)}
-                                                title="Sil" 
-                                                disabled={deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.receipt_id}
-                                            >
-                                                {deleteReceiptMutation.isPending && deleteReceiptMutation.variables?.receiptId === r.receipt_id 
-                                                    ? <span className="animate-spin inline-block w-4 h-4 border-[2px] border-current border-t-transparent rounded-full" role="status" aria-label="loading"></span> 
-                                                    : <TrashIcon className="h-4 w-4" />}
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : (
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="text-center">Filtre kriterlerine uygun dekont bulunamadı.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            )}
-
-            {totalPages > 1 && (
-                <Pagination className="mt-6">
-                    <PaginationContent>
-                        <PaginationItem>
-                            <PaginationPrevious 
-                                href="#" 
-                                onClick={(e) => { 
-                                    e.preventDefault(); 
-                                    if(currentPage > 1) handlePageChange(currentPage - 1);
-                                }}
-                                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-                            />
-                        </PaginationItem>
-                        {[...Array(totalPages)].map((_, i) => (
-                            <PaginationItem key={i}>
-                                <PaginationLink 
-                                    href="#" 
-                                    onClick={(e) => { 
-                                        e.preventDefault(); 
-                                        handlePageChange(i + 1); 
-                                    }} 
-                                    isActive={currentPage === i + 1}
-                                >
-                                    {i + 1}
-                                </PaginationLink>
-                            </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                            <PaginationNext 
-                                href="#" 
-                                onClick={(e) => { 
-                                    e.preventDefault(); 
-                                    if(currentPage < totalPages) handlePageChange(currentPage + 1);
-                                }}
-                                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-                            />
-                        </PaginationItem>
-                    </PaginationContent>
-                </Pagination>
-            )}
 
             <EditReceiptModal
                 isOpen={isEditModalOpen}
                 onOpenChange={setIsEditModalOpen}
-                receiptData={editingReceipt}
+                receiptData={currentReceiptToEdit}
                 onReceiptUpdate={() => {
-                    queryClient.invalidateQueries({ queryKey: ['adminReceipts', currentPage, filters] });
-                    fetchAdminReceipts(currentPage, filters);
+                    fetchAdminReceipts(currentPage, filters); 
                 }}
+            />
+            <StudentsByClassModal
+                isOpen={isStudentsByClassModalOpen}
+                onOpenChange={setIsStudentsByClassModalOpen}
+                studentsByClass={studentsByClassData}
+                isLoading={isModalDataLoading}
             />
         </div>
     );

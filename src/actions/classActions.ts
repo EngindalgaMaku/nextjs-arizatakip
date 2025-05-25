@@ -5,9 +5,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Class, ClassFormSchema, ClassFormValues, ClassSchema } from '@/types/classes';
 import { z } from 'zod';
 
-// Define table name and revalidation path
+// Define table name
 const CLASSES_TABLE = 'classes';
-const CLASSES_PATH = '/dashboard/classes'; // Revalidate this path after CUD operations
 
 /**
  * Fetches all classes, optionally filtered by semesterId.
@@ -25,7 +24,7 @@ export async function fetchClasses(semesterId?: string): Promise<Class[]> {
         query = query.eq('semester_id', semesterId);
     }
 
-    // Default ordering
+    // Default ordering - önce sınıf seviyesine göre, sonra isme göre sırala
     query = query.order('grade_level', { ascending: true }).order('name', { ascending: true });
 
     const { data, error } = await query;
@@ -127,8 +126,11 @@ export async function createClass(
         if (fetchError) {
             console.warn('Could not fetch existing classes to determine display_order:', fetchError.message);
             // Proceed with default 0 or handle error more strictly if required
-        } else if (existingClasses && existingClasses.length > 0 && existingClasses[0].display_order !== null) {
-            newDisplayOrder = existingClasses[0].display_order + 1;
+        } else if (existingClasses && existingClasses.length > 0) {
+            const firstClass = existingClasses[0];
+            if (firstClass && firstClass.display_order !== null) {
+                newDisplayOrder = firstClass.display_order + 1;
+            }
         } else {
             // No classes yet for this semester or display_order is null, start from 0 or 1
             newDisplayOrder = 0; // Or 1, depending on preference

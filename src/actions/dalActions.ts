@@ -2,10 +2,6 @@
 
 import { supabase } from '@/lib/supabase';
 import { Dal, DalFormSchema, DalFormValues } from '@/types/dallar';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { z } from 'zod';
-
-const DALLAR_PATH = '/dashboard/dallar'; // Path for revalidation
 
 /**
  * Fetch all branches.
@@ -189,4 +185,4 @@ export async function fetchDallarByBranch(branchId: string): Promise<Dal[]> {
     throw new Error('Dallar getirilirken bir hata oluştu.');
   }
   return data as Dal[];
-}
+} 

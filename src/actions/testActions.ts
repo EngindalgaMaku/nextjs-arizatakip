@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/supabase'; // Supabase tarafından generate edilen tipler
 import { Test, TestOption, TestQuestion } from '@/types/tests'; // Bu Test tipi hala UI için kullanılabilir, ancak DB tipleri ayrı olacak
 

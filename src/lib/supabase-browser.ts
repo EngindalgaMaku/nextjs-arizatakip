@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase'; // Adjusted path assuming @/ resolves to admin/src/
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gcxbfmqyvqchcrudxpmh.supabase.co";
@@ -8,7 +9,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOi
 export const DEMO_MODE = false;
 
 // Create Supabase client specifically for browser use
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const supabase: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true, // default is true
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,

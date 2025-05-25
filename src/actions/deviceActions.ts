@@ -1,10 +1,7 @@
 'use server';
 
 import { supabase } from '@/lib/supabase';
-import { Device, DeviceFormData, DeviceSchema } from '@/types/devices';
-import { Location } from '@/types/locations'; // Import Location type for relationship typing
-import { z } from 'zod'; // Keep Zod import for validation logic
-import { Issue } from '@/types/devices';
+import { Device, DeviceFormData, DeviceSchema, Issue } from '@/types/devices';
 
 // Define a type for the fetched data including location name
 // Note: Supabase returns related data nested. Adjust if your client setup differs.
@@ -94,24 +91,28 @@ export async function createDevice(formData: DeviceFormData): Promise<{ success:
     notes
   } = validation.data;
 
+  // properties içinden department'ı bul
+  const department = Array.isArray(properties)
+    ? properties.find((p) => p.key === 'department')?.value || ''
+    : '';
+
   try {
     // Insert the new device data (without barcode_value initially)
     const { data: newDeviceData, error: insertError } = await supabase
       .from('devices')
       .insert({
-        name,
-        type: type || null,
+        name: name || '',
+        type: type || '',
         location_id: location_id || null,
-        serial_number: serial_number || null,
+        serial_number: serial_number || '',
         properties: properties || null,
         purchase_date: purchase_date || null,
         warranty_expiry_date: warranty_expiry_date || null,
-        status: status || null,
-        notes: notes || null,
-        // barcode_value will be updated next
-        // sort_order is removed
+        status: status || '',
+        notes: notes || '',
+        department
       })
-      .select() // Select the newly created row
+      .select()
       .single();
 
     if (insertError || !newDeviceData) {
@@ -172,22 +173,26 @@ export async function updateDevice(id: string, formData: DeviceFormData): Promis
         notes
       } = validation.data;
 
+    // properties içinden department'ı bul
+    const department = Array.isArray(properties)
+      ? properties.find((p) => p.key === 'department')?.value || ''
+      : '';
+
     try {
         const { data: updatedDeviceData, error: updateError } = await supabase
             .from('devices')
             .update({
-                name,
-                type: type || null,
+                name: name || '',
+                type: type || '',
                 location_id: location_id || null,
-                serial_number: serial_number || null,
+                serial_number: serial_number || '',
                 properties: properties || null,
                 purchase_date: purchase_date || null,
                 warranty_expiry_date: warranty_expiry_date || null,
-                status: status || null,
-                notes: notes || null,
-                // barcode_value is set on creation and shouldn't be updated here
-                // sort_order is removed
-                updated_at: new Date().toISOString(), // Manually update timestamp
+                status: status || '',
+                notes: notes || '',
+                department,
+                updated_at: new Date().toISOString(),
             })
             .eq('id', id)
             .select()
@@ -353,13 +358,15 @@ async function initializeDeviceSortOrder(): Promise<void> {
 
         // Update each device with a new sort_order
         for (let i = 0; i < devices.length; i++) {
+            const device = devices[i];
+            if (!device) continue;
             const { error: updateError } = await supabase
                 .from('devices')
                 .update({ sort_order: i + 1 }) // Start from 1
-                .eq('id', devices[i].id);
+                .eq('id', device.id);
 
             if (updateError) {
-                console.error(`Error initializing sort_order for device ${devices[i].id}:`, updateError);
+                console.error(`Error initializing sort_order for device ${device.id}:`, updateError);
                 // Continue with other devices
             }
         }
@@ -381,12 +388,15 @@ export async function addIssueToDevice(deviceId: string, issue: Issue): Promise<
     console.error('Error fetching device issues:', fetchError);
     return { success: false, error: fetchError.message };
   }
-  const currentIssues: Issue[] = deviceData?.issues || [];
+  let currentIssues: Issue[] = [];
+  if (Array.isArray(deviceData?.issues)) {
+    currentIssues = deviceData.issues as unknown as Issue[];
+  }
   const updatedIssues = [...currentIssues, issue];
   // Update with new issues array
   const { data: updatedDevice, error: updateError } = await supabase
     .from('devices')
-    .update({ issues: updatedIssues })
+    .update({ issues: updatedIssues.map(issue => ({ ...issue })) })
     .eq('id', deviceId)
     .single();
   if (updateError) {
@@ -417,20 +427,33 @@ export async function updateIssueInDevice(
     console.error('Error fetching device issues:', fetchError);
     return { success: false, error: fetchError.message };
   }
-  const currentIssues: Issue[] = deviceData?.issues || [];
+  let currentIssues: Issue[] = [];
+  if (Array.isArray(deviceData?.issues)) {
+    currentIssues = deviceData.issues as unknown as Issue[];
+  }
   if (issueIndex < 0 || issueIndex >= currentIssues.length) {
     return { success: false, error: 'Geçersiz arıza kaydı indeksi.' };
   }
   // Update evaluation
   const updatedIssues = [...currentIssues];
+  const prev = updatedIssues[issueIndex];
+  if (!prev) {
+    throw new Error("Güncellenmek istenen issue bulunamadı!");
+  }
+  if (!prev.reported_by || !prev.description || !prev.date) {
+    throw new Error("Issue güncellenirken zorunlu alanlar eksik!");
+  }
   updatedIssues[issueIndex] = {
-    ...updatedIssues[issueIndex],
+    ...prev,
     evaluation,
+    reported_by: prev.reported_by,
+    description: prev.description,
+    date: prev.date,
   };
   // Persist updated issues array
   const { data: updatedDevice, error: updateError } = await supabase
     .from('devices')
-    .update({ issues: updatedIssues })
+    .update({ issues: updatedIssues.map(issue => ({ ...issue })) })
     .eq('id', deviceId)
     .select()
     .single();
@@ -461,7 +484,10 @@ export async function deleteIssueFromDevice(
     console.error('Error fetching device issues:', fetchError);
     return { success: false, error: fetchError.message };
   }
-  const currentIssues: Issue[] = deviceData?.issues || [];
+  let currentIssues: Issue[] = [];
+  if (Array.isArray(deviceData?.issues)) {
+    currentIssues = deviceData.issues as unknown as Issue[];
+  }
   if (issueIndex < 0 || issueIndex >= currentIssues.length) {
     return { success: false, error: 'Geçersiz arıza kaydı indeksi.' };
   }
@@ -470,7 +496,7 @@ export async function deleteIssueFromDevice(
   // Persist updated issues array
   const { data: updatedDevice, error: updateError } = await supabase
     .from('devices')
-    .update({ issues: updatedIssues })
+    .update({ issues: updatedIssues.map(issue => ({ ...issue })) })
     .eq('id', deviceId)
     .select()
     .single();

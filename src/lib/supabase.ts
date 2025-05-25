@@ -1,5 +1,5 @@
 // Import the *browser* client instance
-import supabase from './supabase-browser'; 
+import supabase from './supabase-browser';
 // Re-export it for convenience if needed elsewhere, though direct import is preferred
 export { supabase };
 
@@ -759,5 +759,32 @@ export async function deleteFCMToken(userId: string, token?: string) {
   } catch (error) {
     console.error('Unexpected error in deleteFCMToken:', error);
     return { error };
+  }
+}
+
+export async function getStudent(id: string) {
+  return supabase.from('students').select('id, name, school_number, class_id').eq('id', id).single();
+}
+
+export async function getClassNameById(classId: string) {
+  if (!classId) return null;
+  const { data, error } = await supabase.from('classes').select('name').eq('id', classId).single();
+  if (error || !data) return null;
+  return data.name;
+}
+
+export async function getStudentBySchoolNumber(schoolNumber: string) {
+  try {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('schoolNumber', schoolNumber)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching student:', error);
+    return null;
   }
 } 

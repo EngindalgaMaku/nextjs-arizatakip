@@ -17,6 +17,7 @@ export interface AdminReceiptFilter {
   year?: number;
   page?: number;
   pageSize?: number;
+  fetchAll?: boolean;
 }
 
 export interface AdminReceiptListItem {
@@ -44,7 +45,7 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
   const { 
     studentName, className, schoolNumber, 
     businessName, month, year, 
-    page = 1, pageSize = 10 
+    page = 1, pageSize = 10, fetchAll = false
   } = filters;
 
   try {
@@ -76,8 +77,10 @@ export async function getReceiptsForAdmin(filters: AdminReceiptFilter): Promise<
       query = query.eq('receipt_month', month);
     }
 
-    const startIndex = (page - 1) * pageSize;
-    query = query.range(startIndex, startIndex + pageSize - 1);
+    if (!fetchAll) {
+      const startIndex = (page - 1) * pageSize;
+      query = query.range(startIndex, startIndex + pageSize - 1);
+    }
     
     // Sorting using the view's column names - THIS SHOULD NOW WORK RELIABLY
     query = query.order('student_name', { ascending: true, nullsFirst: false }); // student_name from view

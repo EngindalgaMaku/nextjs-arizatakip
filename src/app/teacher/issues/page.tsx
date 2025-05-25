@@ -54,7 +54,7 @@ const formatDate = (date: Date | string | null): string => {
 };
 
 interface IssueData extends Omit<Issue, 'created_at' | 'updated_at' | 'resolved_at'> {
-  created_at: string;
+  created_at: string | null;
   updated_at: string | null;
   resolved_at: string | null; 
 }

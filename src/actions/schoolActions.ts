@@ -47,9 +47,9 @@ export const getSchoolInfo = cache(async (schoolId?: string): Promise<School | n
     
     // Fetch school data from Supabase
     const { data, error } = await supabase
-      .from('schools')
+      .from('schools' as any)
       .select('*')
-      .eq('id', schoolId)
+      .eq('id', schoolId as string)
       .single();
     
     if (error) {
@@ -62,7 +62,7 @@ export const getSchoolInfo = cache(async (schoolId?: string): Promise<School | n
       return null;
     }
     
-    return data as School;
+    return data && 'id' in data && 'name' in data && 'code' in data ? (data as unknown as School) : null;
     
   } catch (error) {
     console.error('Error in getSchoolInfo:', error);
