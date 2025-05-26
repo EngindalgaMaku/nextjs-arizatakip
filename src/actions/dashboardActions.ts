@@ -57,12 +57,8 @@ export const getDashboardStats = cache(async (schoolId?: string): Promise<Dashbo
       }
     }
 
-    // Construct query based on whether we have a school ID
-    let query: any = supabase.from('issues').select('*');
-    
-    if (schoolId) {
-      query = query.eq('school_id', schoolId);
-    }
+    // Fetch all issues without filtering by school
+    const query: any = supabase.from('issues').select('*');
     
     // Fetch all issues
     const { data: issues, error } = await query;

@@ -65,31 +65,51 @@ function ExamTable({ exams, onStartExam, onMonitorExam, onDeleteExam }: ExamTabl
         </TableRow>
       </TableHeader>
       <TableBody>
-        {exams.map(exam => (
-          <TableRow key={exam.id}>
-            <TableCell className="font-medium">{exam.title}</TableCell>
-            <TableCell>{getExamStatusBadge(exam.status)}</TableCell>
-            <TableCell>{format(new Date(exam.scheduledStartTime), 'dd.MM.yyyy HH:mm')}</TableCell>
-            <TableCell>{format(new Date(exam.scheduledEndTime), 'dd.MM.yyyy HH:mm')}</TableCell>
-            <TableCell>{exam.timeLimit} dk.</TableCell>
-            <TableCell className="text-right space-x-2">
-              {exam.status === LiveExamStatus.SCHEDULED && (
-                <Button variant="outline" size="sm" onClick={() => onStartExam(exam.id)}>
-                  Başlat
+        {exams.map(exam => {
+          const now = new Date();
+          const endDate = new Date(exam.scheduledEndTime);
+          const isExpired = endDate < now;
+
+          return (
+            <TableRow key={exam.id} className={isExpired ? 'bg-red-50' : ''}>
+              <TableCell className={`font-medium ${isExpired ? 'text-red-700' : ''}`}>
+                {exam.title}
+              </TableCell>
+              <TableCell>
+                {isExpired ? (
+                  <Badge variant="destructive">Süresi Doldu</Badge>
+                ) : (
+                  getExamStatusBadge(exam.status)
+                )}
+              </TableCell>
+              <TableCell>{format(new Date(exam.scheduledStartTime), 'dd.MM.yyyy HH:mm')}</TableCell>
+              <TableCell className={isExpired ? 'text-red-700 font-medium' : ''}>
+                {format(new Date(exam.scheduledEndTime), 'dd.MM.yyyy HH:mm')}
+              </TableCell>
+              <TableCell>{exam.timeLimit} dk.</TableCell>
+              <TableCell className="text-right space-x-2">
+                {!isExpired && exam.status === LiveExamStatus.SCHEDULED && (
+                  <Button variant="outline" size="sm" onClick={() => onStartExam(exam.id)}>
+                    Başlat
+                  </Button>
+                )}
+                {!isExpired && (exam.status === LiveExamStatus.ACTIVE || exam.status === LiveExamStatus.PAUSED) && (
+                  <Button variant="default" size="sm" onClick={() => onMonitorExam(exam.id)}>
+                    İzle / Yönet
+                  </Button>
+                )}
+                {(isExpired || exam.status === LiveExamStatus.COMPLETED) && (
+                  <Button variant="outline" size="sm" onClick={() => onMonitorExam(exam.id)}>
+                    Sonuçlar
+                  </Button>
+                )}
+                <Button variant="destructive" size="sm" onClick={() => onDeleteExam(exam.id)}>
+                  Sil
                 </Button>
-              )}
-              {(exam.status === LiveExamStatus.ACTIVE || exam.status === LiveExamStatus.PAUSED || exam.status === LiveExamStatus.COMPLETED) && (
-                <Button variant="default" size="sm" onClick={() => onMonitorExam(exam.id)}>
-                  {exam.status === LiveExamStatus.COMPLETED ? 'Sonuçlar' : 'İzle / Yönet'}
-                </Button>
-              )}
-              {/* Add other action buttons here, e.g., Pause, Resume, Complete */}
-              <Button variant="destructive" size="sm" onClick={() => onDeleteExam(exam.id)}>
-                Sil
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

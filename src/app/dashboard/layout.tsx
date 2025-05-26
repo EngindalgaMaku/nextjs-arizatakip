@@ -276,6 +276,18 @@ export default function DashboardLayout({
                 Sınavlar
               </Link>
 
+              <Link
+                href="/dashboard/forms"
+                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                  pathname.includes("/dashboard/forms")
+                    ? "bg-blue-700 text-white"
+                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
+                }`}
+              >
+                <ClipboardDocumentListIcon className="mr-3 h-5 w-5" />
+                Form Yönetimi
+              </Link>
+
               <div className="pt-4 pb-2 px-3">
                 <h4 className="text-xs font-semibold uppercase text-blue-300 tracking-wider">Alan Şeflik Yönetimi</h4>
               </div>
@@ -421,18 +433,6 @@ export default function DashboardLayout({
               >
                 <UserGroupIcon className="mr-3 h-5 w-5" />
                 Kullanıcılar
-              </Link>
-
-              <Link
-                href="/dashboard/forms"
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                  pathname.includes("/forms")
-                    ? "bg-blue-700 text-white"
-                    : "text-gray-100 hover:bg-blue-700 hover:text-white"
-                }`}
-              >
-                <ClipboardDocumentListIcon className="mr-3 h-5 w-5" /> 
-                Form Yönetimi
               </Link>
 
               <Link

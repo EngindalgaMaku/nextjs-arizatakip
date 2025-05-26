@@ -25,6 +25,7 @@ interface ExamData {
   title: string;
   timeLimit: number;
   questions: ExamQuestion[];
+  endDate?: string;
 }
 
 const answerSchema = z.object({
@@ -47,6 +48,7 @@ export default function TakeExam() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const {
     control,
@@ -60,6 +62,55 @@ export default function TakeExam() {
       answers: {}
     }
   });
+
+  // First useEffect to handle student session
+  useEffect(() => {
+    if (!urlStudentId && typeof window !== 'undefined') {
+      const sessionData = localStorage.getItem('studentExamSession');
+      if (sessionData) {
+        const session = JSON.parse(sessionData);
+        if (session?.studentId) {
+          setResolvedStudentId(session.studentId);
+        } else {
+          toast.error("Oturum bilgileri geçersiz.");
+          router.replace('/student/exams');
+        }
+      } else {
+        toast.error("Oturum bulunamadı, lütfen giriş yapın.");
+        router.replace('/student/exams');
+      }
+    }
+    setIsInitialLoad(false);
+  }, [urlStudentId, router]);
+
+  // Load saved answers when component mounts
+  useEffect(() => {
+    if (examId && resolvedStudentId) {
+      const key = `exam_${examId}_answers_${resolvedStudentId}`;
+      const savedAnswers = localStorage.getItem(key);
+      if (savedAnswers) {
+        try {
+          const answers = JSON.parse(savedAnswers);
+          Object.entries(answers).forEach(([questionId, answer]) => {
+            setValue(`answers.${questionId}`, answer);
+          });
+          console.log('Loaded answers:', answers);
+        } catch (err) {
+          console.error('Error loading answers:', err);
+        }
+      }
+    }
+  }, [examId, resolvedStudentId, setValue]);
+
+  // Save answers whenever they change
+  const answers = watch('answers');
+  useEffect(() => {
+    if (examId && resolvedStudentId && Object.keys(answers).length > 0) {
+      const key = `exam_${examId}_answers_${resolvedStudentId}`;
+      localStorage.setItem(key, JSON.stringify(answers));
+      console.log('Saved answers:', answers);
+    }
+  }, [answers, examId, resolvedStudentId]);
 
   const onSubmit = useCallback(async (data: AnswerFormValues) => {
     if (!examData || !resolvedStudentId) {
@@ -102,60 +153,141 @@ export default function TakeExam() {
     }
   }, [examId, resolvedStudentId, router]);
 
+  // Modify the exam initialization effect
   useEffect(() => {
-    if (!urlStudentId && typeof window !== 'undefined') {
-      const sessionData = localStorage.getItem('studentExamSession');
-      if (sessionData) {
-        const session = JSON.parse(sessionData);
-        if (session?.studentId) {
-          setResolvedStudentId(session.studentId);
-        } else {
-          toast.error("Oturum bilgileri geçersiz.");
-          router.replace('/student/exams');
-        }
-      } else {
-        toast.error("Oturum bulunamadı, lütfen giriş yapın.");
-        router.replace('/student/exams');
-      }
-    }
-  }, [urlStudentId, examId, router]);
-
-  useEffect(() => {
-    if (!resolvedStudentId || !examId) return;
+    if (!resolvedStudentId || !examId || isInitialLoad) return;
+    
+    const storageKey = `exam_${examId}_student_${resolvedStudentId}`;
+    const endTimeKey = `${storageKey}_endTime`;
+    const examDataKey = `${storageKey}_examData`;
 
     const initializeExamParticipation = async () => {
       setIsLoading(true);
       setError(null);
+
       try {
-        const registerResult = await registerStudentForExam(examId, resolvedStudentId);
-        if ('error' in registerResult) {
-          if (!registerResult.error.includes("maksimum deneme") && !registerResult.error.includes("zaten kayıtlı")) {
-            if (registerResult.error.includes("zaten tamamladınız")) {
-              router.replace(`/student/exams/${examId}/results?studentId=${resolvedStudentId}`);
+        // First check if exam has ended
+        const { data: exam, error: examError } = await supabase
+          .from('live_exams')
+          .select('id, title, time_limit, status, test_id, tests(questions), scheduled_end_time')
+          .eq('id', examId)
+          .single();
+
+        if (examError || !exam) {
+          throw examError || new Error('Sınav detayları bulunamadı.');
+        }
+
+        // Check if exam has ended
+        const examEndTime = new Date(exam.scheduled_end_time);
+        if (examEndTime < new Date()) {
+          toast.error('Bu sınav süresi dolmuştur.');
+          setError('Bu sınav süresi dolmuştur.');
+          router.replace('/student/exams');
+          return;
+        }
+
+        // Check for existing exam data and end time in localStorage
+        const storedExamData = localStorage.getItem(examDataKey);
+        const endTime = localStorage.getItem(endTimeKey);
+        
+        // Try to load answers from localStorage
+        const answersKey = `exam_${examId}_answers_${resolvedStudentId}`;
+        const savedAnswers = localStorage.getItem(answersKey);
+        if (savedAnswers) {
+          try {
+            const answers = JSON.parse(savedAnswers);
+            Object.entries(answers).forEach(([questionId, answer]) => {
+              setValue(`answers.${questionId}`, answer);
+            });
+            console.log('Loaded answers:', answers);
+          } catch (err) {
+            console.error('Error loading answers:', err);
+          }
+        } else {
+          // If no localStorage data, try to fetch from database
+          const { data: participation } = await supabase
+            .from('live_exam_participants')
+            .select('answers')
+            .eq('live_exam_id', examId)
+            .eq('student_id', resolvedStudentId)
+            .single();
+
+          if (participation?.answers) {
+            Object.entries(participation.answers).forEach(([questionId, answer]) => {
+              setValue(`answers.${questionId}`, answer);
+            });
+            // Also save to localStorage
+            localStorage.setItem(answersKey, JSON.stringify(participation.answers));
+            console.log('Loaded answers from database:', participation.answers);
+          }
+        }
+        
+        if (storedExamData && endTime) {
+          const parsedExamData = JSON.parse(storedExamData);
+          // Check if stored exam data's end time is valid
+          if (parsedExamData.scheduled_end_time && new Date(parsedExamData.scheduled_end_time) < new Date()) {
+            localStorage.removeItem(endTimeKey);
+            localStorage.removeItem(examDataKey);
+            localStorage.removeItem(answersKey);
+            toast.error('Bu sınav süresi dolmuştur.');
+            setError('Bu sınav süresi dolmuştur.');
+            router.replace('/student/exams');
+            return;
+          }
+
+          setExamData(parsedExamData);
+          const diff = Math.floor((Number(endTime) - Date.now()) / 1000);
+          if (diff > 0) {
+            setTimeLeft(diff);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // Check if student is already registered for this exam
+        const { data: existingParticipation, error: participationError } = await supabase
+          .from('live_exam_participants')
+          .select('id, status')
+          .eq('live_exam_id', examId)
+          .eq('student_id', resolvedStudentId)
+          .single();
+
+        if (existingParticipation) {
+          // If already registered and in progress, restore the session
+          if (existingParticipation.status === 'in_progress' || existingParticipation.status === 'registered') {
+            const startResult = await startExamForStudent(examId, resolvedStudentId);
+            if ('error' in startResult) {
+              toast.error(`Sınav başlatılamadı: ${startResult.error}`);
+              setError(`Sınav başlatılamadı: ${startResult.error}`);
+              setIsLoading(false);
               return;
             }
+          } else if (existingParticipation.status === 'completed') {
+            router.replace(`/student/exams/${examId}/results?studentId=${resolvedStudentId}`);
+            return;
+          } else if (existingParticipation.status === 'timed_out') {
+            setError('Bu sınav süresi dolmuş.');
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          // Only register if not already registered
+          const registerResult = await registerStudentForExam(examId, resolvedStudentId);
+          if ('error' in registerResult) {
             toast.error(`Sınava kayıt başarısız: ${registerResult.error}`);
             setError(`Sınava kayıt başarısız: ${registerResult.error}`);
             setIsLoading(false);
             return;
           }
-        }
-        const startResult = await startExamForStudent(examId, resolvedStudentId);
-        if ('error' in startResult) {
-          toast.error(`Sınav başlatılamadı: ${startResult.error}`);
-          setError(`Sınav başlatılamadı: ${startResult.error}`);
-          setIsLoading(false);
-          return;
-        }
 
-        const { data: exam, error: examError } = await supabase
-          .from('live_exams')
-          .select('id, title, time_limit, status, test_id, tests(questions)')
-          .eq('id', examId)
-          .single();
-
-        if (examError) throw examError;
-        if (!exam) throw new Error("Sınav detayları bulunamadı.");
+          const startResult = await startExamForStudent(examId, resolvedStudentId);
+          if ('error' in startResult) {
+            toast.error(`Sınav başlatılamadı: ${startResult.error}`);
+            setError(`Sınav başlatılamadı: ${startResult.error}`);
+            setIsLoading(false);
+            return;
+          }
+        }
 
         if (exam.status !== 'active') {
           toast.error('Bu sınav şu anda aktif değil.');
@@ -165,30 +297,36 @@ export default function TakeExam() {
         }
 
         if (!exam.tests || !Array.isArray(exam.tests.questions)) {
-             console.error("Fetched exam data is missing questions:", exam);
-             throw new Error("Sınav soruları yüklenemedi veya formatı yanlış.");
+          throw new Error('Sınav soruları yüklenemedi veya formatı yanlış.');
         }
 
         const mappedQuestions: ExamQuestion[] = exam.tests.questions.map((q: any) => ({
           id: q.id,
           text: q.text,
-          options: q.options.map((opt: any) => ({
-            id: opt.id,
-            text: opt.text
-          })),
+          options: q.options.map((opt: any) => ({ id: opt.id, text: opt.text })),
           imageUrl: q.image_url
         }));
 
-        setExamData({
+        const newExamData = {
           id: exam.id,
           title: exam.title,
           timeLimit: exam.time_limit,
-          questions: mappedQuestions
-        });
-        setTimeLeft(exam.time_limit * 60);
+          questions: mappedQuestions,
+          scheduled_end_time: exam.scheduled_end_time
+        };
+
+        setExamData(newExamData);
+        localStorage.setItem(examDataKey, JSON.stringify(newExamData));
+
+        // Set new end time
+        const newEndTime = (Date.now() + exam.time_limit * 60 * 1000).toString();
+        localStorage.setItem(endTimeKey, newEndTime);
+        
+        const diff = Math.floor((Number(newEndTime) - Date.now()) / 1000);
+        setTimeLeft(diff > 0 ? diff : 0);
 
       } catch (err: any) {
-        console.error("Error in exam participation/fetch data:", err);
+        console.error('Error in exam participation:', err);
         const message = err.message || 'Sınav bilgileri yüklenirken bir hata oluştu.';
         toast.error(message);
         setError(message);
@@ -198,28 +336,102 @@ export default function TakeExam() {
     };
 
     initializeExamParticipation();
+  }, [resolvedStudentId, examId, isInitialLoad, router, setValue]);
 
-  }, [resolvedStudentId, examId, router]);
-
+  // Modify the timer effect
   useEffect(() => {
-    if (timeLeft <= 0) {
-      handleSubmit(onSubmit)();
+    if (!resolvedStudentId || !examId || isInitialLoad) return;
+    
+    const storageKey = `exam_${examId}_student_${resolvedStudentId}`;
+    const endTimeKey = `${storageKey}_endTime`;
+    
+    // Get the end time from localStorage
+    const endTime = localStorage.getItem(endTimeKey);
+    if (!endTime) return;
+
+    // Calculate initial time left
+    const initialTimeLeft = Math.floor((Number(endTime) - Date.now()) / 1000);
+    if (initialTimeLeft <= 0) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(endTimeKey);
+        handleSubmit(onSubmit)();
+      }
       return;
     }
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft, handleSubmit, onSubmit]);
 
+    // Set initial time
+    setTimeLeft(initialTimeLeft);
+
+    // Start countdown
+    const timerId = setInterval(() => {
+      setTimeLeft(prev => {
+        const newTimeLeft = prev - 1;
+        if (newTimeLeft <= 0) {
+          clearInterval(timerId);
+          localStorage.removeItem(endTimeKey);
+          handleSubmit(onSubmit)();
+          return 0;
+        }
+        return newTimeLeft;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [resolvedStudentId, examId, isInitialLoad, handleSubmit, onSubmit]);
+
+  // Add effect to handle exam completion when time runs out
   useEffect(() => {
-    if (!examData || !resolvedStudentId || !examId) return;
-    const progress = (Object.keys(watch('answers')).length / examData.questions.length) * 100;
-    updateStudentAnswers(examId, resolvedStudentId, watch('answers'), progress);
-  }, [watch('answers'), currentQuestion, examData, examId, resolvedStudentId]);
+    if (timeLeft <= 0 && !isLoading && !error) {
+      const storageKey = `exam_${examId}_student_${resolvedStudentId}`;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`${storageKey}_endTime`);
+        localStorage.removeItem(`${storageKey}_examData`);
+        localStorage.removeItem(`${storageKey}_answers`);
+      }
+      handleSubmit(onSubmit)();
+    }
+  }, [timeLeft, isLoading, error, examId, resolvedStudentId, handleSubmit, onSubmit]);
+
+  // Add cleanup effect
+  useEffect(() => {
+    return () => {
+      if (timeLeft <= 0) {
+        const storageKey = `exam_${examId}_student_${resolvedStudentId}`;
+        localStorage.removeItem(`${storageKey}_endTime`);
+        localStorage.removeItem(`${storageKey}_examData`);
+        localStorage.removeItem(`${storageKey}_answers`);
+      }
+    };
+  }, [timeLeft, examId, resolvedStudentId]);
+
+  // Update the radio button onChange handler
+  const handleAnswerChange = (questionId: string, answerId: string) => {
+    setValue(`answers.${questionId}`, answerId);
+    const storageKey = `exam_${examId}_student_${resolvedStudentId}`;
+    const answersKey = `${storageKey}_answers`;
+    const currentAnswers = watch('answers');
+    localStorage.setItem(answersKey, JSON.stringify({
+      ...currentAnswers,
+      [questionId]: answerId
+    }));
+  };
+
+  if (isInitialLoad) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <ArrowPathIcon className="h-12 w-12 text-indigo-600 animate-spin" />
+        <p className="ml-4 text-lg text-gray-700">Oturum kontrol ediliyor...</p>
+      </div>
+    );
+  }
 
   if (!resolvedStudentId) {
-    return <div className="flex justify-center items-center h-screen">Yükleniyor...</div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <ArrowPathIcon className="h-12 w-12 text-indigo-600 animate-spin" />
+        <p className="ml-4 text-lg text-gray-700">Öğrenci bilgileri yükleniyor...</p>
+      </div>
+    );
   }
 
   if (isLoading) {
@@ -326,7 +538,25 @@ export default function TakeExam() {
                       value={option.id}
                       checked={isChecked}
                       onChange={(e) => {
-                        setValue(`answers.${currentQ.id}`, e.target.value);
+                        const newValue = e.target.value;
+                        setValue(`answers.${currentQ.id}`, newValue);
+                        
+                        // Immediately save to localStorage
+                        const key = `exam_${examId}_answers_${resolvedStudentId}`;
+                        const currentAnswers = watch('answers');
+                        const updatedAnswers = {
+                          ...currentAnswers,
+                          [currentQ.id]: newValue
+                        };
+                        localStorage.setItem(key, JSON.stringify(updatedAnswers));
+                        console.log('Saved answer:', currentQ.id, newValue);
+                        
+                        // Also save to database
+                        if (examId && resolvedStudentId) {
+                          const progress = examData ? (Object.keys(updatedAnswers).length / examData.questions.length) * 100 : 0;
+                          updateStudentAnswers(examId, resolvedStudentId, updatedAnswers, progress)
+                            .catch(err => console.error('Error saving to database:', err));
+                        }
                       }}
                       className="h-4 w-4 text-indigo-600 hidden"
                     />

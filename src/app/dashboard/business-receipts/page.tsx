@@ -26,6 +26,8 @@ import { Edit, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 const ITEMS_PER_PAGE = 10;
 const monthNames: { [key: number]: string } = {
@@ -289,6 +291,7 @@ function AdminBusinessReceiptsContent() {
     const [isModalDataLoading, setIsModalDataLoading] = useState(false);
     
     const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
+    const [isZipLoading, setIsZipLoading] = useState(false);
     const [filters, setFilters] = useState<FiltersState>(() => {
         const params: FiltersState = {};
         if (searchParams.get('studentName')) params.studentName = searchParams.get('studentName')!;
@@ -480,19 +483,62 @@ function AdminBusinessReceiptsContent() {
         }
     };
 
+    // ZIP all receipts grouped by student and month
+    const handleDownloadZip = async () => {
+        setIsZipLoading(true);
+        try {
+            const apiParams = getApiFilters(filters, true);
+            const result = await getReceiptsForAdmin(apiParams);
+            if (result.error) {
+                toast.error(result.error);
+                return;
+            }
+            const zip = new JSZip();
+            for (const r of result.data || []) {
+                const { data, error } = await getReceiptDownloadUrl(r.receipt_file_path);
+                if (error || !data?.downloadUrl) {
+                    toast.error(`İndirme linki alınamadı: ${r.student_name}`);
+                    continue;
+                }
+                const blob = await fetch(data.downloadUrl).then(res => res.blob());
+                const studentFolder = zip.folder(r.student_name || 'Unknown');
+                const monthFolder = studentFolder.folder(`${monthNames[r.receipt_month]} ${r.receipt_year}`);
+                const fileName = r.receipt_file_name_original || r.receipt_file_path.split('/').pop() || r.receipt_id;
+                monthFolder.file(fileName, blob);
+            }
+            const content = await zip.generateAsync({ type: 'blob' });
+            saveAs(content, 'dekontlar.zip');
+        } catch (e) {
+            console.error('ZIP oluşturma hatası:', e);
+            toast.error('ZIP oluşturulurken bir hata oluştu.');
+        } finally {
+            setIsZipLoading(false);
+        }
+    };
+
     return (
         <div className="container mx-auto py-2 sm:py-4 md:py-6 lg:py-8">
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-2xl font-bold">İşletme Dekontları (Yönetici)</CardTitle>
-                    <Button 
-                        onClick={handleShowStudentsByClass} 
-                        variant="outline"
-                        disabled={isModalDataLoading}
-                    >
-                        {isModalDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Sınıfa Göre Öğrencileri Göster
-                    </Button>
+                    <div className="flex space-x-2 items-center">
+                        <Button
+                            onClick={handleShowStudentsByClass}
+                            variant="outline"
+                            disabled={isModalDataLoading}
+                        >
+                            {isModalDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Sınıfa Göre Öğrencileri Göster
+                        </Button>
+                        <Button
+                            onClick={handleDownloadZip}
+                            variant="outline"
+                            disabled={isZipLoading}
+                        >
+                            {isZipLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Dekontları ZIP İndir
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {error && (

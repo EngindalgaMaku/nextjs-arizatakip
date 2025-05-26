@@ -5,32 +5,45 @@ import { getDashboardStats } from "@/actions/dashboardActions";
 import { fetchDevices } from "@/actions/deviceActions";
 import { getLiveExams } from "@/actions/liveExamActions";
 import { fetchForms } from "@/actions/formActions";
+import { getReceiptsForAdmin, type AdminReceiptListItem } from '@/actions/business-receipts/admin-actions';
 import Link from "next/link";
-import { UsersIcon, DevicePhoneMobileIcon, DocumentTextIcon, ClipboardDocumentListIcon, AcademicCapIcon } from "@heroicons/react/24/outline";
-import { Bar } from "react-chartjs-2";
-import { Chart, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from "chart.js";
-Chart.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+import { UsersIcon, DevicePhoneMobileIcon, DocumentTextIcon, ClipboardDocumentListIcon, AcademicCapIcon, XCircleIcon } from "@heroicons/react/24/outline";
+
+// Mapping of month numbers to Turkish month names for labels
+const monthNames: { [key: number]: string } = {
+  1: 'Ocak', 2: 'Şubat', 3: 'Mart', 4: 'Nisan', 5: 'Mayıs', 6: 'Haziran',
+  7: 'Temmuz', 8: 'Ağustos', 9: 'Eylül', 10: 'Ekim', 11: 'Kasım', 12: 'Aralık'
+};
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [devices, setDevices] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
   const [forms, setForms] = useState<any[]>([]);
+  const [recentReceipts, setRecentReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const [statsRes, devicesRes, examsRes, formsRes] = await Promise.all([
+      const [statsRes, devicesRes, examsRes, formsRes, receiptsRes] = await Promise.all([
         getDashboardStats(),
         fetchDevices(),
         getLiveExams(),
         fetchForms(),
+        getReceiptsForAdmin({ page: 1, pageSize: 5 }),
       ]);
       setStats(statsRes);
       setDevices(devicesRes);
       setExams(examsRes);
       setForms(formsRes);
+      // Format receipts to include student name and month/year in a label
+      const rawReceipts = receiptsRes.data || [];
+      const formatted = rawReceipts.map((r: AdminReceiptListItem) => ({
+        ...r,
+        label: `${r.student_name || '-'} - ${monthNames[r.receipt_month]} ${r.receipt_year}`
+      }));
+      setRecentReceipts(formatted);
       setLoading(false);
     }
     loadData();
@@ -40,52 +53,51 @@ export default function DashboardPage() {
     return <div className="flex items-center justify-center h-96 text-xl">Yükleniyor...</div>;
   }
 
-  // Bar chart için veri hazırlama
-  const timelineData = stats?.timelineData || [];
-  const chartData = {
-    labels: timelineData.map((d: any) => d.date.slice(5)),
-    datasets: [
-      {
-        label: "Arıza Sayısı",
-        data: timelineData.map((d: any) => d.count),
-        backgroundColor: "#6366f1",
-        borderRadius: 6,
-        maxBarThickness: 18,
-      },
-    ],
-  };
-  const chartOptions = {
-    plugins: {
-      legend: { display: false },
-    },
-    scales: {
-      x: { grid: { display: false } },
-      y: { beginAtZero: true, grid: { color: "#f3f4f6" } },
-    },
-  };
-
   return (
     <div className="p-6 max-w-7xl mx-auto bg-gradient-to-br from-blue-50 to-white min-h-screen">
       <h1 className="text-4xl font-extrabold mb-8 text-blue-900">Yönetim Paneli</h1>
       {/* İstatistik Kartları */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
-        <StatCard icon={<DevicePhoneMobileIcon className="h-8 w-8" />} label="Cihazlar" value={devices.length} href="/dashboard/devices" color="from-blue-400 to-blue-600" />
-        <StatCard icon={<ClipboardDocumentListIcon className="h-8 w-8" />} label="Arızalar" value={stats?.totalIssuesCount ?? 0} href="/dashboard/issues" color="from-orange-400 to-orange-600" />
-        <StatCard icon={<UsersIcon className="h-8 w-8" />} label="Kullanıcılar" value={stats?.usersCount ?? 0} href="/dashboard/users" color="from-green-400 to-green-600" />
-        <StatCard icon={<AcademicCapIcon className="h-8 w-8" />} label="Sınavlar" value={exams.length} href="/dashboard/live-exams" color="from-purple-400 to-purple-600" />
-        <StatCard icon={<DocumentTextIcon className="h-8 w-8" />} label="Formlar" value={forms.length} href="/dashboard/forms" color="from-pink-400 to-pink-600" />
+        <StatCard icon={<DevicePhoneMobileIcon className="h-8 w-8 text-blue-600" />} label="Cihazlar" value={devices.length} href="/dashboard/devices" color="from-blue-400 to-blue-600" />
+        <StatCard icon={<XCircleIcon className="h-8 w-8 text-orange-600" />} label="Arızalar" value={stats?.totalIssuesCount ?? 0} href="/dashboard/issues" color="from-orange-400 to-orange-600" />
+        <StatCard icon={<UsersIcon className="h-8 w-8 text-green-600" />} label="Kullanıcılar" value={stats?.usersCount ?? 0} href="/dashboard/users" color="from-green-400 to-green-600" />
+        <StatCard icon={<AcademicCapIcon className="h-8 w-8 text-purple-600" />} label="Sınavlar" value={exams.length} href="/dashboard/live-exams" color="from-purple-400 to-purple-600" />
+        <StatCard icon={<DocumentTextIcon className="h-8 w-8 text-pink-600" />} label="Formlar" value={forms.length} href="/dashboard/forms" color="from-pink-400 to-pink-600" />
       </div>
-      {/* Grafik ve Son Eklenenler */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h2 className="text-xl font-bold mb-4">Son 30 Gün Arıza Grafiği</h2>
-          <Bar data={chartData} options={chartOptions} height={180} />
-        </div>
-        <div className="grid grid-cols-1 gap-6">
-          <RecentList title="Son Cihazlar" items={devices.slice(0, 5)} itemKey="id" itemLabel="name" hrefPrefix="/dashboard/devices/" badgeColor="bg-blue-100 text-blue-700" />
-          <RecentList title="Son Sınavlar" items={exams.slice(0, 5)} itemKey="id" itemLabel="title" hrefPrefix="/dashboard/live-exams/" badgeColor="bg-purple-100 text-purple-700" />
-          <RecentList title="Son Formlar" items={forms.slice(0, 5)} itemKey="id" itemLabel="title" hrefPrefix="/dashboard/forms/" badgeColor="bg-pink-100 text-pink-700" />
-        </div>
+      {/* Son 5 Arızalar, Son 5 İşletme Dekontları, Son 5 Sınavlar ve Son 5 Formlar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
+        <RecentList
+          title="Son 5 Arızalar"
+          items={stats?.recentIssues ?? []}
+          itemKey="id"
+          itemLabel="description"
+          hrefPrefix="/dashboard/issues/"
+          badgeColor="bg-orange-100 text-orange-700"
+        />
+        <RecentList
+          title="Son 5 İşletme Dekontları"
+          items={recentReceipts}
+          itemKey="receipt_id"
+          itemLabel="label"
+          hrefPrefix="/dashboard/business-receipts/"
+          badgeColor="bg-blue-100 text-blue-700"
+        />
+        <RecentList
+          title="Son 5 Sınavlar"
+          items={exams.slice(0, 5)}
+          itemKey="id"
+          itemLabel="title"
+          hrefPrefix="/dashboard/live-exams/"
+          badgeColor="bg-purple-100 text-purple-700"
+        />
+        <RecentList
+          title="Son 5 Formlar"
+          items={forms.slice(0, 5)}
+          itemKey="id"
+          itemLabel="title"
+          hrefPrefix="/dashboard/forms/"
+          badgeColor="bg-pink-100 text-pink-700"
+        />
       </div>
       {/* Hızlı Aksiyonlar */}
       <div className="bg-white rounded-xl shadow p-6 flex flex-wrap gap-4 justify-center">
