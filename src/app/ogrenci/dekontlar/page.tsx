@@ -411,9 +411,14 @@ function StudentReceiptDashboardContent() {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Dekont Ekle</DialogTitle>
+            <DialogTitle>
+              {formState?.receiptId ? 'Dekont Güncelle' : 'Dekont Ekle'}
+            </DialogTitle>
             <DialogDescription>
-              Lütfen dekont bilgilerini girin.
+              {formState?.receiptId 
+                ? `${monthNames[formState.month]} ${formState.year} ayı dekontunu güncelliyorsunuz.` 
+                : 'Lütfen dekont bilgilerini girin.'
+              }
             </DialogDescription>
           </DialogHeader>
           <form id="receipt-form" onSubmit={handleFormSubmit} className="grid gap-4 py-4">
@@ -479,18 +484,25 @@ function StudentReceiptDashboardContent() {
               <Label htmlFor="file" className="text-right">
                 Dekont
               </Label>
-              <input 
-                type="file" 
-                id="file" 
-                accept=".jpg,.jpeg,.pdf"
-                onChange={handleFileChange} 
-                className="col-span-3 block w-full text-sm text-slate-500 
-                           file:mr-4 file:py-2 file:px-4 
-                           file:rounded-full file:border-0 
-                           file:text-sm file:font-semibold 
-                           file:bg-violet-50 file:text-violet-700 
-                           hover:file:bg-violet-100"
-              />
+              <div className="col-span-3">
+                {formState?.receiptId && (
+                  <p className="text-sm text-gray-600 mb-2">
+                    Yeni dosya seçerek mevcut dekontu değiştirebilirsiniz. Dosya seçmezseniz sadece diğer bilgiler güncellenir.
+                  </p>
+                )}
+                <input 
+                  type="file" 
+                  id="file" 
+                  accept=".jpg,.jpeg,.pdf"
+                  onChange={handleFileChange} 
+                  className="block w-full text-sm text-slate-500 
+                             file:mr-4 file:py-2 file:px-4 
+                             file:rounded-full file:border-0 
+                             file:text-sm file:font-semibold 
+                             file:bg-violet-50 file:text-violet-700 
+                             hover:file:bg-violet-100"
+                />
+              </div>
             </div>
           </form>
           <DialogFooter>

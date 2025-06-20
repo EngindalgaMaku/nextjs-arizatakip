@@ -483,7 +483,7 @@ function AdminBusinessReceiptsContent() {
         }
     };
 
-    // ZIP all receipts grouped by student and month
+    // ZIP all receipts grouped by month with new naming format
     const handleDownloadZip = async () => {
         setIsZipLoading(true);
         try {
@@ -494,6 +494,14 @@ function AdminBusinessReceiptsContent() {
                 return;
             }
             const zip = new JSZip();
+            
+            // Academic year months in order (September to June)
+            const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+            const monthOrder: { [key: number]: number } = {};
+            academicMonths.forEach((month, index) => {
+                monthOrder[month] = index + 1;
+            });
+
             for (const r of result.data || []) {
                 const { data, error } = await getReceiptDownloadUrl(r.receipt_file_path);
                 if (error || !data?.downloadUrl) {
@@ -501,10 +509,30 @@ function AdminBusinessReceiptsContent() {
                     continue;
                 }
                 const blob = await fetch(data.downloadUrl).then(res => res.blob());
-                const studentFolder = zip.folder(r.student_name || 'Unknown');
-                const monthFolder = studentFolder.folder(`${monthNames[r.receipt_month]} ${r.receipt_year}`);
-                const fileName = r.receipt_file_name_original || r.receipt_file_path.split('/').pop() || r.receipt_id;
-                monthFolder.file(fileName, blob);
+                
+                // Create folder name: "1. EYLÜL 2024" format
+                const monthName = monthNames[r.receipt_month]?.toUpperCase() || `AY-${r.receipt_month}`;
+                const monthOrderNumber = monthOrder[r.receipt_month] || r.receipt_month;
+                const folderName = `${monthOrderNumber}. ${monthName} ${r.receipt_year}`;
+                const monthFolder = zip.folder(folderName);
+                
+                // Create file name: "Firma İsmi - Sınıf-ÖğrenciNo - Öğrenci İsmi - Ay Yıl" format
+                const businessName = r.business_name || 'Bilinmeyen İşletme';
+                const studentClass = r.student_class_name || 'Sınıf Yok';
+                const studentNumber = r.student_school_number || 'No Yok';
+                const studentName = r.student_name || 'İsim Yok';
+                const monthNameTitleCase = monthNames[r.receipt_month] || `Ay-${r.receipt_month}`;
+                
+                // Get file extension from original file
+                const fileExt = r.receipt_file_path.split('.').pop() || 'pdf';
+                
+                // Format: "SMMM Abdullah Koç - 12A-123 - Nisanur Biyikli - Ocak 2025.pdf"
+                const newFileName = `${businessName} - ${studentClass}-${studentNumber} - ${studentName} - ${monthNameTitleCase} ${r.receipt_year}.${fileExt}`;
+                
+                // Sanitize filename (remove special characters that might cause issues)
+                const sanitizedFileName = newFileName.replace(/[<>:"/\\|?*]/g, '_');
+                
+                monthFolder.file(sanitizedFileName, blob);
             }
             const content = await zip.generateAsync({ type: 'blob' });
             saveAs(content, 'dekontlar.zip');
