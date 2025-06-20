@@ -131,7 +131,8 @@ export async function updateReceipt(
 ): Promise<{ data: { id: string } | null; error: string | null }> {
   const supabase = await createSupabaseServerClient();
 
-  const validatedForm = UpdateReceiptFormSchema.safeParse(payload);
+  // Separate validation for metadata and file
+  const validatedForm = UpdateReceiptFormSchema.safeParse({...payload, file: file ? [file] : undefined});
   if (!validatedForm.success) {
     return { data: null, error: validatedForm.error.errors.map(e => e.message).join(', ') };
   }

@@ -47,7 +47,23 @@ export const UploadReceiptMetadataSchema = z.object({
 // Type for the metadata payload
 export type UploadReceiptFormPayload = z.infer<typeof UploadReceiptMetadataSchema>;
 
-export const UpdateReceiptFormSchema = UploadReceiptFormSchema.extend({
-  receiptId: z.string().uuid()
+// Update schema with optional file (for editing without changing file)
+export const UpdateReceiptFormSchema = z.object({
+  receiptId: z.string().uuid(),
+  businessName: z.string().min(2, { message: "İşletme adı en az 2 karakter olmalıdır." }),
+  month: z.coerce.number().int().min(1, {message: "Ay seçimi zorunludur."}).max(12),
+  year: z.coerce.number().int().min(new Date().getFullYear() - 5, {message: "Yıl hatası"}).max(new Date().getFullYear() + 1, {message: "Yıl hatası"}),
+  file: z
+    .any()
+    .optional() // File is optional for updates
+    .refine(
+      (files) => !files || !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE_BYTES, 
+      `Maksimum dosya boyutu ${MAX_FILE_SIZE_MB}MB olabilir.`
+    )
+    .refine(
+      (files) => !files || !files?.[0] || ACCEPTED_FILE_TYPES.includes(files?.[0]?.type),
+      ".pdf, .jpg, .jpeg, .png ve .webp uzantılı dosyalar kabul edilir."
+    ),
+  notes: z.string().optional(),
 });
 export type UpdateReceiptFormPayload = z.infer<typeof UpdateReceiptFormSchema>; 
