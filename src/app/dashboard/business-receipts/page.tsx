@@ -1,6 +1,6 @@
 'use client';
 
-import { AdminReceiptListItem, getReceiptDownloadUrl, getReceiptsForAdmin, updateAdminReceipt, type AdminReceiptFilter, type UpdateAdminReceiptPayload } from '@/actions/business-receipts/admin-actions';
+import { AdminReceiptListItem, getReceiptDownloadUrl, getReceiptsForAdmin, updateAdminReceipt, getStudentReceiptStatusByMonth, type AdminReceiptFilter, type UpdateAdminReceiptPayload, type StudentReceiptStatus } from '@/actions/business-receipts/admin-actions';
 import { deleteReceiptAndFile } from '@/actions/business-receipts/receipt-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,99 @@ const StudentsByClassModal: React.FC<StudentsByClassModalProps> = ({ isOpen, onO
                 )}
               </div>
             ))
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">Kapat</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+interface MonthlyReceiptStatusModalProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  studentStatuses: StudentReceiptStatus[];
+  isLoading?: boolean;
+}
+
+const MonthlyReceiptStatusModal: React.FC<MonthlyReceiptStatusModalProps> = ({ isOpen, onOpenChange, studentStatuses, isLoading }) => {
+  const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+  
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[900px]">
+        <DialogHeader>
+          <DialogTitle>Aylara Göre Dekont Durumu</DialogTitle>
+          <DialogDescription>
+            Öğrencilerin aylık dekont gönderme durumları. ✅ = Gönderdi, ❌ = Göndermedi
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 max-h-[70vh] overflow-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Dekont durumları yükleniyor...</p>
+            </div>
+          ) : studentStatuses.length === 0 ? (
+            <p>Öğrenci bulunamadı.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-300 p-2 text-left sticky left-0 bg-gray-50 min-w-[150px]">Öğrenci</th>
+                    <th className="border border-gray-300 p-2 text-center min-w-[60px]">Sınıf</th>
+                    {academicMonths.map(month => (
+                      <th key={month} className="border border-gray-300 p-2 text-center min-w-[80px]">
+                        {monthNames[month]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentStatuses.map((student) => (
+                    <tr key={student.student_id} className="hover:bg-gray-50">
+                      <td className="border border-gray-300 p-2 sticky left-0 bg-white font-medium">
+                        <div>
+                          <div className="font-semibold">{student.student_name}</div>
+                          <div className="text-sm text-gray-600">{student.student_school_number}</div>
+                        </div>
+                      </td>
+                      <td className="border border-gray-300 p-2 text-center">
+                        {student.student_class_name}
+                      </td>
+                      {academicMonths.map(month => {
+                        const status = student.monthly_status[month];
+                        return (
+                          <td key={month} className="border border-gray-300 p-2 text-center">
+                            {status?.has_receipt ? (
+                              <div className="flex flex-col items-center">
+                                <span className="text-green-600 text-lg">✅</span>
+                                {status.business_name && (
+                                  <span className="text-xs text-gray-600 mt-1" title={status.business_name}>
+                                    {status.business_name.length > 10 
+                                      ? status.business_name.substring(0, 10) + '...' 
+                                      : status.business_name}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-red-600 text-lg">❌</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
         <DialogFooter>
@@ -289,6 +382,11 @@ function AdminBusinessReceiptsContent() {
     const [isStudentsByClassModalOpen, setIsStudentsByClassModalOpen] = useState(false);
     const [studentsByClassData, setStudentsByClassData] = useState<StudentByClass[]>([]);
     const [isModalDataLoading, setIsModalDataLoading] = useState(false);
+    
+    // Monthly receipt status modal states
+    const [isMonthlyStatusModalOpen, setIsMonthlyStatusModalOpen] = useState(false);
+    const [monthlyStatusData, setMonthlyStatusData] = useState<StudentReceiptStatus[]>([]);
+    const [isMonthlyStatusLoading, setIsMonthlyStatusLoading] = useState(false);
     
     const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1);
     const [isZipLoading, setIsZipLoading] = useState(false);
@@ -483,6 +581,35 @@ function AdminBusinessReceiptsContent() {
         }
     };
 
+    const handleShowMonthlyReceiptStatus = async () => {
+        setIsMonthlyStatusModalOpen(true);
+        setIsMonthlyStatusLoading(true);
+        setMonthlyStatusData([]);
+
+        try {
+            const currentYear = new Date().getFullYear();
+            const targetYear = filters.year && filters.year !== 'all' ? parseInt(filters.year) : currentYear;
+            
+            const result = await getStudentReceiptStatusByMonth({
+                className: filters.className || undefined,
+                year: targetYear
+            });
+
+            if (result.error) {
+                toast.error(`Dekont durumları alınamadı: ${result.error}`);
+                setMonthlyStatusData([]);
+            } else {
+                setMonthlyStatusData(result.data || []);
+            }
+        } catch (e: any) {
+            console.error("Failed to fetch monthly receipt status:", e);
+            toast.error("Dekont durumları alınırken beklenmedik bir hata oluştu.");
+            setMonthlyStatusData([]);
+        } finally {
+            setIsMonthlyStatusLoading(false);
+        }
+    };
+
     // ZIP all receipts grouped by month with new naming format
     const handleDownloadZip = async () => {
         setIsZipLoading(true);
@@ -549,7 +676,7 @@ function AdminBusinessReceiptsContent() {
             <Card>
                 <CardHeader className="flex items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-2xl font-bold">İşletme Dekontları (Yönetici)</CardTitle>
-                    <div className="flex space-x-2 items-center">
+                    <div className="flex space-x-2 items-center flex-wrap">
                         <Button
                             onClick={handleShowStudentsByClass}
                             variant="outline"
@@ -557,6 +684,14 @@ function AdminBusinessReceiptsContent() {
                         >
                             {isModalDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Sınıfa Göre Öğrencileri Göster
+                        </Button>
+                        <Button
+                            onClick={handleShowMonthlyReceiptStatus}
+                            variant="outline"
+                            disabled={isMonthlyStatusLoading}
+                        >
+                            {isMonthlyStatusLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Aylara Göre Dekont Durumu
                         </Button>
                         <Button
                             onClick={handleDownloadZip}
@@ -737,6 +872,12 @@ function AdminBusinessReceiptsContent() {
                 onOpenChange={setIsStudentsByClassModalOpen}
                 studentsByClass={studentsByClassData}
                 isLoading={isModalDataLoading}
+            />
+            <MonthlyReceiptStatusModal
+                isOpen={isMonthlyStatusModalOpen}
+                onOpenChange={setIsMonthlyStatusModalOpen}
+                studentStatuses={monthlyStatusData}
+                isLoading={isMonthlyStatusLoading}
             />
         </div>
     );

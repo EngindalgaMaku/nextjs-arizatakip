@@ -154,6 +154,108 @@ export async function getReceiptDownloadUrl(
   }
 }
 
+export interface StudentReceiptStatus {
+  student_id: string;
+  student_name: string;
+  student_school_number: string;
+  student_class_name: string;
+  monthly_status: {
+    [month: number]: {
+      has_receipt: boolean;
+      business_name?: string;
+      uploaded_at?: string;
+    };
+  };
+}
+
+export async function getStudentReceiptStatusByMonth(filters?: {
+  className?: string;
+  year?: number;
+}): Promise<{
+  data: StudentReceiptStatus[] | null;
+  error: string | null;
+}> {
+  const supabase = await createSupabaseServerClient();
+  
+  try {
+    const currentYear = new Date().getFullYear();
+    const targetYear = filters?.year || currentYear;
+    
+    // Akademik yıl ayları (Eylül-Haziran)
+    const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+    
+    // Önce tüm öğrencileri getir
+    let studentsQuery = supabase
+      .from('students')
+      .select('id, name, school_number, classes(name)')
+      .order('name');
+    
+    if (filters?.className) {
+      studentsQuery = studentsQuery.eq('classes.name', filters.className);
+    }
+    
+    const { data: students, error: studentsError } = await studentsQuery;
+    
+    if (studentsError) {
+      console.error('Error fetching students:', studentsError);
+      return { data: null, error: 'Öğrenciler alınırken hata oluştu: ' + studentsError.message };
+    }
+    
+    if (!students || students.length === 0) {
+      return { data: [], error: null };
+    }
+    
+    // Akademik yıla ait tüm dekontları getir
+    const { data: receipts, error: receiptsError } = await supabase
+      .from('admin_receipts_display')
+      .select('student_id, receipt_month, receipt_year, business_name, receipt_uploaded_at')
+      .or(
+        `and(receipt_year.eq.${targetYear},receipt_month.gte.9),` +
+        `and(receipt_year.eq.${targetYear + 1},receipt_month.lte.6)`
+      );
+    
+    if (receiptsError) {
+      console.error('Error fetching receipts:', receiptsError);
+      return { data: null, error: 'Dekontlar alınırken hata oluştu: ' + receiptsError.message };
+    }
+    
+    // Öğrenci dekont durumlarını oluştur
+    const studentReceiptStatuses: StudentReceiptStatus[] = students.map(student => {
+      const monthly_status: StudentReceiptStatus['monthly_status'] = {};
+      
+      // Her ay için varsayılan durum
+      academicMonths.forEach(month => {
+        monthly_status[month] = { has_receipt: false };
+      });
+      
+      // Öğrencinin dekontlarını kontrol et
+      receipts?.forEach(receipt => {
+        if (receipt.student_id === student.id && academicMonths.includes(receipt.receipt_month)) {
+          monthly_status[receipt.receipt_month] = {
+            has_receipt: true,
+            business_name: receipt.business_name || undefined,
+            uploaded_at: new Date(receipt.receipt_uploaded_at).toLocaleDateString('tr-TR')
+          };
+        }
+      });
+      
+      return {
+        student_id: student.id,
+        student_name: student.name,
+        student_school_number: student.school_number,
+        student_class_name: (student.classes as any)?.name || 'Sınıf Yok',
+        monthly_status
+      };
+    });
+    
+    return { data: studentReceiptStatuses, error: null };
+    
+  } catch (e: any) {
+    console.error('Unexpected error in getStudentReceiptStatusByMonth:', e);
+    return { data: null, error: 'Dekont durumları alınırken beklenmedik bir hata oluştu: ' + e.message };
+  }
+}
+
 // Schema for validating receipt update data
 const updateReceiptSchema = z.object({
   receiptId: z.string().min(1, "Dekont ID gereklidir."),
