@@ -205,14 +205,25 @@ export async function getStudentReceiptStatusByMonth(filters?: {
       return { data: [], error: null };
     }
     
-    // Akademik yıla ait tüm dekontları getir
+    // Akademik yıla ait tüm dekontları getir - önce receipts tablosundan direkt deneyelim
+    console.log('Dekont verileri aranıyor, yıl:', targetYear);
+    
     const { data: receipts, error: receiptsError } = await supabase
-      .from('admin_receipts_display')
-      .select('student_id, receipt_month, receipt_year, business_name, receipt_uploaded_at')
+      .from('receipts')
+      .select(`
+        student_id, 
+        month, 
+        year, 
+        updated_at,
+        staj_isletmesi:staj_isletmesi_id(name)
+      `)
       .or(
-        `and(receipt_year.eq.${targetYear},receipt_month.gte.9),` +
-        `and(receipt_year.eq.${targetYear + 1},receipt_month.lte.6)`
+        `and(year.eq.${targetYear},month.gte.9),` +
+        `and(year.eq.${targetYear + 1},month.lte.6)`
       );
+    
+    console.log('Bulunan dekont verileri:', receipts);
+    console.log('Dekont verileri hatası:', receiptsError);
     
     if (receiptsError) {
       console.error('Error fetching receipts:', receiptsError);
@@ -230,11 +241,11 @@ export async function getStudentReceiptStatusByMonth(filters?: {
       
       // Öğrencinin dekontlarını kontrol et
       receipts?.forEach(receipt => {
-        if (receipt.student_id === student.id && academicMonths.includes(receipt.receipt_month)) {
-          monthly_status[receipt.receipt_month] = {
+        if (receipt.student_id === student.id && academicMonths.includes(receipt.month)) {
+          monthly_status[receipt.month] = {
             has_receipt: true,
-            business_name: receipt.business_name || undefined,
-            uploaded_at: new Date(receipt.receipt_uploaded_at).toLocaleDateString('tr-TR')
+            business_name: receipt.staj_isletmesi?.[0]?.name || undefined,
+            uploaded_at: new Date(receipt.updated_at).toLocaleDateString('tr-TR')
           };
         }
       });

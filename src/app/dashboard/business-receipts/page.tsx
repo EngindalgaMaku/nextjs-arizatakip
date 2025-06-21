@@ -685,14 +685,7 @@ function AdminBusinessReceiptsContent() {
                             {isModalDataLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Sınıfa Göre Öğrencileri Göster
                         </Button>
-                        <Button
-                            onClick={handleShowMonthlyReceiptStatus}
-                            variant="outline"
-                            disabled={isMonthlyStatusLoading}
-                        >
-                            {isMonthlyStatusLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Aylara Göre Dekont Durumu
-                        </Button>
+
                         <Button
                             onClick={handleDownloadZip}
                             variant="outline"
