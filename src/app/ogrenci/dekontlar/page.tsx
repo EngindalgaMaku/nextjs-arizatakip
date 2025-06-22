@@ -362,8 +362,8 @@ function StudentReceiptDashboardContent() {
         setFormError(null);
       }
     } else {
-      // Dialog is closing. We are temporarily REMOVING setFormState(null) here to debug.
-      // setFormState(null); 
+      // Dialog is closing - Clear form state to prevent conflicts between edit and new receipt modes
+      setFormState(null); 
       setSelectedFile(null);
       setFormError(null);
     }
