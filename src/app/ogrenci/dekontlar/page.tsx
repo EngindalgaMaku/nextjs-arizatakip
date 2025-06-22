@@ -555,7 +555,11 @@ function StudentReceiptDashboardContent() {
             const receipt = receipts.find(r => r.month === month && r.year === yearForMonth);
 
             return (
-              <Card key={`${yearForMonth}-${month}`} className="h-full">
+              <Card 
+                key={`${yearForMonth}-${month}`} 
+                className={`h-full ${!receipt ? 'cursor-pointer hover:shadow-md transition-shadow duration-200' : ''}`}
+                onClick={!receipt ? () => openUploadForm(month, yearForMonth) : undefined}
+              >
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                     <div>
@@ -580,7 +584,10 @@ function StudentReceiptDashboardContent() {
                   {receipt ? (
                     <p className="text-sm text-gray-600 text-center py-4">Bu ayın dekontu sisteme yüklenmiştir.</p>
                   ) : (
-                    <p className="text-center py-4">Dekont bulunamadı.</p>
+                    <div className="text-center py-4">
+                      <p className="text-gray-600 mb-2">Dekont bulunamadı.</p>
+                      <p className="text-sm text-blue-600 font-medium">Dekont yüklemek için tıklayın</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
